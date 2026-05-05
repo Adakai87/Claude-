@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -110,40 +111,15 @@ let comments = [
 ];
 
 let notifications = [
-  {
-    id: 'n1', type: 'resonance', userId: '3', targetUserId: '1',
-    postId: '1', message: '@haru_05 さんがあなたの投稿に「共鳴」しました。',
-    read: false, createdAt: '2024-05-18T11:05:00Z',
-  },
-  {
-    id: 'n2', type: 'timeleap', userId: '2', targetUserId: '1',
-    postId: '1', message: 'あなたの声に、1970年代生まれの方が返信しました。',
-    read: false, createdAt: '2024-05-18T11:00:00Z',
-  },
-  {
-    id: 'n3', type: 'today', userId: null, targetUserId: '1',
-    postId: null, message: '今日の1通が更新されました。',
-    read: true, createdAt: '2024-05-18T08:00:00Z',
-  },
-  {
-    id: 'n4', type: 'follow', userId: '2', targetUserId: '1',
-    postId: null, message: '@mio_98 さんがあなたをフォローしました。',
-    read: true, createdAt: '2024-05-18T07:30:00Z',
-  },
-  {
-    id: 'n5', type: 'milestone', userId: null, targetUserId: '1',
-    postId: '5', message: 'あなたの投稿が100回共鳴されました！おめでとうございます🎉',
-    read: true, createdAt: '2024-05-18T05:00:00Z',
-  },
+  { id: 'n1', type: 'resonance', message: '@haru_05 さんがあなたの投稿に「共鳴」しました。', read: false, createdAt: '2024-05-18T11:05:00Z' },
+  { id: 'n2', type: 'timeleap',  message: 'あなたの声に、1970年代生まれの方が返信しました。', read: false, createdAt: '2024-05-18T11:00:00Z' },
+  { id: 'n3', type: 'today',     message: '今日の1通が更新されました。', read: true,  createdAt: '2024-05-18T08:00:00Z' },
+  { id: 'n4', type: 'follow',    message: '@mio_98 さんがあなたをフォローしました。', read: true,  createdAt: '2024-05-18T07:30:00Z' },
+  { id: 'n5', type: 'milestone', message: 'あなたの投稿が100回共鳴されました！おめでとうございます🎉', read: true, createdAt: '2024-05-18T05:00:00Z' },
 ];
 
 let timecapsules = [
-  {
-    id: 'tc1', userId: '1',
-    text: '3年後の自分へ。\nその時のあなたに、\n伝えたいことを。',
-    deliverAt: '2027-05-18', targetEra: 'future', status: 'pending',
-    createdAt: '2024-05-18T10:00:00Z',
-  },
+  { id: 'tc1', userId: '1', text: '3年後の自分へ。\nその時のあなたに、\n伝えたいことを。', deliverAt: '2027-05-18', targetEra: 'future', status: 'pending', createdAt: '2024-05-18T10:00:00Z' },
 ];
 
 const todayPost = {
@@ -158,10 +134,10 @@ const todayPost = {
   ],
 };
 
-// ── Routes ──────────────────────────────────────────────────
+// ── API Routes (/api/*) ─────────────────────────────────────
+const api = express.Router();
 
-// GET /posts
-app.get('/posts', (req, res) => {
+api.get('/posts', (req, res) => {
   const { type, tag, q, sort = 'new' } = req.query;
   let result = [...posts];
   if (type && type !== 'all') result = result.filter(p => p.type === type);
@@ -172,20 +148,17 @@ app.get('/posts', (req, res) => {
   res.json(result);
 });
 
-// GET /posts/:id
-app.get('/posts/:id', (req, res) => {
+api.get('/posts/:id', (req, res) => {
   const post = posts.find(p => p.id === req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   res.json(post);
 });
 
-// POST /posts
-app.post('/posts', (req, res) => {
+api.post('/posts', (req, res) => {
   const { text, era, ageLabel, birthYear, targetEra, tags, userId, username, name } = req.body;
   const newPost = {
-    id: uuidv4(), userId: userId || '1',
-    text, era, ageLabel, birthYear: birthYear || 1998,
-    targetEra: targetEra || 'all',
+    id: uuidv4(), userId: userId || '1', text, era, ageLabel,
+    birthYear: birthYear || 1998, targetEra: targetEra || 'all',
     tags: tags || [], resonances: 0, comments: 0, shares: 0,
     createdAt: new Date().toISOString(), type: 'now',
     username: username || 'mio_98', name: name || 'みお',
@@ -194,26 +167,22 @@ app.post('/posts', (req, res) => {
   res.status(201).json(newPost);
 });
 
-// POST /posts/:id/resonate
-app.post('/posts/:id/resonate', (req, res) => {
+api.post('/posts/:id/resonate', (req, res) => {
   const post = posts.find(p => p.id === req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   post.resonances += 1;
   res.json(post);
 });
 
-// GET /posts/:id/comments
-app.get('/posts/:id/comments', (req, res) => {
-  const postComments = comments.filter(c => c.postId === req.params.id);
-  res.json(postComments);
+api.get('/posts/:id/comments', (req, res) => {
+  res.json(comments.filter(c => c.postId === req.params.id));
 });
 
-// POST /comments
-app.post('/comments', (req, res) => {
+api.post('/comments', (req, res) => {
   const { postId, text, era, ageLabel, userId, username, name } = req.body;
   const newComment = {
-    id: uuidv4(), postId, userId: userId || '1',
-    text, era, ageLabel, username: username || 'mio_98', name: name || 'みお',
+    id: uuidv4(), postId, userId: userId || '1', text, era, ageLabel,
+    username: username || 'mio_98', name: name || 'みお',
     resonances: 0, createdAt: new Date().toISOString(),
   };
   comments.push(newComment);
@@ -222,62 +191,49 @@ app.post('/comments', (req, res) => {
   res.status(201).json(newComment);
 });
 
-// GET /users/:id
-app.get('/users/:id', (req, res) => {
+api.get('/users/:id', (req, res) => {
   const user = users.find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ error: 'Not found' });
-  const userPosts = posts.filter(p => p.userId === req.params.id);
-  res.json({ ...user, posts: userPosts });
+  res.json({ ...user, posts: posts.filter(p => p.userId === req.params.id) });
 });
 
-// GET /notifications
-app.get('/notifications', (req, res) => {
-  res.json(notifications);
-});
+api.get('/notifications', (req, res) => res.json(notifications));
 
-// POST /notifications/:id/read
-app.post('/notifications/:id/read', (req, res) => {
+api.post('/notifications/:id/read', (req, res) => {
   const n = notifications.find(n => n.id === req.params.id);
   if (n) n.read = true;
   res.json({ ok: true });
 });
 
-// GET /today
-app.get('/today', (req, res) => {
-  res.json(todayPost);
-});
+api.get('/today', (req, res) => res.json(todayPost));
 
-// GET /timecapsules
-app.get('/timecapsules', (req, res) => {
-  res.json(timecapsules.filter(tc => tc.userId === '1'));
-});
+api.get('/timecapsules', (req, res) => res.json(timecapsules.filter(tc => tc.userId === '1')));
 
-// POST /timecapsules
-app.post('/timecapsules', (req, res) => {
+api.post('/timecapsules', (req, res) => {
   const { text, deliverAt, targetEra } = req.body;
-  const tc = {
-    id: uuidv4(), userId: '1', text,
-    deliverAt, targetEra: targetEra || 'future',
-    status: 'pending', createdAt: new Date().toISOString(),
-  };
+  const tc = { id: uuidv4(), userId: '1', text, deliverAt, targetEra: targetEra || 'future', status: 'pending', createdAt: new Date().toISOString() };
   timecapsules.push(tc);
   res.status(201).json(tc);
 });
 
-// GET /tags/popular
-app.get('/tags/popular', (req, res) => {
-  const tags = [
-    { tag: '#将来のこと', count: 12345 },
-    { tag: '#恋愛', count: 8765 },
-    { tag: '#仕事', count: 9301 },
-    { tag: '#人生', count: 15679 },
-    { tag: '#夢', count: 6543 },
-    { tag: '#家族', count: 7890 },
-    { tag: '#モヤモヤ', count: 5432 },
-    { tag: '#感謝', count: 9001 },
-  ];
-  res.json(tags);
+api.get('/tags/popular', (req, res) => {
+  res.json([
+    { tag: '#将来のこと', count: 12345 }, { tag: '#恋愛', count: 8765 },
+    { tag: '#仕事', count: 9301 },        { tag: '#人生', count: 15679 },
+    { tag: '#夢', count: 6543 },          { tag: '#家族', count: 7890 },
+    { tag: '#モヤモヤ', count: 5432 },    { tag: '#感謝', count: 9001 },
+  ]);
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`KOE backend running on port ${PORT}`));
+app.use('/api', api);
+
+// ── Serve frontend static files ─────────────────────────────
+const distPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(distPath));
+app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+
+// ── Start ───────────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`KOE app running → http://localhost:${PORT}`);
+});
