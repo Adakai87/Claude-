@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: koe-app
+    runtime: node
+    rootDir: koe-app
+    buildCommand: cd backend && npm install
+    startCommand: node backend/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
