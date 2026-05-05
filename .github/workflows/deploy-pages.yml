@@ -1,8 +1,8 @@
-name: Deploy KOE App to GitHub Pages
+name: Enable and Deploy GitHub Pages
 
 on:
   push:
-    branches: [main, gh-pages]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,30 +10,21 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  enable-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout gh-pages content
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
+      - name: Enable GitHub Pages via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Enabling GitHub Pages..."
+          RESPONSE=$(gh api repos/${{ github.repository }}/pages \
+            -X POST \
+            --field source[branch]=gh-pages \
+            --field source[path]=/ \
+            2>&1) || true
+          echo "Response: $RESPONSE"
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          echo "Checking Pages status..."
+          gh api repos/${{ github.repository }}/pages 2>&1 || echo "Pages not yet available"
