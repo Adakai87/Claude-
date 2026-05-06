@@ -35,7 +35,7 @@ input,textarea,select{font:inherit;color:inherit}
   background:var(--bg);border-bottom:1px solid var(--bd);
   position:sticky;top:0;z-index:20;flex-shrink:0;
 }
-.tb-logo{font-size:20px;font-weight:900;color:var(--ac);letter-spacing:-1px;flex:1;text-align:center}
+.tb-logo{font-size:22px;font-weight:900;letter-spacing:.1em;flex:1;text-align:center;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .tb-title{font-size:16px;font-weight:700;flex:1;text-align:center}
 .ib{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .ib:active{background:var(--acl)}
@@ -53,9 +53,10 @@ input,textarea,select{font:inherit;color:inherit}
 /* ===== FAB ===== */
 #fab{
   position:absolute;right:16px;bottom:70px;z-index:30;
-  width:52px;height:52px;border-radius:50%;background:var(--ac);color:#fff;
-  font-size:22px;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 20px rgba(118,75,162,.45);
+  width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);
+  color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(102,126,234,.5);
 }
 #fab:active{transform:scale(.93)}
 
@@ -89,12 +90,18 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* ===== TAB BAR ===== */
 .tabbar{display:flex;background:var(--bg);border-bottom:1px solid var(--bd);flex-shrink:0}
-.tb{flex:1;padding:13px 0;font-size:13px;font-weight:600;color:var(--mu);text-align:center;border-bottom:3px solid transparent;transition:all .15s}
-.tb.on{color:var(--ac);border-bottom-color:var(--ac)}
+.tb{flex:1;padding:13px 0 10px;font-size:13px;font-weight:600;color:var(--mu);text-align:center;border-bottom:3px solid transparent;transition:all .15s;position:relative}
+.tb.on{color:var(--ac);border-bottom-color:transparent}
+.tb.on::after{content:'';position:absolute;bottom:0;left:15%;right:15%;height:3px;border-radius:2px;background:linear-gradient(90deg,#667EEA,#F093FB)}
 
 /* ===== POST CARD ===== */
-.pc{padding:14px 14px 10px;border-bottom:1px solid var(--bd);display:flex;gap:10px;position:relative;cursor:pointer}
-.pc:active{background:var(--acl)}
+.pc{
+  background:#fff;border-radius:16px;margin:8px 12px;padding:14px 16px 10px;
+  box-shadow:0 2px 8px rgba(102,126,234,.08);border:1px solid rgba(232,228,240,.6);
+  display:flex;gap:10px;position:relative;cursor:pointer;transition:transform .15s;
+}
+.pc:active{transform:scale(.98);background:#fff}
+.dark .pc{background:#1A1F2E;border-color:rgba(102,126,234,.12);box-shadow:0 2px 12px rgba(0,0,0,.3)}
 .pc-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:700}
 .pc-body{flex:1;min-width:0}
 .pc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
@@ -170,7 +177,7 @@ input,textarea,select{font:inherit;color:inherit}
 .empty-d{font-size:13px;color:var(--mu);line-height:1.65}
 
 /* ===== PROFILE ===== */
-.p-cover{height:110px;background:linear-gradient(135deg,#764BA2,#4A2080);flex-shrink:0}
+.p-cover{height:110px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);flex-shrink:0}
 .p-av-wrap{position:relative;margin-top:-36px;margin-left:14px;display:inline-block}
 .p-av{width:72px;height:72px;border-radius:50%;border:3px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700}
 .p-head{padding:10px 14px 14px;border-bottom:1px solid var(--bd)}
@@ -218,7 +225,7 @@ input,textarea,select{font:inherit;color:inherit}
 .rp-inp{flex:1;padding:9px 13px;border-radius:18px;background:var(--bg2);border:1.5px solid var(--bd);font-size:13px;color:var(--tx);resize:none;max-height:80px}
 .rp-inp:focus{outline:none;border-color:var(--ac)}
 .rp-inp::placeholder{color:var(--mu)}
-.rp-send{width:36px;height:36px;border-radius:50%;background:var(--ac);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rp-send{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#667EEA,#764BA2);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
 /* ===== COMPOSER ===== */
 #comp{
@@ -237,7 +244,7 @@ input,textarea,select{font:inherit;color:inherit}
 .ctag{font-size:11px;padding:4px 9px;border-radius:10px;background:var(--acl);color:var(--ac);font-weight:600;cursor:pointer}
 .comp-bot{padding:10px 14px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .cchar{font-size:12px;color:var(--mu);flex:1;text-align:right}
-.post-btn{padding:8px 20px;border-radius:20px;background:var(--ac);color:#fff;font-size:14px;font-weight:700}
+.post-btn{padding:8px 20px;border-radius:20px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:14px;font-weight:700;box-shadow:0 2px 10px rgba(102,126,234,.35)}
 .post-btn:disabled{opacity:.4}
 .comp-extra{padding:0 14px 10px}
 .cbox{background:var(--bg2);border-radius:12px;padding:14px;border:1.5px solid var(--bd)}
@@ -258,7 +265,7 @@ input,textarea,select{font:inherit;color:inherit}
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:36px 28px;overflow-y:auto;
 }
-.l-logo{font-size:52px;font-weight:900;color:var(--ac);letter-spacing:-3px;margin-bottom:8px}
+.l-logo{font-size:52px;font-weight:900;letter-spacing:-1px;margin-bottom:8px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .l-tag{font-size:14px;color:var(--mu);text-align:center;line-height:1.65;margin-bottom:44px}
 .l-form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:18px}
 .lbl{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:5px;display:block}
@@ -267,7 +274,7 @@ input,textarea,select{font:inherit;color:inherit}
 .lsel{width:100%;padding:13px 15px;border-radius:12px;background:var(--bg2);border:1.5px solid var(--bd);font-size:15px;color:var(--tx);cursor:pointer}
 .lsel:focus{outline:none;border-color:var(--ac)}
 .l-info{background:var(--acl);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--ac);line-height:1.65}
-.l-btn{width:100%;padding:15px;border-radius:26px;background:var(--ac);color:#fff;font-size:16px;font-weight:700;margin-top:6px}
+.l-btn{width:100%;padding:15px;border-radius:26px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:16px;font-weight:700;margin-top:6px;box-shadow:0 4px 16px rgba(102,126,234,.4)}
 .l-btn:disabled{opacity:.35}
 .l-note{font-size:11px;color:var(--mu);text-align:center;line-height:1.65}
 
@@ -289,7 +296,7 @@ input,textarea,select{font:inherit;color:inherit}
 .dark .ls-banner h2{color:#C4B5FD}
 .ls-banner p{font-size:12px;color:#4C1D95;line-height:1.65}
 .dark .ls-banner p{color:#A78BFA}
-.cs-btn{margin:0 14px 14px;display:block;width:calc(100% - 28px);padding:13px;border-radius:12px;background:var(--ac);color:#fff;font-size:14px;font-weight:700;text-align:center}
+.cs-btn{margin:0 14px 14px;display:block;width:calc(100% - 28px);padding:13px;border-radius:12px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:14px;font-weight:700;text-align:center;box-shadow:0 4px 14px rgba(102,126,234,.35)}
 
 /* ===== BOTTOM SHEET ===== */
 .bso{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:250;display:flex;align-items:flex-end}
@@ -322,6 +329,39 @@ input,textarea,select{font:inherit;color:inherit}
 }
 .dark #toast{background:#E2D9F3;color:#1A1A2E}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== TODAY BANNER ===== */
+.today-banner{
+  margin:10px 12px 4px;
+  background:linear-gradient(135deg,#1A1A2E,#16213E,#0F3460,#533483);
+  border-radius:18px;padding:22px 20px;position:relative;overflow:hidden;cursor:pointer;
+}
+.today-banner:active{opacity:.9}
+.today-star{position:absolute;color:rgba(255,255,255,.5);line-height:1;pointer-events:none}
+.today-from-tag{display:inline-block;padding:4px 12px;background:rgba(255,255,255,.12);border-radius:20px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,.85);font-weight:500}
+.today-text{font-size:22px;font-weight:700;color:#fff;line-height:1.6;white-space:pre-line;margin-bottom:16px}
+.today-hint{font-size:13px;color:rgba(255,255,255,.55);font-style:italic}
+.today-actions{display:none;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+.today-act-btn{padding:9px 18px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer}
+.today-act-like{background:rgba(240,147,251,.25);color:#fff;border:none}
+.today-act-share{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3)}
+
+/* ===== AGE FILTER CHIPS ===== */
+.age-filter-bar{
+  display:flex;gap:8px;padding:8px 12px;overflow-x:auto;background:var(--bg);
+  border-bottom:1px solid var(--bd);flex-shrink:0;align-items:center;
+}
+.age-filter-bar::-webkit-scrollbar{display:none}
+.age-filter-label{font-size:11px;color:var(--mu);font-weight:600;white-space:nowrap;flex-shrink:0}
+.afc{padding:5px 13px;border-radius:14px;font-size:12px;font-weight:600;border:1.5px solid var(--bd);color:var(--mu);white-space:nowrap;flex-shrink:0;transition:all .15s}
+.afc.on{background:linear-gradient(135deg,#667EEA,#764BA2);color:#fff;border-color:transparent}
+
+/* ===== SECTION HEADER (special) ===== */
+.sh-special{
+  padding:8px 14px;font-size:11px;font-weight:700;color:rgba(255,255,255,.8);
+  background:linear-gradient(90deg,#533483,#764BA2);
+  letter-spacing:.4px;
+}
 
 /* ===== ANIM ===== */
 @keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -446,6 +486,14 @@ input,textarea,select{font:inherit;color:inherit}
   <div class="sa">
     <div class="set-sec-t">表示</div>
     <div class="set-row"><span class="ico">🌙</span><span class="set-lbl">ダークモード</span><div class="tgl" id="dark-tgl" onclick="toggleDark()"></div></div>
+    <div class="set-row"><span class="ico">👥</span><span class="set-lbl">同世代タイムラインの範囲</span>
+      <select id="age-range-sel" onchange="setAgeRange(parseInt(this.value))" style="padding:5px 8px;border-radius:8px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-size:12px;font-weight:600">
+        <option value="3">±3歳</option>
+        <option value="5" selected>±5歳</option>
+        <option value="10">±10歳</option>
+        <option value="999">全世代</option>
+      </select>
+    </div>
     <div class="set-row"><span class="ico">🔤</span><span class="set-lbl">文字サイズ</span><span class="set-val">標準</span></div>
     <div class="set-sec-t">通知</div>
     <div class="set-row"><span class="ico">💬</span><span class="set-lbl">返信・コメント</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
@@ -705,6 +753,23 @@ let cTags = [];
 let cYear = YR + 10;
 let cAge = 20;
 let darkOn = false;
+let todayRevealed = false;
+
+// 年齢フィルター設定
+const AGE_FILTER = { range: 5, tempRange: null };
+function getAgeRange(){ return AGE_FILTER.tempRange !== null ? AGE_FILTER.tempRange : AGE_FILTER.range; }
+function setAgeRange(v){
+  AGE_FILTER.range = v;
+  AGE_FILTER.tempRange = null;
+  const sel = document.getElementById('age-range-sel');
+  if(sel) sel.value = v;
+  if(hTab === 'same') renderHome();
+  showToast(`同世代の範囲を±${v === 999 ? '全世代' : v+'歳'}に設定しました`);
+}
+function setTempAgeRange(v){
+  AGE_FILTER.tempRange = (AGE_FILTER.tempRange === v) ? null : v;
+  renderHome();
+}
 
 // =====================================================
 // UTILS
@@ -824,25 +889,67 @@ function renderHome(){
   else renderCompare(cmpTopic);
 }
 
+function todayBannerHTML(){
+  const revealed = todayRevealed;
+  return `<div class="today-banner" onclick="revealToday(this)">
+    <div class="today-star" style="top:14%;right:10%;font-size:18px">✦</div>
+    <div class="today-star" style="bottom:22%;left:7%;font-size:11px;opacity:.5">✦</div>
+    <div class="today-star" style="top:55%;right:5%;font-size:9px;opacity:.4">✦</div>
+    <div class="today-from-tag">1970年代生まれ・50代より</div>
+    <div class="today-text">「大丈夫。\nなんとかなるよ、\nきっと。」</div>
+    ${revealed
+      ? `<div class="today-actions">
+          <button class="today-act-btn today-act-like" onclick="event.stopPropagation();showToast('共鳴しました ❤️')">❤️ 共鳴する</button>
+          <button class="today-act-btn today-act-share" onclick="event.stopPropagation();showToast('シェアしました 📤')">シェア</button>
+        </div>`
+      : `<div class="today-hint" id="today-hint">タップして開く</div>`
+    }
+  </div>`;
+}
+
+function revealToday(el){
+  todayRevealed = true;
+  renderHome();
+}
+
 function renderMainTL(){
   if(!ME){document.getElementById('home-content').innerHTML='';return;}
-  const myGen=gLabel(ME.by);
-  const same=POSTS.filter(p=>p.ptype==='post'&&gLabel(p.by)===myGen);
-  const special=POSTS.filter(p=>p.ptype==='capsule'||p.ptype==='letter');
-  const other=POSTS.filter(p=>p.ptype==='post'&&gLabel(p.by)!==myGen);
-  let h='';
+  const range = AGE_FILTER.range;
+  const myAge = ME.age;
+  // 同世代フィルター（メインTLはrangeベース）
+  const same = POSTS.filter(p => p.ptype==='post' && (range===999 ? true : Math.abs((YR-p.by)-myAge)<=range));
+  const special = POSTS.filter(p=>p.ptype==='capsule'||p.ptype==='letter');
+  const other = POSTS.filter(p=>p.ptype==='post' && !(range===999 ? false : Math.abs((YR-p.by)-myAge)<=range));
+  let h = todayBannerHTML();
   same.forEach(p=>{h+=pCard(p);});
-  if(special.length){h+=`<div class="sh">✨ タイムラインに届いた声</div>`;special.forEach(p=>{h+=pCard(p);});}
+  if(special.length){h+=`<div class="sh-special">✨ タイムラインに届いた声</div>`;special.forEach(p=>{h+=pCard(p);});}
   if(other.length){h+=`<div class="sh">🌍 他の世代から</div>`;other.forEach(p=>{h+=pCard(p);});}
   document.getElementById('home-content').innerHTML=h;
 }
 
 function renderSameTL(){
   if(!ME){document.getElementById('home-content').innerHTML='';return;}
-  const myGen=gLabel(ME.by);
-  const posts=POSTS.filter(p=>gLabel(p.by)===myGen);
-  let h=`<div class="sh">👥 ${myGen}の声</div>`;
-  h+=posts.length?posts.map(pCard).join(''):emptyState('🔍','投稿がありません','同世代の投稿がまだありません');
+  const range = getAgeRange();
+  const myAge = ME.age;
+  const rangeLabel = range === 999 ? '全世代' : `±${range}歳`;
+  const tempRange = AGE_FILTER.tempRange;
+
+  // フィルターチップ
+  const filterChips = [3, 5, 10, 999].map(v => {
+    const label = v === 999 ? '全世代' : `±${v}歳`;
+    const isOn = tempRange !== null ? tempRange === v : (tempRange === null && AGE_FILTER.range === v);
+    return `<button class="afc${isOn?' on':''}" onclick="setTempAgeRange(${v})">${label}</button>`;
+  }).join('');
+
+  const posts = POSTS.filter(p => {
+    if(range === 999) return true;
+    return Math.abs((YR - p.by) - myAge) <= range;
+  });
+
+  const myAgeStr = `${myAge}歳前後（${rangeLabel}）`;
+  let h = `<div class="age-filter-bar"><span class="age-filter-label">表示範囲：</span>${filterChips}</div>`;
+  h += `<div class="sh">👥 ${myAgeStr}の声</div>`;
+  h += posts.length ? posts.map(pCard).join('') : emptyState('🔍','投稿がありません',`${rangeLabel}の投稿がまだありません`);
   document.getElementById('home-content').innerHTML=h;
 }
 
@@ -904,7 +1011,7 @@ function pCard(p){
       <div class="pc-top">
         <div class="pc-name">
           ${p.name}
-          <span class="gbadge" style="background:${col}22;color:${col}">${gen}</span>
+          <span class="gbadge" style="background:${col}22;color:${col}">${p.by}年生まれ</span>
           ${FOLLOWS.has(p.un)?'<span style="font-size:10px;color:var(--mu)">フォロー中</span>':''}
         </div>
         <button class="ib" style="width:30px;height:30px;font-size:14px" onclick="event.stopPropagation();openOpts('${p.id}')">•••</button>
