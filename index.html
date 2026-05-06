@@ -166,7 +166,7 @@ input,textarea,select{font:inherit;color:inherit}
 .nitem{padding:13px 14px;border-bottom:1px solid var(--bd);display:flex;gap:10px;cursor:pointer}
 .nitem:active{background:var(--acl)}
 .nitem.unr{background:var(--acl)}
-.n-ico{font-size:22px;flex-shrink:0;width:36px;text-align:center}
+.n-ico{flex-shrink:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--ac)}
 .n-text{font-size:13px;line-height:1.5;flex:1}
 .n-time{font-size:11px;color:var(--mu);margin-top:3px}
 
@@ -387,7 +387,7 @@ input,textarea,select{font:inherit;color:inherit}
     <div>
       <label class="lbl">生まれ年（KOEでのアイデンティティ）</label>
       <select class="lsel" id="l-year" onchange="loginYearChange()"></select>
-      <div class="l-info" id="l-info" style="display:none;margin-top:8px">📍 生まれ年を選択しました</div>
+      <div class="l-info" id="l-info" style="display:none;margin-top:8px">生まれ年を選択しました</div>
     </div>
     <div>
       <label class="lbl">自己紹介（任意）</label>
@@ -402,7 +402,7 @@ input,textarea,select{font:inherit;color:inherit}
 <div id="sbo" onclick="sbClose()">
   <div id="sb" onclick="event.stopPropagation()">
     <div class="sb-head">
-      <div class="sb-av" id="sb-av">😊</div>
+      <div class="sb-av" id="sb-av"></div>
       <div class="sb-name" id="sb-name">-</div>
       <div class="sb-sub" id="sb-sub">-</div>
       <div class="sb-stats">
@@ -411,17 +411,17 @@ input,textarea,select{font:inherit;color:inherit}
       </div>
     </div>
     <div class="sb-list">
-      <button class="si" onclick="nav('home');sbClose()"><span class="ico">🏠</span>ホーム</button>
-      <button class="si" onclick="nav('search');sbClose()"><span class="ico">🔍</span>検索</button>
-      <button class="si" onclick="nav('notif');sbClose()"><span class="ico">🔔</span>通知</button>
-      <button class="si" onclick="nav('bm');sbClose()"><span class="ico">🔖</span>ブックマーク</button>
-      <button class="si" onclick="nav('profile');sbClose()"><span class="ico">👤</span>プロフィール</button>
+      <button class="si" onclick="nav('home');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>ホーム</button>
+      <button class="si" onclick="nav('search');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>検索</button>
+      <button class="si" onclick="nav('notif');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>通知</button>
+      <button class="si" onclick="nav('bm');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>ブックマーク</button>
+      <button class="si" onclick="nav('profile');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>プロフィール</button>
       <div class="sdiv"></div>
-      <button class="si" onclick="openCapsScreen();sbClose()"><span class="ico">📅</span>タイムカプセル</button>
-      <button class="si" onclick="openLettScreen();sbClose()"><span class="ico">✉️</span>過去への手紙</button>
+      <button class="si" onclick="openCapsScreen();sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>タイムカプセル</button>
+      <button class="si" onclick="openLettScreen();sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>過去への手紙</button>
       <div class="sdiv"></div>
-      <button class="si" onclick="nav('settings');sbClose()"><span class="ico">⚙️</span>設定</button>
-      <button class="si red" onclick="doLogout()"><span class="ico">🚪</span>ログアウト</button>
+      <button class="si" onclick="nav('settings');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg></span>設定</button>
+      <button class="si red" onclick="doLogout()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>ログアウト</button>
     </div>
   </div>
 </div>
@@ -429,9 +429,9 @@ input,textarea,select{font:inherit;color:inherit}
 <!-- ========== HOME ========== -->
 <div class="screen active" id="screen-home">
   <div class="topbar">
-    <button class="ib" onclick="sbOpen()">☰</button>
+    <button class="ib" onclick="sbOpen()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="tb-logo">KOE</div>
-    <button class="ib" onclick="showToast('更新しました ✓')">🔄</button>
+    <button class="ib" onclick="showToast('更新しました')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
   <div class="tabbar">
     <button class="tb on" id="ht-home" onclick="switchHTab('home',this)">ホーム</button>
@@ -472,7 +472,7 @@ input,textarea,select{font:inherit;color:inherit}
   <div class="topbar">
     <button class="ib" onclick="nav('home')">←</button>
     <div class="tb-title">プロフィール</div>
-    <button class="ib" onclick="openEditProfile()">✏️</button>
+    <button class="ib" onclick="openEditProfile()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
   <div class="sa" id="profile-body"></div>
 </div>
@@ -485,8 +485,8 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
   <div class="sa">
     <div class="set-sec-t">表示</div>
-    <div class="set-row"><span class="ico">🌙</span><span class="set-lbl">ダークモード</span><div class="tgl" id="dark-tgl" onclick="toggleDark()"></div></div>
-    <div class="set-row"><span class="ico">👥</span><span class="set-lbl">同世代タイムラインの範囲</span>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="set-lbl">ダークモード</span><div class="tgl" id="dark-tgl" onclick="toggleDark()"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">同世代タイムラインの範囲</span>
       <select id="age-range-sel" onchange="setAgeRange(parseInt(this.value))" style="padding:5px 8px;border-radius:8px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-size:12px;font-weight:600">
         <option value="3">±3歳</option>
         <option value="5" selected>±5歳</option>
@@ -494,36 +494,54 @@ input,textarea,select{font:inherit;color:inherit}
         <option value="999">全世代</option>
       </select>
     </div>
-    <div class="set-row"><span class="ico">🔤</span><span class="set-lbl">文字サイズ</span><span class="set-val">標準</span></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><polyline points="4 7 4 4 20 4 20 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="20" x2="15" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">文字サイズ</span><span class="set-val">標準</span></div>
     <div class="set-sec-t">通知</div>
-    <div class="set-row"><span class="ico">💬</span><span class="set-lbl">返信・コメント</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
-    <div class="set-row"><span class="ico">📅</span><span class="set-lbl">タイムカプセル到着</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
-    <div class="set-row"><span class="ico">✉️</span><span class="set-lbl">過去への手紙</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
-    <div class="set-row"><span class="ico">👤</span><span class="set-lbl">フォロー通知</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="set-lbl">返信・コメント</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">タイムカプセル到着</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">過去への手紙</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="set-lbl">フォロー通知</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
     <div class="set-sec-t">プライバシー</div>
-    <div class="set-row"><span class="ico">🔒</span><span class="set-lbl">非公開アカウント</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
-    <div class="set-row"><span class="ico">🛡️</span><span class="set-lbl">センシティブコンテンツ非表示</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">非公開アカウント</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="set-lbl">センシティブコンテンツ非表示</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
     <div class="set-sec-t">アカウント</div>
-    <div class="set-row" onclick="openEditProfile()"><span class="ico">✏️</span><span class="set-lbl">プロフィール編集</span><span class="set-val">›</span></div>
-    <div class="set-row" onclick="showToast('準備中です')"><span class="ico">📱</span><span class="set-lbl">連携アプリ</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="openEditProfile()"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="set-lbl">プロフィール編集</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg></span><span class="set-lbl">連携アプリ</span><span class="set-val">›</span></div>
     <div class="set-sec-t">サポート</div>
-    <div class="set-row" onclick="showToast('準備中です')"><span class="ico">❓</span><span class="set-lbl">ヘルプ</span><span class="set-val">›</span></div>
-    <div class="set-row" onclick="showToast('準備中です')"><span class="ico">📝</span><span class="set-lbl">利用規約・プライバシー</span><span class="set-val">›</span></div>
-    <div class="set-row" onclick="showToast('KOE v3.0.0')"><span class="ico">ℹ️</span><span class="set-lbl">バージョン情報</span><span class="set-val">3.0.0</span></div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg></span><span class="set-lbl">ヘルプ</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">利用規約・プライバシー</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('KOE v3.0.0')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></span><span class="set-lbl">バージョン情報</span><span class="set-val">3.0.0</span></div>
   </div>
 </div>
 
 <!-- ========== BOTTOM NAV ========== -->
 <div id="bnav" style="display:none">
-  <button class="ni on" data-n="home" onclick="nav('home')"><div class="ni-ico">🏠</div><div>ホーム</div></button>
-  <button class="ni" data-n="search" onclick="nav('search')"><div class="ni-ico">🔍</div><div>検索</div></button>
-  <button class="ni" data-n="notif" onclick="nav('notif')"><div class="ni-ico">🔔</div><div>通知</div><div class="nbadge" id="nbadge">3</div></button>
-  <button class="ni" data-n="bm" onclick="nav('bm')"><div class="ni-ico">🔖</div><div>保存</div></button>
-  <button class="ni" data-n="profile" onclick="nav('profile')"><div class="ni-ico">👤</div><div>自分</div></button>
+  <button class="ni on" data-n="home" onclick="nav('home')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div>ホーム</div>
+  </button>
+  <button class="ni" data-n="search" onclick="nav('search')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>検索</div>
+  </button>
+  <button class="ni" data-n="notif" onclick="nav('notif')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>通知</div>
+    <div class="nbadge" id="nbadge">3</div>
+  </button>
+  <button class="ni" data-n="bm" onclick="nav('bm')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div>保存</div>
+  </button>
+  <button class="ni" data-n="profile" onclick="nav('profile')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>自分</div>
+  </button>
 </div>
 
 <!-- ========== FAB ========== -->
-<button id="fab" style="display:none" onclick="openComp()">✏️</button>
+<button id="fab" style="display:none" onclick="openComp()">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.2" stroke-linecap="round"/></svg>
+</button>
 
 <!-- ========== COMPOSER ========== -->
 <div id="comp">
@@ -533,7 +551,7 @@ input,textarea,select{font:inherit;color:inherit}
     <button class="post-btn" id="post-btn" disabled onclick="submitPost()">投稿</button>
   </div>
   <div class="comp-body">
-    <div class="comp-av" id="comp-av">😊</div>
+    <div class="comp-av" id="comp-av"></div>
     <div class="comp-r">
       <div class="comp-who" id="comp-who"></div>
       <textarea id="ctxt" placeholder="いまどんなこと思ってる？" oninput="compInput()" rows="5"></textarea>
@@ -542,9 +560,9 @@ input,textarea,select{font:inherit;color:inherit}
   </div>
   <div class="comp-extra" id="comp-extra"></div>
   <div class="comp-bot">
-    <button onclick="addTag()" style="font-size:20px;color:var(--ac)" title="タグ追加">🏷️</button>
-    <button onclick="setCapsMode()" style="font-size:20px;color:#F59E0B" title="タイムカプセル">📅</button>
-    <button onclick="setLettMode()" style="font-size:20px;color:#A78BFA" title="過去への手紙">✉️</button>
+    <button onclick="addTag()" style="color:var(--ac)" title="タグ追加"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg></button>
+    <button onclick="setCapsMode()" style="color:#F59E0B" title="タイムカプセル"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button onclick="setLettMode()" style="color:#A78BFA" title="過去への手紙"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="cchar" id="cchar">140</div>
   </div>
 </div>
@@ -553,11 +571,11 @@ input,textarea,select{font:inherit;color:inherit}
 <div id="caps-screen">
   <div class="topbar">
     <button class="ib" onclick="closeCapsScreen()">←</button>
-    <div class="tb-title">📅 タイムカプセル</div>
+    <div class="tb-title">タイムカプセル</div>
   </div>
   <div class="sa">
     <div class="cs-banner">
-      <h2>📅 タイムカプセルとは？</h2>
+      <h2>タイムカプセルとは？</h2>
       <p>未来の日付に届くメッセージ。届いた時、<strong>2か所</strong>に表示されます：<br><br>
       ① 未来の自分のタイムライン<br>
       ② 設定した年に、<strong>あなたと同じ年齢の人たちのタイムライン</strong><br><br>
@@ -573,18 +591,18 @@ input,textarea,select{font:inherit;color:inherit}
 <div id="lett-screen">
   <div class="topbar">
     <button class="ib" onclick="closeLettScreen()">←</button>
-    <div class="tb-title">✉️ 過去への手紙</div>
+    <div class="tb-title">過去への手紙</div>
   </div>
   <div class="sa">
     <div class="ls-banner">
-      <h2>✉️ 過去への手紙とは？</h2>
+      <h2>過去への手紙とは？</h2>
       <p>若いころ知りたかったこと、経験から学んだことを届けよう。<br><br>
       手紙は<strong>指定した年齢の人たちのタイムライン</strong>に表示されます。<br><br>
       例：「20歳の頃の自分へ」と書けば、今20歳の人たちに届きます。</p>
     </div>
     <div class="sh">届いた手紙</div>
     <div id="lett-list"></div>
-    <button class="cs-btn" style="background:#764BA2" onclick="closeLettScreen();openComp();setLettMode()">✉️ 手紙を書く</button>
+    <button class="cs-btn" style="background:#764BA2" onclick="closeLettScreen();openComp();setLettMode()">手紙を書く</button>
   </div>
 </div>
 
@@ -609,10 +627,10 @@ const POSTS = [
    text:'50代になって気づいたこと。\n人生、急がなくていい。\n回り道が、一番いい道だったりする。',
    ptype:'post',tags:['#人生','#50代の気づき'],res:341,cmt:56,rp:89,ts:'3時間前'},
   {id:'p4',name:'はな',un:'hana_85',by:1985,
-   text:'28歳の自分へ。\n今の不安は全部、あとで笑い話になるよ。\n大丈夫。ちゃんと前に進んでる。',
+   text:'未来の自分へ。今28歳。\n毎日不安だけど、ちゃんと前に進んでるはず。\n数年後の私、どうなってるかな。',
    ptype:'capsule',writtenYr:2013,deliverYr:2026,tags:['#タイムカプセル'],res:512,cmt:41,rp:127,ts:'届きました'},
   {id:'p5',name:'けんじ',un:'kenji_80',by:1980,
-   text:'未来の自分へ。今46歳。\nあの頃悩んでいたことは、全部乗り越えてきた。\n君も絶対乗り越えられる。',
+   text:'未来の自分へ。今27歳。\n仕事も恋愛もなにもうまくいかない。\nでも、先の自分を信じたい。ちゃんとなれてるかな。',
    ptype:'capsule',writtenYr:2007,deliverYr:2026,tags:['#タイムカプセル'],res:298,cmt:33,rp:76,ts:'届きました'},
   {id:'p6',name:'あかり',un:'akari_82',by:1982,
    text:'20歳の君へ。\n恋愛に悩みすぎないで。\n人は出会いと別れを繰り返しながら、\n自分の芯をつくっていくから。',
@@ -723,14 +741,23 @@ const GEN_TRENDS = [
   {gen:'60代',col:'#F59E0B',tags:['#シニアライフ','#孫','#健康']},
 ];
 
+const N_ICO = {
+  chat:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  rp:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  caps:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  heart:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#EF4444"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="#EF4444" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  user:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>',
+  mail:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  bell:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+};
 const NOTIFS = [
-  {id:'n1',ico:'💬',msg:'<strong>みお</strong>さんがあなたの投稿に返信しました',time:'5分前',unr:true},
-  {id:'n2',ico:'🔁',msg:'<strong>そら</strong>さんがあなたの投稿をリポストしました',time:'20分前',unr:true},
-  {id:'n3',ico:'📅',msg:'タイムカプセルが届きました！<strong>2013年</strong>のあなたからのメッセージです',time:'1時間前',unr:true},
-  {id:'n4',ico:'❤️',msg:'<strong>たかし</strong>さんがあなたの投稿をいいねしました',time:'2時間前',unr:false},
-  {id:'n5',ico:'👤',msg:'<strong>なな</strong>さんがあなたをフォローしました',time:'3時間前',unr:false},
-  {id:'n6',ico:'✉️',msg:'<strong>50代からの手紙</strong>があなたのタイムラインに届きました',time:'5時間前',unr:false},
-  {id:'n7',ico:'🔔',msg:'同世代の<strong>#転職</strong>が今週トレンド入りしています',time:'8時間前',unr:false},
+  {id:'n1',ico:N_ICO.chat,msg:'<strong>みお</strong>さんがあなたの投稿に返信しました',time:'5分前',unr:true},
+  {id:'n2',ico:N_ICO.rp,msg:'<strong>そら</strong>さんがあなたの投稿をリポストしました',time:'20分前',unr:true},
+  {id:'n3',ico:N_ICO.caps,msg:'タイムカプセルが届きました！<strong>2013年</strong>のあなたからのメッセージです',time:'1時間前',unr:true},
+  {id:'n4',ico:N_ICO.heart,msg:'<strong>たかし</strong>さんがあなたの投稿をいいねしました',time:'2時間前',unr:false},
+  {id:'n5',ico:N_ICO.user,msg:'<strong>なな</strong>さんがあなたをフォローしました',time:'3時間前',unr:false},
+  {id:'n6',ico:N_ICO.mail,msg:'<strong>50代からの手紙</strong>があなたのタイムラインに届きました',time:'5時間前',unr:false},
+  {id:'n7',ico:N_ICO.bell,msg:'同世代の<strong>#転職</strong>が今週トレンド入りしています',time:'8時間前',unr:false},
 ];
 
 const CMTS = {
@@ -764,7 +791,7 @@ function setAgeRange(v){
   const sel = document.getElementById('age-range-sel');
   if(sel) sel.value = v;
   if(hTab === 'same') renderHome();
-  showToast(`同世代の範囲を±${v === 999 ? '全世代' : v+'歳'}に設定しました`);
+  showToast(`同世代の範囲を${v === 999 ? '全世代' : '±'+v+'歳'}に設定しました`);
 }
 function setTempAgeRange(v){
   AGE_FILTER.tempRange = (AGE_FILTER.tempRange === v) ? null : v;
@@ -812,7 +839,7 @@ function loginYearChange(){
   if(y){
     const age=YR-parseInt(y);
     info.style.display='block';
-    info.innerHTML=`📍 ${y}年生まれ・${age}歳（${gLabel(parseInt(y))}）<br>同世代タイムラインに${gLabel(parseInt(y))}の声が届きます`;
+    info.innerHTML=`${y}年生まれ・${age}歳（${gLabel(parseInt(y))}）<br>同世代タイムラインに${gLabel(parseInt(y))}の声が届きます`;
   } else { info.style.display='none'; }
   loginCheck();
 }
@@ -899,8 +926,8 @@ function todayBannerHTML(){
     <div class="today-text">「大丈夫。\nなんとかなるよ、\nきっと。」</div>
     ${revealed
       ? `<div class="today-actions">
-          <button class="today-act-btn today-act-like" onclick="event.stopPropagation();showToast('共鳴しました ❤️')">❤️ 共鳴する</button>
-          <button class="today-act-btn today-act-share" onclick="event.stopPropagation();showToast('シェアしました 📤')">シェア</button>
+          <button class="today-act-btn today-act-like" onclick="event.stopPropagation();showToast('共鳴しました')">共鳴する</button>
+          <button class="today-act-btn today-act-share" onclick="event.stopPropagation();showToast('シェアしました')">シェア</button>
         </div>`
       : `<div class="today-hint" id="today-hint">タップして開く</div>`
     }
@@ -922,8 +949,8 @@ function renderMainTL(){
   const other = POSTS.filter(p=>p.ptype==='post' && !(range===999 ? false : Math.abs((YR-p.by)-myAge)<=range));
   let h = todayBannerHTML();
   same.forEach(p=>{h+=pCard(p);});
-  if(special.length){h+=`<div class="sh-special">✨ タイムラインに届いた声</div>`;special.forEach(p=>{h+=pCard(p);});}
-  if(other.length){h+=`<div class="sh">🌍 他の世代から</div>`;other.forEach(p=>{h+=pCard(p);});}
+  if(special.length){h+=`<div class="sh-special">タイムラインに届いた声</div>`;special.forEach(p=>{h+=pCard(p);});}
+  if(other.length){h+=`<div class="sh">他の世代から</div>`;other.forEach(p=>{h+=pCard(p);});}
   document.getElementById('home-content').innerHTML=h;
 }
 
@@ -948,8 +975,8 @@ function renderSameTL(){
 
   const myAgeStr = `${myAge}歳前後（${rangeLabel}）`;
   let h = `<div class="age-filter-bar"><span class="age-filter-label">表示範囲：</span>${filterChips}</div>`;
-  h += `<div class="sh">👥 ${myAgeStr}の声</div>`;
-  h += posts.length ? posts.map(pCard).join('') : emptyState('🔍','投稿がありません',`${rangeLabel}の投稿がまだありません`);
+  h += `<div class="sh">${myAgeStr}の声</div>`;
+  h += posts.length ? posts.map(pCard).join('') : emptyState('','投稿がありません',`${rangeLabel}の投稿がまだありません`);
   document.getElementById('home-content').innerHTML=h;
 }
 
@@ -998,10 +1025,10 @@ function pCard(p){
   let banner='';
   let extra='';
   if(p.ptype==='capsule'){
-    const ya=p.writtenYr?YR-p.writtenYr:13;
-    banner=`<div class="cbanner">📅 タイムカプセルが届きました・${ya}年前に投稿</div>`;
+    const ageAtWrite = p.writtenYr && p.by ? p.writtenYr-p.by : null;
+    banner=`<div class="cbanner">${ageAtWrite?ageAtWrite+'歳のときに書かれたカプセル':'タイムカプセル'}</div>`;
   } else if(p.ptype==='letter'){
-    banner=`<div class="lbanner">✉️ 過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
+    banner=`<div class="lbanner">過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
   }
   const tags=(p.tags||[]).map(t=>`<span class="ptag">${t}</span>`).join('');
   return `<div class="pc fu" onclick="openDetail('${p.id}')">
@@ -1020,11 +1047,11 @@ function pCard(p){
       <div class="pc-text">${p.text.replace(/\n/g,'<br>')}</div>
       ${tags?`<div class="pc-tags">${tags}</div>`:''}
       <div class="pc-acts">
-        <button class="pa" onclick="event.stopPropagation();openDetail('${p.id}')"><span class="pi">💬</span>${p.cmt}</button>
-        <button class="pa" onclick="event.stopPropagation();openRP('${p.id}')"><span class="pi">🔁</span>${p.rp}</button>
-        <button class="pa${liked?' liked':''}" onclick="event.stopPropagation();toggleLike('${p.id}',this)"><span class="pi">${liked?'❤️':'🤍'}</span>${p.res}</button>
-        <button class="pa${bked?' saved':''}" onclick="event.stopPropagation();toggleBM('${p.id}',this)"><span class="pi">${bked?'🔖':'🏳️'}</span></button>
-        <button class="pa" onclick="event.stopPropagation();showToast('シェアしました 📤')"><span class="pi">📤</span></button>
+        <button class="pa" onclick="event.stopPropagation();openDetail('${p.id}')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>${p.cmt}</button>
+        <button class="pa" onclick="event.stopPropagation();openRP('${p.id}')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${p.rp}</button>
+        <button class="pa${liked?' liked':''}" onclick="event.stopPropagation();toggleLike('${p.id}',this)"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="${liked?'#EF4444':'none'}"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="${liked?'#EF4444':'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg></span>${p.res}</button>
+        <button class="pa${bked?' saved':''}" onclick="event.stopPropagation();toggleBM('${p.id}',this)"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="${bked?'currentColor':'none'}"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span></button>
+        <button class="pa" onclick="event.stopPropagation();showToast('シェアしました')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
       </div>
     </div>
   </div>`;
@@ -1044,15 +1071,15 @@ function toggleLike(id,btn){
 }
 function toggleBM(id){
   if(BM.has(id)){BM.delete(id);showToast('ブックマークを外しました');}
-  else{BM.add(id);showToast('ブックマークしました 🔖');}
+  else{BM.add(id);showToast('ブックマークしました');}
   renderHome();
 }
 
 function openRP(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
   showSheet('リポスト',[
-    {ico:'🔁',lbl:'リポスト',fn:()=>{p.rp++;showToast('リポストしました');renderHome();}},
-    {ico:'✏️',lbl:'引用リポスト',fn:()=>{openComp();document.getElementById('ctxt').placeholder=`「${p.text.slice(0,20)}...」への引用コメント`;}},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',lbl:'リポスト',fn:()=>{p.rp++;showToast('リポストしました');renderHome();}},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',lbl:'引用リポスト',fn:()=>{openComp();document.getElementById('ctxt').placeholder=`「${p.text.slice(0,20)}...」への引用コメント`;}},
   ]);
 }
 
@@ -1060,14 +1087,14 @@ function openOpts(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
   const fw=FOLLOWS.has(p.un);
   showSheet(`${p.name}の投稿`,[
-    {ico:'🔖',lbl:'ブックマーク',fn:()=>{BM.add(id);showToast('ブックマークしました 🔖');renderHome();}},
-    {ico:fw?'➖':'➕',lbl:fw?'フォロー解除':'フォローする',fn:()=>{
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',lbl:'ブックマーク',fn:()=>{BM.add(id);showToast('ブックマークしました');renderHome();}},
+    {ico:fw?'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>':'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',lbl:fw?'フォロー解除':'フォローする',fn:()=>{
       if(fw){FOLLOWS.delete(p.un);showToast('フォロー解除しました');}
       else{FOLLOWS.add(p.un);showToast(`${p.name}さんをフォローしました`);}
       renderHome();
     }},
-    {ico:'🔗',lbl:'リンクをコピー',fn:()=>showToast('リンクをコピーしました')},
-    {ico:'🚨',lbl:'報告する',red:true,fn:()=>showToast('報告しました。ありがとうございます。')},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',lbl:'リンクをコピー',fn:()=>showToast('リンクをコピーしました')},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',lbl:'報告する',red:true,fn:()=>showToast('報告しました。ありがとうございます。')},
   ]);
 }
 
@@ -1099,10 +1126,10 @@ function openDetail(id){
   const cmts=(CMTS[id]||[]);
   let banner='';
   if(p.ptype==='capsule'){
-    const ya=p.writtenYr?YR-p.writtenYr:13;
-    banner=`<div class="cbanner" style="margin-bottom:12px">📅 タイムカプセルが届きました・${ya}年前に投稿</div>`;
+    const ageAtWrite = p.writtenYr && p.by ? p.writtenYr-p.by : null;
+    banner=`<div class="cbanner" style="margin-bottom:12px">${ageAtWrite?ageAtWrite+'歳のときに書かれたカプセル':'タイムカプセル'}</div>`;
   } else if(p.ptype==='letter'){
-    banner=`<div class="lbanner" style="margin-bottom:12px">✉️ 過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
+    banner=`<div class="lbanner" style="margin-bottom:12px">過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
   }
   const tags=(p.tags||[]).map(t=>`<span class="ptag" style="font-size:12px">${t}</span>`).join('');
   const fw=FOLLOWS.has(p.un);
@@ -1141,13 +1168,13 @@ function openDetail(id){
           <span><strong>${p.cmt}</strong> 返信</span>
         </div>
         <div class="d-acts">
-          <button class="da" onclick="openRP('${p.id}')"><span class="pi">🔁</span>リポスト</button>
-          <button class="da${liked?' liked':''}" onclick="toggleLike('${p.id}',this)"><span class="pi">${liked?'❤️':'🤍'}</span>いいね</button>
-          <button class="da${bked?' saved':''}" onclick="toggleBM('${p.id}')"><span class="pi">${bked?'🔖':'🏳️'}</span>保存</button>
-          <button class="da" onclick="showToast('シェアしました 📤')"><span class="pi">📤</span>シェア</button>
+          <button class="da" onclick="openRP('${p.id}')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>リポスト</button>
+          <button class="da${liked?' liked':''}" onclick="toggleLike('${p.id}',this)"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="${liked?'#EF4444':'none'}"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="${liked?'#EF4444':'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg></span>いいね</button>
+          <button class="da${bked?' saved':''}" onclick="toggleBM('${p.id}')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="${bked?'currentColor':'none'}"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>保存</button>
+          <button class="da" onclick="showToast('シェアしました')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>シェア</button>
         </div>
       </div>
-      <div id="d-cmts-${id}">${cmtH||emptyState('💬','まだ返信なし','最初に返信しよう')}</div>
+      <div id="d-cmts-${id}">${cmtH||emptyState('','まだ返信なし','最初に返信しよう')}</div>
     </div>
     <div class="reply-bar">
       <div class="rp-av" style="background:${ME?ME.col:'#764BA2'}">${ME?ini(ME.name):'?'}</div>
@@ -1181,7 +1208,7 @@ function sendReply(id){
     </div>`+con.innerHTML;
   }
   inp.value='';
-  showToast('返信しました 💬');
+  showToast('返信しました');
 }
 
 // =====================================================
@@ -1223,51 +1250,51 @@ function rmTag(t){cTags=cTags.filter(x=>x!==t);document.getElementById('comp-tag
 
 function setCapsMode(){
   cMode='capsule';
-  document.getElementById('comp-title').textContent='📅 タイムカプセル';
+  document.getElementById('comp-title').textContent='タイムカプセル';
   const myAge=ME?ME.age:28;
   const opts=Array.from({length:30},(_,i)=>YR+1+i).map(y=>
     `<option value="${y}"${y===cYear?' selected':''}>${y}年（${ME?y-ME.by:y-YR}歳のとき）</option>`
   ).join('');
   document.getElementById('comp-extra').innerHTML=`
     <div class="cbox">
-      <h3>📅 届ける年を選択</h3>
-      <p>タイムカプセルは2か所に届きます：①未来の自分 ②その年に今のあなたと同い年の人たち</p>
+      <h3>届ける年を設定</h3>
+      <p>今書いたメッセージが、未来のあなたへ届きます。②その年に今のあなたと同じ年齢の人たちにも届きます。</p>
       <select onchange="cYear=parseInt(this.value);updCapsPrev()">${opts}</select>
-      <div class="dprev" id="cprev">📅 ${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${myAge}歳の人たちのタイムライン</div>
+      <div class="dprev" id="cprev">${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${myAge}歳の人たちのタイムライン</div>
     </div>`;
 }
 
 function updCapsPrev(){
   const el=document.getElementById('cprev');
-  if(el){const a=ME?ME.age:28;el.innerHTML=`📅 ${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${a}歳の人たちのタイムライン`;}
+  if(el){const a=ME?ME.age:28;el.innerHTML=`${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${a}歳の人たちのタイムライン`;}
 }
 
 function setLettMode(){
   cMode='letter';
-  document.getElementById('comp-title').textContent='✉️ 過去への手紙';
+  document.getElementById('comp-title').textContent='過去への手紙';
   const opts=Array.from({length:25},(_,i)=>i+10).map(a=>
     `<option value="${a}"${a===cAge?' selected':''}>${a}歳の人へ</option>`
   ).join('');
   document.getElementById('comp-extra').innerHTML=`
     <div class="cbox lbox">
-      <h3>✉️ 届ける年齢を選択</h3>
+      <h3>届ける年齢を設定</h3>
       <p>今その年齢を生きている人たちのタイムラインに届きます</p>
       <select onchange="cAge=parseInt(this.value);updLettPrev()">${opts}</select>
-      <div class="dprev" id="lprev">✉️ 今${cAge}歳の人たちのタイムラインに届きます</div>
+      <div class="dprev" id="lprev">今${cAge}歳の人たちのタイムラインに届きます</div>
     </div>`;
 }
 function updLettPrev(){
   const el=document.getElementById('lprev');
-  if(el)el.innerHTML=`✉️ 今${cAge}歳の人たちのタイムラインに届きます`;
+  if(el)el.innerHTML=`今${cAge}歳の人たちのタイムラインに届きます`;
 }
 
 function submitPost(){
   const txt=document.getElementById('ctxt').value.trim();
   if(!txt)return;
   const p={id:'u'+Date.now(),name:ME.name,un:ME.un,by:ME.by,text:txt,ptype:cMode,tags:[...cTags],res:0,cmt:0,rp:0,ts:'今'};
-  if(cMode==='capsule'){p.writtenYr=YR;p.deliverYr=cYear;showToast(`タイムカプセルを${cYear}年に設定しました 📅`);}
-  else if(cMode==='letter'){p.targetAge=cAge;showToast(`${cAge}歳の人へ手紙を届けました ✉️`);}
-  else{showToast('投稿しました ✨');}
+  if(cMode==='capsule'){p.writtenYr=YR;p.deliverYr=cYear;showToast(`タイムカプセルを${cYear}年に設定しました`);}
+  else if(cMode==='letter'){p.targetAge=cAge;showToast(`${cAge}歳の人へ手紙を届けました`);}
+  else{showToast('投稿しました');}
   POSTS.unshift(p);
   closeComp();
   renderHome();
@@ -1281,7 +1308,7 @@ function renderSearch(){
     <div class="trend-item" onclick="searchBy('${t.tag}')">
       <div class="tr-rank">${i+1}</div>
       <div class="tr-info">
-        <div class="tr-tag">${t.tag} ${t.hot?'<span class="tr-hot">🔥</span>':''}</div>
+        <div class="tr-tag">${t.tag} ${t.hot?'<span class="tr-hot">HOT</span>':''}</div>
         <div class="tr-cnt">${t.cnt}の投稿</div>
       </div>
     </div>`).join('');
@@ -1291,7 +1318,7 @@ function renderSearch(){
       <div style="display:flex;gap:7px;flex-wrap:wrap">${g.tags.map(t=>`<button class="chip" onclick="searchBy('${t}')">${t}</button>`).join('')}</div>
     </div>`).join('');
   document.getElementById('search-body').innerHTML=`
-    <div class="sh">🔥 トレンド</div>${tH}
+    <div class="sh">トレンド</div>${tH}
     <div class="sh" style="margin-top:8px">世代別注目タグ</div>${gH}`;
 }
 
@@ -1299,7 +1326,7 @@ function doSearch(q){
   if(!q.trim()){renderSearch();return;}
   const ql=q.toLowerCase();
   const r=POSTS.filter(p=>p.text.toLowerCase().includes(ql)||(p.tags||[]).some(t=>t.toLowerCase().includes(ql))||p.name.toLowerCase().includes(ql));
-  document.getElementById('search-body').innerHTML=r.length?r.map(pCard).join(''):emptyState('🔍','見つかりません',`「${q}」の検索結果がありません`);
+  document.getElementById('search-body').innerHTML=r.length?r.map(pCard).join(''):emptyState('','見つかりません',`「${q}」の検索結果がありません`);
 }
 
 function searchBy(tag){
@@ -1325,7 +1352,7 @@ function markAllRead(){
   NOTIFS.forEach(n=>n.unr=false);
   renderNotifs();
   document.getElementById('nbadge').style.display='none';
-  showToast('すべて既読にしました ✓');
+  showToast('すべて既読にしました');
 }
 
 // =====================================================
@@ -1333,7 +1360,7 @@ function markAllRead(){
 // =====================================================
 function renderBM(){
   const con=document.getElementById('bm-body');
-  if(BM.size===0){con.innerHTML=emptyState('🔖','ブックマークなし','気に入った投稿をブックマークすると、ここで確認できます');return;}
+  if(BM.size===0){con.innerHTML=emptyState('','ブックマークなし','気に入った投稿をブックマークすると、ここで確認できます');return;}
   con.innerHTML=POSTS.filter(p=>BM.has(p.id)).map(pCard).join('');
 }
 
@@ -1350,7 +1377,7 @@ function renderProfile(){
       <div class="p-namerow">
         <div>
           <div class="p-name">${ME.name}</div>
-          <div class="p-sub" style="color:${ME.col}">📍 ${ME.by}年生まれ・${ME.age}歳・${gLabel(ME.by)}</div>
+          <div class="p-sub" style="color:${ME.col}">${ME.by}年生まれ・${ME.age}歳・${gLabel(ME.by)}</div>
         </div>
         <button class="edit-btn" onclick="openEditProfile()">編集</button>
       </div>
@@ -1367,7 +1394,7 @@ function renderProfile(){
       <button class="tb" onclick="showProfileTab(this,'letter')">手紙</button>
       <button class="tb" onclick="showProfileTab(this,'likes')">いいね</button>
     </div>
-    <div id="profile-posts">${myPosts.length?myPosts.map(pCard).join(''):emptyState('✍️','まだ投稿なし','声を届けよう')}</div>
+    <div id="profile-posts">${myPosts.length?myPosts.map(pCard).join(''):emptyState('','まだ投稿なし','声を届けよう')}</div>
   `;
 }
 
@@ -1375,10 +1402,10 @@ function showProfileTab(el,type){
   document.querySelectorAll('#screen-profile .tabbar .tb').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');
   const con=document.getElementById('profile-posts');
-  if(type==='posts'){const p=POSTS.filter(x=>x.un===ME.un);con.innerHTML=p.length?p.map(pCard).join(''):emptyState('✍️','まだ投稿なし','声を届けよう');}
-  else if(type==='caps'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='capsule');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('📅','タイムカプセルなし','未来の自分へメッセージを書こう');}
-  else if(type==='letter'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='letter');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('✉️','手紙なし','過去への手紙を書いてみよう');}
-  else{const p=POSTS.filter(x=>LIKES.has(x.id));con.innerHTML=p.length?p.map(pCard).join(''):emptyState('❤️','いいねなし','気に入った投稿をいいねしよう');}
+  if(type==='posts'){const p=POSTS.filter(x=>x.un===ME.un);con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','まだ投稿なし','声を届けよう');}
+  else if(type==='caps'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='capsule');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','タイムカプセルなし','未来の自分へメッセージを書こう');}
+  else if(type==='letter'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='letter');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','手紙なし','過去への手紙を書いてみよう');}
+  else{const p=POSTS.filter(x=>LIKES.has(x.id));con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','いいねなし','気に入った投稿をいいねしよう');}
 }
 
 // =====================================================
@@ -1421,14 +1448,14 @@ function saveProfile(btn){
 function openCapsScreen(){
   document.getElementById('caps-screen').classList.add('open');
   const caps=POSTS.filter(p=>p.ptype==='capsule');
-  document.getElementById('caps-list').innerHTML=caps.length?caps.map(pCard).join(''):emptyState('📅','タイムカプセルなし','未来の自分へメッセージを書こう');
+  document.getElementById('caps-list').innerHTML=caps.length?caps.map(pCard).join(''):emptyState('','タイムカプセルなし','未来の自分へメッセージを書こう');
 }
 function closeCapsScreen(){document.getElementById('caps-screen').classList.remove('open');}
 
 function openLettScreen(){
   document.getElementById('lett-screen').classList.add('open');
   const lett=POSTS.filter(p=>p.ptype==='letter');
-  document.getElementById('lett-list').innerHTML=lett.length?lett.map(pCard).join(''):emptyState('✉️','手紙なし','若い世代への手紙を書いてみよう');
+  document.getElementById('lett-list').innerHTML=lett.length?lett.map(pCard).join(''):emptyState('','手紙なし','若い世代への手紙を書いてみよう');
 }
 function closeLettScreen(){document.getElementById('lett-screen').classList.remove('open');}
 
@@ -1439,7 +1466,7 @@ function toggleDark(){
   darkOn=!darkOn;
   document.getElementById('app').classList.toggle('dark',darkOn);
   document.getElementById('dark-tgl').classList.toggle('on',darkOn);
-  showToast(darkOn?'ダークモード ON 🌙':'ライトモード ON ☀️');
+  showToast(darkOn?'ダークモード ON':'ライトモード ON');
 }
 
 // =====================================================
