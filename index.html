@@ -415,7 +415,7 @@ input[type=range]{width:100%;appearance:none;height:4px;border-radius:2px;backgr
       <div style="padding:0 16px 16px"><button class="btn-grad" onclick="submitTC()">タイムカプセルに入れる</button><p style="font-size:12px;color:#9CA3AF;text-align:center;margin-top:10px">※ 設定した日に、通知でお届けします</p></div>
       <div style="padding:0 16px 16px">
         <p style="font-size:12px;font-weight:600;color:#9CA3AF;margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em">保存済みのカプセル</p>
-        <div class="tc-item"><div class="tc-icon">⏰</div><div style="flex:1"><div class="tc-text">3年後の自分へ。その時のあなたに、伝えたいことを。</div><div class="tc-date">📅 2027/05/18 届け予定</div></div><div class="pending-label">準備中</div></div>
+        <div id="tc-list"></div>
       </div>
     </div>
   </div>
@@ -448,7 +448,7 @@ input[type=range]{width:100%;appearance:none;height:4px;border-radius:2px;backgr
 const GRADS=['linear-gradient(135deg,#667EEA,#764BA2)','linear-gradient(135deg,#F093FB,#F5576C)','linear-gradient(135deg,#4FACFE,#00F2FE)','linear-gradient(135deg,#43e97b,#38f9d7)','linear-gradient(135deg,#fa709a,#fee140)'];
 const avatarGrad=y=>GRADS[((y||1990)*37)%GRADS.length]||GRADS[0];
 
-let POSTS=[
+const SEED_POSTS=[
   {id:'1',name:'みお',username:'mio_98',era:'1998年生まれ',ageLabel:'26歳',birthYear:1998,text:'ふと、思ったこと。\n将来のことを考えると、\n不安になるけど、\nそれ以上にワクワクしてる。',tags:['#将来のこと','#モヤモヤ'],resonances:128,comments:23,shares:12,type:'now'},
   {id:'2',name:'jun',username:'jun_70s',era:'1970年代生まれ',ageLabel:'50代',birthYear:1973,text:'若い頃の自分へ。\n焦らなくていいよ。\n道は、ちゃんと\nあとからつながってる。',tags:['#若い頃へ','#人生'],resonances:96,comments:12,shares:8,type:'past'},
   {id:'3',name:'はる',username:'haru_05',era:'2005年生まれ',ageLabel:'19歳',birthYear:2005,text:'みんなと同じように\nできない自分が嫌になる日もある。\nでも、その日もきっと意味がある。',tags:[],resonances:45,comments:7,shares:3,type:'future'},
@@ -456,17 +456,48 @@ let POSTS=[
   {id:'5',name:'みお',username:'mio_98',era:'1998年生まれ',ageLabel:'26歳',birthYear:1998,text:'10年後の自分へ。\nあの時の決断は正しかったですか？\n今は怖くて仕方ないけど、進んでいます。',tags:['#10年後へ','#将来のこと'],resonances:76,comments:18,shares:5,type:'now'},
   {id:'6',name:'はる',username:'haru_05',era:'2005年生まれ',ageLabel:'19歳',birthYear:2005,text:'就活がこんなに辛いとは思わなかった。\n先輩たち、どうやって乗り越えたんですか？',tags:['#就活','#モヤモヤ'],resonances:112,comments:42,shares:7,type:'future'},
 ];
-const COMMENTS={
+const SEED_COMMENTS={
   '1':[{name:'はる',era:'2005年生まれ',ageLabel:'19歳',text:'ありがとうございます。今、すごく救われました。',resonances:32},{name:'みお',era:'1998年生まれ',ageLabel:'26歳',text:'泣きそうになった。\nいつか、私も誰かに届けたい。',resonances:18}],
   '2':[{name:'はる',era:'2005年生まれ',ageLabel:'19歳',text:'「道はあとからつながる」って言葉、刺さりました。',resonances:24}],
 };
-const NOTIFS=[
+const SEED_NOTIFS=[
   {type:'resonance',msg:'@haru_05 さんがあなたの投稿に「共鳴」しました。',time:'29分前',icon:'❤️',bg:'rgba(240,147,251,.12)',unread:true},
   {type:'timeleap',msg:'あなたの声に、1970年代生まれの方が返信しました。',time:'13分前',icon:'✨',bg:'rgba(102,126,234,.12)',unread:true},
   {type:'today',msg:'今日の1通が更新されました。',time:'10時間前',icon:'📅',bg:'rgba(118,75,162,.12)',unread:false},
   {type:'follow',msg:'@mio_98 さんがあなたをフォローしました。',time:'3時間前',icon:'👤',bg:'rgba(16,185,129,.12)',unread:false},
   {type:'milestone',msg:'あなたの投稿が100回共鳴されました！🎉',time:'5時間前',icon:'🌟',bg:'rgba(245,158,11,.12)',unread:false},
 ];
+
+// ── 状態（localStorageで永続化）──
+const ME={name:'みお',username:'mio_98',era:'1998年生まれ',ageLabel:'26歳',birthYear:1998};
+const LS_KEY='koe_state_v1';
+let POSTS, COMMENTS, NOTIFS, CAPSULES, resonated, replied;
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function loadState(){
+  let s=null;
+  try{s=JSON.parse(localStorage.getItem(LS_KEY));}catch(e){}
+  if(s){
+    POSTS=s.posts||clone(SEED_POSTS);
+    COMMENTS=s.comments||clone(SEED_COMMENTS);
+    NOTIFS=s.notifs||clone(SEED_NOTIFS);
+    CAPSULES=s.capsules||[];
+    resonated=new Set(s.resonated||[]);
+    replied=new Set(s.replied||[]);
+  }else{
+    POSTS=clone(SEED_POSTS);COMMENTS=clone(SEED_COMMENTS);NOTIFS=clone(SEED_NOTIFS);
+    CAPSULES=[];resonated=new Set();replied=new Set();
+  }
+}
+function saveState(){
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify({
+      posts:POSTS,comments:COMMENTS,notifs:NOTIFS,capsules:CAPSULES,
+      resonated:[...resonated],replied:[...replied]
+    }));
+  }catch(e){}
+}
+function resetState(){localStorage.removeItem(LS_KEY);location.reload();}
+loadState();
 
 let currentTab='now', selectedEras=new Set(['all']), selectedTags=[], currentNotifTab='all';
 
@@ -483,8 +514,8 @@ function postCardHTML(p){
     <p class="post-text">${p.text.replace(/\n/g,'<br>')}</p>
     ${tagsHTML?`<div class="tags">${tagsHTML}</div>`:''}
     <div class="card-actions">
-      <button class="action-btn" id="res-${p.id}" onclick="event.stopPropagation();resonate('${p.id}')">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="#9CA3AF" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <button class="action-btn${resonated.has(p.id)?' resonated':''}" id="res-${p.id}" onclick="event.stopPropagation();resonate('${p.id}')">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" ${resonated.has(p.id)?'fill="#F093FB" stroke="#F093FB"':'stroke="#9CA3AF"'} stroke-width="1.8" stroke-linejoin="round"/></svg>
         <span id="res-count-${p.id}">${p.resonances}</span>
       </button>
       <button class="action-btn" onclick="event.stopPropagation();showDetail('${p.id}')">
@@ -512,11 +543,14 @@ function renderProfilePosts(){
 function renderNotifs(type){
   const list=type==='all'?NOTIFS:NOTIFS.filter(n=>n.type===type);
   document.getElementById('notif-list').innerHTML=list.map(n=>`
-    <div class="notif-item ${n.unread?'unread':''}">
+    <div class="notif-item ${n.unread?'unread':''}" onclick="markNotifRead(${NOTIFS.indexOf(n)})">
       <div class="notif-icon" style="background:${n.bg}">${n.icon}</div>
       <div style="flex:1"><div class="notif-msg">${n.msg}</div><div class="notif-time">${n.time}</div></div>
       ${n.unread?'<div class="unread-dot"></div>':''}
     </div>`).join('');
+}
+function markNotifRead(i){
+  if(NOTIFS[i]&&NOTIFS[i].unread){NOTIFS[i].unread=false;saveState();renderNotifs(currentNotifTab);}
 }
 
 function go(screen){
@@ -549,30 +583,57 @@ function switchNotifTab(el,type){
 function switchProfileTab(el,type){
   document.querySelectorAll('.profile-tab').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
-  if(type==='posts')renderProfilePosts();
-  else document.getElementById('profile-posts').innerHTML=`<p style="text-align:center;padding:40px 24px;color:#9CA3AF;font-size:14px">${type==='replied'?'返信した声はまだありません':'いいねした声はまだありません'}</p>`;
+  const box=document.getElementById('profile-posts');
+  if(type==='posts'){renderProfilePosts();return;}
+  const ids=type==='replied'?replied:resonated;
+  const list=POSTS.filter(p=>ids.has(p.id));
+  const empty=type==='replied'?'返信した声はまだありません':'いいねした声はまだありません';
+  box.innerHTML=list.length?list.map(postCardHTML).join(''):`<p style="text-align:center;padding:40px 24px;color:#9CA3AF;font-size:14px">${empty}</p>`;
 }
 
 function resonate(id){
   const p=POSTS.find(x=>x.id===id);if(!p)return;
-  p.resonances++;
+  const on=resonated.has(id);
+  if(on){resonated.delete(id);p.resonances=Math.max(0,p.resonances-1);}
+  else{resonated.add(id);p.resonances++;}
+  saveState();
   const btn=document.getElementById('res-'+id);
-  if(btn){btn.classList.add('resonated');btn.querySelector('path').setAttribute('fill','#F093FB');btn.querySelector('path').setAttribute('stroke','#F093FB');}
+  if(btn){
+    btn.classList.toggle('resonated',!on);
+    const path=btn.querySelector('path');
+    path.setAttribute('stroke',on?'#9CA3AF':'#F093FB');
+    if(on)path.removeAttribute('fill');else path.setAttribute('fill','#F093FB');
+  }
   const cnt=document.getElementById('res-count-'+id);
   if(cnt)cnt.textContent=p.resonances;
+  if(currentDetailId===id)refreshDetailStats(p);
+}
+function refreshDetailStats(p){
+  const el=document.getElementById('detail-stats');
+  if(el)el.innerHTML=`<span class="stat"><b>${p.resonances}</b> 共鳴</span><span class="stat"><b>${p.comments}</b> 返信</span><span class="stat"><b>${p.shares}</b> シェア</span>`;
+  const da=document.getElementById('detail-resonate');
+  if(da)da.classList.toggle('resonated',resonated.has(p.id));
 }
 
-function showDetail(id){
-  const p=POSTS.find(x=>x.id===id);if(!p)return;
-  const comments=(COMMENTS[id]||[]).map(c=>`
-    <div class="comment-item">
+let currentDetailId=null;
+function commentHTML(c){
+  return `<div class="comment-item">
       <div class="comment-user">
         <div class="avatar sm" style="width:32px;height:32px;font-size:13px;background:${avatarGrad(2000)}">${c.name[0]}</div>
         <span class="comment-name">${c.name}</span>
         <span class="comment-era">${c.era}・${c.ageLabel}</span>
       </div>
       <p class="comment-text">${c.text.replace(/\n/g,'<br>')}</p>
-    </div>`).join('');
+    </div>`;
+}
+function renderComments(id){
+  const list=COMMENTS[id]||[];
+  const box=document.getElementById('comment-list');
+  if(box)box.innerHTML=list.length?list.map(commentHTML).join(''):'<p style="color:#9CA3AF;font-size:14px;text-align:center;padding:24px">まだ返信はありません</p>';
+}
+function showDetail(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  currentDetailId=id;
   document.getElementById('detail-content').innerHTML=`
     <div style="flex:1;overflow-y:auto;padding-bottom:70px">
       <div style="padding:16px">
@@ -584,27 +645,49 @@ function showDetail(id){
         <p class="detail-text">${p.text.replace(/\n/g,'<br>')}</p>
         ${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
         <p class="timestamp" style="margin-top:12px">2024/05/18 22:30</p>
-        <div class="stats-row"><span class="stat"><b>${p.resonances}</b> 共鳴</span><span class="stat"><b>${p.comments}</b> 返信</span><span class="stat"><b>${p.shares}</b> シェア</span></div>
+        <div class="stats-row" id="detail-stats"><span class="stat"><b>${p.resonances}</b> 共鳴</span><span class="stat"><b>${p.comments}</b> 返信</span><span class="stat"><b>${p.shares}</b> シェア</span></div>
         <div class="detail-actions">
-          <button class="det-action">❤️ 共鳴</button>
-          <button class="det-action">💬 返信</button>
-          <button class="det-action">↗ シェア</button>
+          <button class="det-action${resonated.has(id)?' resonated':''}" id="detail-resonate" onclick="resonate('${id}')">❤️ 共鳴</button>
+          <button class="det-action" onclick="focusReply()">💬 返信</button>
+          <button class="det-action" onclick="sharePost('${id}')">↗ シェア</button>
         </div>
       </div>
       <div class="sec-div"></div>
       <div style="padding:16px">
         <p class="comments-title">時を越えて返信</p>
-        ${comments||'<p style="color:#9CA3AF;font-size:14px;text-align:center;padding:24px">まだ返信はありません</p>'}
+        <div id="comment-list"></div>
       </div>
     </div>
     <div class="reply-bar">
       <div class="avatar sm" style="width:32px;height:32px;font-size:13px;background:linear-gradient(135deg,#667EEA,#764BA2)">み</div>
-      <input class="reply-input" placeholder="返信を入力..."/>
-      <button class="send-btn">
+      <input class="reply-input" id="reply-input" placeholder="返信を入力..." onkeydown="if(event.key==='Enter')postReply()"/>
+      <button class="send-btn" onclick="postReply()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="#764BA2" stroke-width="2" stroke-linejoin="round"/></svg>
       </button>
     </div>`;
+  renderComments(id);
   go('detail');
+}
+function focusReply(){const el=document.getElementById('reply-input');if(el)el.focus();}
+function postReply(){
+  const inp=document.getElementById('reply-input');
+  const text=inp&&inp.value.trim();
+  if(!text||!currentDetailId)return;
+  if(!COMMENTS[currentDetailId])COMMENTS[currentDetailId]=[];
+  COMMENTS[currentDetailId].push({name:ME.name,era:ME.era,ageLabel:ME.ageLabel,text,resonances:0});
+  const p=POSTS.find(x=>x.id===currentDetailId);
+  if(p)p.comments++;
+  replied.add(currentDetailId);
+  saveState();
+  inp.value='';
+  renderComments(currentDetailId);
+  if(p)refreshDetailStats(p);
+}
+function sharePost(id){
+  const url=location.origin+location.pathname+'#post-'+id;
+  const done=()=>alert('リンクをコピーしました ✦\n'+url);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(done).catch(done);
+  else done();
 }
 
 function updateCount(){
@@ -632,8 +715,9 @@ function toggleTag(tag,btn){
 function submitPost(){
   const text=document.getElementById('post-text').value.trim();
   if(!text)return;
-  const newPost={id:Date.now().toString(),name:'みお',username:'mio_98',era:'1998年生まれ',ageLabel:'26歳',birthYear:1998,text,tags:[...selectedTags],resonances:0,comments:0,shares:0,type:'now'};
+  const newPost={id:Date.now().toString(),name:ME.name,username:ME.username,era:ME.era,ageLabel:ME.ageLabel,birthYear:ME.birthYear,text,tags:[...selectedTags],resonances:0,comments:0,shares:0,type:'now'};
   POSTS.unshift(newPost);
+  saveState();
   document.getElementById('post-text').value='';
   selectedTags=[];
   document.querySelectorAll('.tag-chip').forEach(b=>b.classList.remove('active'));
@@ -648,6 +732,7 @@ function setSearchTab(el,type){
   searchType=type;
   document.querySelectorAll('.era-tab').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
+  doSearch();
 }
 function searchTag(tag){document.getElementById('search-input').value=tag;doSearch();}
 function doSearch(){
@@ -674,18 +759,29 @@ function selectTcEra(era){
   });
 }
 
+function renderCapsules(){
+  const box=document.getElementById('tc-list');
+  if(!box)return;
+  const seed='<div class="tc-item"><div class="tc-icon">⏰</div><div style="flex:1"><div class="tc-text">3年後の自分へ。その時のあなたに、伝えたいことを。</div><div class="tc-date">📅 2027/05/18 届け予定</div></div><div class="pending-label">準備中</div></div>';
+  const items=CAPSULES.map(c=>`<div class="tc-item"><div class="tc-icon">⏰</div><div style="flex:1"><div class="tc-text">${c.text.replace(/\n/g,'<br>')}</div><div class="tc-date">📅 ${c.date.replace(/-/g,'/')} 届け予定</div></div><div class="pending-label">準備中</div></div>`).join('');
+  box.innerHTML=items+seed;
+}
 function submitTC(){
   const text=document.getElementById('tc-text').value.trim();
   const date=document.getElementById('tc-date').value;
   if(!text||!date)return;
-  alert(`タイムカプセルを保存しました！\n${date.replace(/-/g,'/')} に届けます ✦`);
+  CAPSULES.unshift({text,date,era:tcEra});
+  saveState();
   document.getElementById('tc-text').value='';
+  renderCapsules();
+  alert(`タイムカプセルを保存しました！\n${date.replace(/-/g,'/')} に届けます ✦`);
 }
 
 // Init
 renderPosts('now');
 renderNotifs('all');
 renderProfilePosts();
+renderCapsules();
 </script>
 </body>
 </html>
