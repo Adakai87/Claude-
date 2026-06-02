@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LIFE QUEST — AIコーチ × 人生ダッシュボード × RPG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#15131c;
+    --bg-soft:#1e1b29;
+    --card:#241f33;
+    --card-2:#2c2640;
+    --line:#3a3350;
+    --ink:#f2eef7;
+    --ink-soft:#b7aecd;
+    --ink-faint:#7d7396;
+    --coral:#ff6b5e;
+    --amber:#ffc24b;
+    --teal:#3fd6c4;
+    --violet:#9b7bff;
+    --good:#5fe08a;
+    --shadow:0 14px 40px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:'Zen Maru Gothic',system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:radial-gradient(1200px 700px at 80% -10%, #2a2140 0%, var(--bg) 55%);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:'Space Grotesk',sans-serif;}
+  .app{max-width:1120px;margin:0 auto;padding:22px 20px 60px;}
+
+  /* ---- Top bar ---- */
+  header.top{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:18px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .logo{
+    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--coral),var(--amber));
+    box-shadow:0 8px 22px rgba(255,107,94,.4);font-size:24px;
+  }
+  .brand h1{font-size:20px;margin:0;letter-spacing:.5px;}
+  .brand p{margin:0;font-size:12px;color:var(--ink-faint);letter-spacing:1.5px;}
+  .lvlbox{margin-left:auto;display:flex;align-items:center;gap:14px;min-width:280px;}
+  .lvl-badge{
+    width:54px;height:54px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;
+    background:conic-gradient(var(--teal) var(--xpdeg,0deg), #322b47 0deg);
+    position:relative;
+  }
+  .lvl-badge .inner{
+    position:absolute;inset:5px;border-radius:50%;background:var(--bg-soft);
+    display:grid;place-items:center;line-height:1;
+  }
+  .lvl-badge .inner b{font-family:'Space Grotesk';font-size:20px;color:var(--teal);}
+  .lvl-badge .inner span{font-size:8px;color:var(--ink-faint);letter-spacing:1px;}
+  .xpinfo{flex:1;}
+  .xpinfo .row{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-bottom:5px;}
+  .xpbar{height:9px;border-radius:99px;background:#322b47;overflow:hidden;}
+  .xpbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--violet));transition:width .6s cubic-bezier(.2,.8,.2,1);}
+  .streak{font-size:12px;color:var(--amber);white-space:nowrap;}
+  .gear{background:var(--card);border:1px solid var(--line);color:var(--ink-soft);width:40px;height:40px;border-radius:12px;cursor:pointer;font-size:18px;}
+  .gear:hover{color:var(--ink);border-color:var(--violet);}
+
+  /* ---- Tabs ---- */
+  nav.tabs{display:flex;gap:8px;margin:6px 0 20px;flex-wrap:wrap;}
+  nav.tabs button{
+    border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+    padding:10px 18px;border-radius:99px;cursor:pointer;font-size:14px;font-weight:700;
+    font-family:inherit;transition:.15s;
+  }
+  nav.tabs button:hover{color:var(--ink);}
+  nav.tabs button.active{background:linear-gradient(135deg,var(--coral),var(--amber));color:#1a1320;border-color:transparent;box-shadow:0 8px 20px rgba(255,107,94,.32);}
+
+  .grid{display:grid;grid-template-columns:1fr;gap:18px;}
+  @media(min-width:900px){ .grid.two{grid-template-columns:1.35fr .9fr;} }
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);}
+  .card h2{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px;}
+  .card .sub{margin:0 0 16px;font-size:12px;color:var(--ink-faint);}
+  .pill{font-size:10px;padding:3px 9px;border-radius:99px;background:var(--card-2);color:var(--ink-soft);font-weight:700;letter-spacing:.5px;}
+
+  /* ---- Chat ---- */
+  .chat-wrap{display:flex;flex-direction:column;height:560px;}
+  .quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .quick button{
+    border:1px dashed var(--line);background:transparent;color:var(--ink-soft);
+    border-radius:99px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;
+  }
+  .quick button:hover{border-color:var(--teal);color:var(--teal);}
+  .stream{flex:1;overflow-y:auto;padding-right:6px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:86%;padding:12px 15px;border-radius:16px;font-size:14px;line-height:1.7;white-space:pre-wrap;}
+  .msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--violet),#7a5bff);color:#fff;border-bottom-right-radius:5px;}
+  .msg.ai{align-self:flex-start;background:var(--card-2);border:1px solid var(--line);border-bottom-left-radius:5px;}
+  .msg.sys{align-self:center;font-size:11px;color:var(--amber);background:rgba(255,194,75,.08);border:1px solid rgba(255,194,75,.25);padding:5px 12px;border-radius:99px;}
+  .typing{align-self:flex-start;color:var(--ink-faint);font-size:13px;padding:8px 4px;}
+  .typing i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ink-faint);margin-right:3px;animation:bl 1s infinite;}
+  .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+  @keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
+  .composer{display:flex;gap:10px;margin-top:14px;}
+  .composer textarea{
+    flex:1;resize:none;background:var(--bg-soft);border:1px solid var(--line);border-radius:14px;
+    color:var(--ink);padding:12px 14px;font-family:inherit;font-size:14px;height:50px;line-height:1.5;
+  }
+  .composer textarea:focus{outline:none;border-color:var(--violet);}
+  .send{
+    border:none;border-radius:14px;width:54px;cursor:pointer;font-size:20px;color:#1a1320;
+    background:linear-gradient(135deg,var(--teal),var(--violet));font-weight:700;
+  }
+  .send:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* ---- Dashboard ---- */
+  .stat-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .stat-row .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:0 0 auto;}
+  .stat-row .nm{width:74px;font-size:13px;font-weight:700;}
+  .stat-row .track{flex:1;height:10px;background:#322b47;border-radius:99px;overflow:hidden;}
+  .stat-row .track i{display:block;height:100%;border-radius:99px;transition:width .7s cubic-bezier(.2,.8,.2,1);}
+  .stat-row .vl{width:34px;text-align:right;font-family:'Space Grotesk';font-size:14px;color:var(--ink-soft);}
+  canvas{max-width:100%;}
+
+  /* ---- Quests ---- */
+  .addq{display:flex;gap:8px;margin-bottom:16px;}
+  .addq input{flex:1;background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:10px 12px;font-family:inherit;font-size:13px;}
+  .addq input:focus{outline:none;border-color:var(--teal);}
+  .addq button{border:none;background:var(--teal);color:#10221f;font-weight:700;border-radius:12px;padding:0 16px;cursor:pointer;font-family:inherit;}
+  .quest{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:var(--card-2);transition:.2s;}
+  .quest.done{opacity:.5;}
+  .quest .check{width:24px;height:24px;border-radius:8px;border:2px solid var(--ink-faint);cursor:pointer;flex:0 0 auto;display:grid;place-items:center;font-size:14px;color:transparent;transition:.15s;}
+  .quest.done .check{background:var(--good);border-color:var(--good);color:#0d2417;}
+  .quest .tt{flex:1;font-size:14px;}
+  .quest.done .tt{text-decoration:line-through;}
+  .quest .cat{font-size:10px;}
+  .quest .xp{font-family:'Space Grotesk';font-size:12px;color:var(--amber);white-space:nowrap;}
+  .quest .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;}
+  .quest .del:hover{color:var(--coral);}
+  .empty{text-align:center;color:var(--ink-faint);font-size:13px;padding:24px 0;}
+
+  /* ---- Modal ---- */
+  .modal{position:fixed;inset:0;background:rgba(8,6,14,.7);display:none;place-items:center;z-index:50;padding:20px;}
+  .modal.show{display:grid;}
+  .modal .box{width:100%;max-width:480px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow);}
+  .modal h3{margin:0 0 6px;}
+  .modal p{font-size:13px;color:var(--ink-soft);margin:0 0 16px;line-height:1.6;}
+  .modal label{font-size:12px;color:var(--ink-soft);display:block;margin:14px 0 6px;font-weight:700;}
+  .modal input,.modal select{width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:11px 13px;font-family:inherit;font-size:14px;}
+  .modal input:focus,.modal select:focus{outline:none;border-color:var(--violet);}
+  .modal .actions{display:flex;gap:10px;margin-top:22px;}
+  .modal .actions button{flex:1;border:none;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;}
+  .btn-primary{background:linear-gradient(135deg,var(--coral),var(--amber));color:#1a1320;}
+  .btn-ghost{background:var(--card-2);color:var(--ink-soft);border:1px solid var(--line)!important;}
+  .hint{font-size:11px;color:var(--ink-faint);margin-top:8px;}
+  a{color:var(--teal);}
+
+  /* ---- Toast ---- */
+  .toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{background:var(--card);border:1px solid var(--teal);color:var(--ink);padding:11px 18px;border-radius:99px;font-size:13px;font-weight:700;box-shadow:var(--shadow);animation:pop .3s ease;}
+  .toast.xp{border-color:var(--amber);color:var(--amber);}
+  .toast.lvl{border-color:var(--coral);color:var(--coral);font-size:15px;}
+  @keyframes pop{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+  .hide{display:none!important;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">🎯</div>
+      <div>
+        <h1 class="display">LIFE QUEST</h1>
+        <p>AI COACH · DASHBOARD · RPG</p>
+      </div>
+    </div>
+    <div class="lvlbox">
+      <div class="lvl-badge" id="lvlBadge">
+        <div class="inner"><span>LV</span><b id="lvlNum">1</b></div>
+      </div>
+      <div class="xpinfo">
+        <div class="row"><span id="xpLabel">XP 0 / 100</span><span class="streak" id="streak">🔥 1日連続</span></div>
+        <div class="xpbar"><i id="xpFill" style="width:0%"></i></div>
+      </div>
+      <button class="gear" id="gearBtn" title="設定">⚙️</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="home">💬 コーチ</button>
+    <button data-tab="dash">📊 ダッシュボード</button>
+    <button data-tab="quest">🗡️ クエスト</button>
+  </nav>
+
+  <!-- ============ HOME / CHAT ============ -->
+  <section id="tab-home" class="grid two">
+    <div class="card">
+      <h2>💬 AIコーチ <span class="pill" id="coachModel">opus 4.8</span></h2>
+      <p class="sub">話すと、ダッシュボードとクエストが自動で動きます。今日どうだった？</p>
+      <div class="chat-wrap">
+        <div class="quick">
+          <button data-q="おはよう！今日のチェックインをしたい。">🌅 朝のチェックイン</button>
+          <button data-q="今日一日をふりかえりたい。聞いてくれる？">🌙 夜のふりかえり</button>
+          <button data-q="ちょっとモヤモヤしてることがあって、壁打ちしたい。">🧱 壁打ちしたい</button>
+          <button data-q="今の自分にちょうどいいクエストを3つ提案して。">🎲 クエスト提案して</button>
+        </div>
+        <div class="stream" id="stream"></div>
+        <div class="composer">
+          <textarea id="input" placeholder="メッセージを入力…（Enterで送信 / Shift+Enterで改行）"></textarea>
+          <button class="send" id="sendBtn">➤</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>⚡ 今日のフォーカス</h2>
+      <p class="sub">コーチとの会話から自動で決まる、今日の主役クエスト</p>
+      <div id="focusBox"></div>
+      <h2 style="margin-top:22px;">🌡️ 最近の気分</h2>
+      <p class="sub">チェックインで記録した気分の推移</p>
+      <canvas id="moodChart" height="150"></canvas>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section id="tab-dash" class="grid two hide">
+    <div class="card">
+      <h2>📊 人生5軸バランス</h2>
+      <p class="sub">会話やクエスト達成で変化します。バランスよく育てよう</p>
+      <canvas id="radar" height="260"></canvas>
+    </div>
+    <div class="card">
+      <h2>📈 ステータス詳細</h2>
+      <p class="sub">各軸 0〜100</p>
+      <div id="statBars"></div>
+      <h2 style="margin-top:20px;">🏆 サマリー</h2>
+      <p class="sub" id="summaryLine">これまでの歩み</p>
+    </div>
+  </section>
+
+  <!-- ============ QUESTS ============ -->
+  <section id="tab-quest" class="hide">
+    <div class="card">
+      <h2>🗡️ クエストボード</h2>
+      <p class="sub">完了するとXPゲット。コーチが提案したものもここに溜まります</p>
+      <div class="addq">
+        <input id="newQuest" placeholder="新しいクエストを追加…（例：30分散歩する）" />
+        <button id="addQuestBtn">＋ 追加</button>
+      </div>
+      <div id="questList"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal" id="settings">
+  <div class="box">
+    <h3>⚙️ 設定</h3>
+    <p>Claude APIキーが必要です（<a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a> で取得）。キーはこのブラウザ内（localStorage）にのみ保存され、Anthropic以外には送信されません。</p>
+    <label>Claude API キー</label>
+    <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off" />
+    <label>モデル</label>
+    <select id="modelSel">
+      <option value="claude-opus-4-8">Claude Opus 4.8（最高性能・推奨）</option>
+      <option value="claude-sonnet-4-6">Claude Sonnet 4.6（速い・安い）</option>
+      <option value="claude-haiku-4-5">Claude Haiku 4.5（最速）</option>
+    </select>
+    <label>あなたの名前（コーチが呼びかけます）</label>
+    <input id="userName" type="text" placeholder="例：開" />
+    <p class="hint">⚠️ APIキーをブラウザから直接使う構成です。自分専用ツールとしての利用を想定しています。共有PCでは使わないでください。</p>
+    <div class="actions">
+      <button class="btn-ghost" id="resetBtn">データ初期化</button>
+      <button class="btn-primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+"use strict";
+
+/* ---------------- State ---------------- */
+const STATS = [
+  {key:"health",       name:"健康",   icon:"💪", color:"#5fe08a"},
+  {key:"work",         name:"仕事",   icon:"💼", color:"#ffc24b"},
+  {key:"growth",       name:"学び",   icon:"📚", color:"#9b7bff"},
+  {key:"relationships",name:"人間関係",icon:"🤝", color:"#3fd6c4"},
+  {key:"play",         name:"遊び",   icon:"🎉", color:"#ff6b5e"},
+];
+
+const DEFAULT = {
+  apiKey:"", model:"claude-opus-4-8", userName:"",
+  totalXP:0,
+  stats:{health:50,work:50,growth:50,relationships:50,play:50},
+  quests:[],
+  focus:null,
+  moods:[],            // {date, value}
+  messages:[],         // {role, content} for API
+  streakCount:1, lastActive:null,
+};
+
+let S = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem("lifequest");
+    if(!raw) return structuredClone(DEFAULT);
+    const d = JSON.parse(raw);
+    return Object.assign(structuredClone(DEFAULT), d,
+      {stats:Object.assign({}, DEFAULT.stats, d.stats||{})});
+  }catch(e){ return structuredClone(DEFAULT); }
+}
+function save(){ localStorage.setItem("lifequest", JSON.stringify(S)); }
+
+/* ---------------- Leveling ---------------- */
+const xpForLevel = lv => 100 + (lv-1)*60;          // XP needed within a level
+function levelInfo(){
+  let lv=1, rem=S.totalXP;
+  while(rem >= xpForLevel(lv)){ rem -= xpForLevel(lv); lv++; }
+  return {level:lv, into:rem, need:xpForLevel(lv)};
+}
+
+/* ---------------- Streak ---------------- */
+function touchStreak(){
+  const today = new Date().toDateString();
+  if(S.lastActive === today) return;
+  if(S.lastActive){
+    const diff = (new Date(today) - new Date(S.lastActive))/86400000;
+    S.streakCount = diff === 1 ? S.streakCount+1 : 1;
+  }
+  S.lastActive = today;
+  save();
+}
+
+/* ---------------- Rendering ---------------- */
+let radarChart=null, moodChart=null;
+
+function renderHeader(){
+  const {level,into,need} = levelInfo();
+  $("lvlNum").textContent = level;
+  $("xpLabel").textContent = `XP ${into} / ${need}`;
+  const pct = Math.min(100, Math.round(into/need*100));
+  $("xpFill").style.width = pct+"%";
+  $("lvlBadge").style.setProperty("--xpdeg", (pct*3.6)+"deg");
+  $("streak").textContent = `🔥 ${S.streakCount}日連続`;
+  $("coachModel").textContent = ({"claude-opus-4-8":"opus 4.8","claude-sonnet-4-6":"sonnet 4.6","claude-haiku-4-5":"haiku 4.5"})[S.model]||S.model;
+}
+
+function renderStats(){
+  const box = $("statBars"); box.innerHTML="";
+  STATS.forEach(s=>{
+    const v = S.stats[s.key];
+    const row = document.createElement("div");
+    row.className="stat-row";
+    row.innerHTML = `
+      <div class="ic" style="background:${s.color}22">${s.icon}</div>
+      <div class="nm">${s.name}</div>
+      <div class="track"><i style="width:${v}%;background:${s.color}"></i></div>
+      <div class="vl">${v}</div>`;
+    box.appendChild(row);
+  });
+  const avg = Math.round(STATS.reduce((a,s)=>a+S.stats[s.key],0)/STATS.length);
+  const done = S.quests.filter(q=>q.done).length;
+  $("summaryLine").textContent = `平均バランス ${avg} ・ 累計XP ${S.totalXP} ・ 達成クエスト ${done}件 ・ ${S.streakCount}日連続`;
+  renderRadar();
+}
+
+function renderRadar(){
+  const ctx = $("radar");
+  const data = STATS.map(s=>S.stats[s.key]);
+  if(radarChart){ radarChart.data.datasets[0].data=data; radarChart.update(); return; }
+  radarChart = new Chart(ctx,{
+    type:"radar",
+    data:{labels:STATS.map(s=>s.name),datasets:[{
+      data,fill:true,
+      backgroundColor:"rgba(155,123,255,.22)",
+      borderColor:"#9b7bff",pointBackgroundColor:"#ffc24b",
+      pointBorderColor:"#fff",borderWidth:2,
+    }]},
+    options:{plugins:{legend:{display:false}},
+      scales:{r:{min:0,max:100,ticks:{display:false,stepSize:20},
+        grid:{color:"#3a3350"},angleLines:{color:"#3a3350"},
+        pointLabels:{color:"#b7aecd",font:{size:13,family:"Zen Maru Gothic"}}}}}
+  });
+}
+
+function renderMood(){
+  const ctx = $("moodChart");
+  const recent = S.moods.slice(-10);
+  const labels = recent.map(m=>m.date.slice(5));
+  const data = recent.map(m=>m.value);
+  if(moodChart){ moodChart.data.labels=labels; moodChart.data.datasets[0].data=data; moodChart.update(); return; }
+  moodChart = new Chart(ctx,{
+    type:"line",
+    data:{labels,datasets:[{data,tension:.4,borderColor:"#3fd6c4",
+      backgroundColor:"rgba(63,214,196,.15)",fill:true,pointBackgroundColor:"#ffc24b",pointRadius:4}]},
+    options:{plugins:{legend:{display:false}},
+      scales:{y:{min:1,max:5,ticks:{color:"#7d7396",stepSize:1},grid:{color:"#2c2640"}},
+              x:{ticks:{color:"#7d7396"},grid:{display:false}}}}
+  });
+}
+
+function renderFocus(){
+  const box=$("focusBox");
+  if(!S.focus){ box.innerHTML=`<div class="empty">コーチに「今日のチェックインしたい」と話しかけると、今日の主役が決まります 🌅</div>`; return; }
+  box.innerHTML = `<div class="quest" style="margin:0"><div class="check" style="border-color:var(--amber);color:var(--amber)">⚡</div>
+    <div class="tt">${esc(S.focus)}</div></div>`;
+}
+
+function renderQuests(){
+  const list=$("questList"); list.innerHTML="";
+  if(S.quests.length===0){ list.innerHTML=`<div class="empty">まだクエストがありません。手動追加するか、コーチに提案してもらおう 🗡️</div>`; }
+  S.quests.forEach((q,i)=>{
+    const cat = STATS.find(s=>s.key===q.category);
+    const el=document.createElement("div");
+    el.className="quest"+(q.done?" done":"");
+    el.innerHTML=`
+      <div class="check" data-i="${i}">✓</div>
+      <div class="tt">${esc(q.title)}</div>
+      <span class="cat pill">${cat?cat.icon+" "+cat.name:"⭐ 自由"}</span>
+      <span class="xp">+${q.xp}XP</span>
+      <button class="del" data-del="${i}">✕</button>`;
+    list.appendChild(el);
+  });
+  list.querySelectorAll(".check").forEach(c=>c.onclick=()=>toggleQuest(+c.dataset.i));
+  list.querySelectorAll(".del").forEach(d=>d.onclick=()=>{S.quests.splice(+d.dataset.del,1);save();renderQuests();});
+}
+
+function renderAll(){ renderHeader(); renderStats(); renderMood(); renderFocus(); renderQuests(); }
+
+/* ---------------- Game mechanics ---------------- */
+function addXP(amount, reason){
+  if(!amount) return;
+  const before = levelInfo().level;
+  S.totalXP += amount; save();
+  const after = levelInfo().level;
+  renderHeader();
+  toast(`+${amount} XP${reason?" · "+reason:""}`,"xp");
+  if(after>before){ setTimeout(()=>toast(`🎉 レベルアップ！ Lv.${after}`,"lvl"),400); confetti(); }
+}
+function applyStatDeltas(deltas){
+  if(!deltas) return;
+  let changed=false;
+  STATS.forEach(s=>{
+    const d = deltas[s.key];
+    if(typeof d==="number" && d!==0){
+      S.stats[s.key] = Math.max(0,Math.min(100, S.stats[s.key]+d));
+      changed=true;
+    }
+  });
+  if(changed){ save(); renderStats(); }
+}
+function addQuests(arr){
+  if(!Array.isArray(arr)) return;
+  arr.forEach(q=>{
+    if(!q || !q.title) return;
+    S.quests.push({title:q.title, category:STATS.some(s=>s.key===q.category)?q.category:null, xp:q.xp||15, done:false});
+  });
+  save(); renderQuests();
+}
+function toggleQuest(i){
+  const q=S.quests[i]; if(!q) return;
+  q.done=!q.done; save(); renderQuests();
+  if(q.done){
+    addXP(q.xp,"クエスト達成");
+    if(q.category){ S.stats[q.category]=Math.min(100,S.stats[q.category]+3); save(); renderStats(); }
+  }
+}
+function addQuestManual(){
+  const inp=$("newQuest"); const t=inp.value.trim(); if(!t) return;
+  S.quests.push({title:t,category:null,xp:15,done:false});
+  inp.value=""; save(); renderQuests();
+}
+
+/* ---------------- Claude API ---------------- */
+const COACH_SYSTEM = `あなたは「LIFE QUEST」という人生管理アプリに搭載された、最高にエネルギッシュでワクワクさせるAIライフコーチです。
+
+# あなたのキャラクター
+- ポジティブで、スピード感があり、トレンドに敏感。マーケティングや広告が大好き。
+- ユーザーを応援する相棒。説教くさくならず、対等に、面白がりながら話す。
+- 共感をベースにしつつ、ときに鋭く本質を突く質問をする。
+- 返信は簡潔に。長くなりすぎない（2〜5文を基本に、必要なときだけ深掘り）。
+- 日本語で、親しみやすくフランクに。絵文字は控えめに効果的に。
+
+# あなたの役割
+1. 朝のチェックイン：今日一番ワクワクすることを聞き、今日の主役タスク（focus）を一緒に1つ決める。
+2. 夜のふりかえり：今日を一緒に振り返り、気分(mood)を1〜5で見立てる。良かったことを必ず1つ拾う。
+3. 壁打ち：悩みやアイデアを深掘りする質問を返す。
+4. 会話の内容に応じて、ゲーム要素（XP・ステータス・クエスト）を動かす。
+
+# ゲーム要素の動かし方（重要）
+あなたの返信は必ず指定のJSON形式で返します。
+- reply: ユーザーに見せる会話メッセージ。
+- xp_awarded: 良い行動・前向きな一歩・正直な振り返りがあれば 5〜30 のXPを与える。なければ0。
+- xp_reason: XPを与えた理由（短く）。なければ空文字。
+- mood: 夜のふりかえりやユーザーの感情が読み取れたとき 1〜5。読み取れなければ null。
+- stat_updates: 会話内容に関連する人生5軸の増減（-2〜+3）。health=健康, work=仕事, growth=学び, relationships=人間関係, play=遊び。変化なしは0。
+- focus: 朝のチェックインなどで「今日の主役タスク」が決まったらその短い文。変化なければ null。
+- quests: ユーザーに提案する新しいクエストがあれば配列で。各 {title, category, xp}。categoryは5軸のkeyかnull。xpは10〜30。提案しないなら空配列。
+
+控えめに、でも会話が前に進んだら必ずゲーム要素を動かして、達成感を演出してください。`;
+
+const SCHEMA = {
+  type:"object",
+  properties:{
+    reply:{type:"string"},
+    xp_awarded:{type:"integer"},
+    xp_reason:{type:"string"},
+    mood:{type:["integer","null"]},
+    stat_updates:{type:"object",properties:{
+      health:{type:"integer"},work:{type:"integer"},growth:{type:"integer"},
+      relationships:{type:"integer"},play:{type:"integer"}},
+      required:["health","work","growth","relationships","play"],additionalProperties:false},
+    focus:{type:["string","null"]},
+    quests:{type:"array",items:{type:"object",properties:{
+      title:{type:"string"},category:{type:["string","null"]},xp:{type:"integer"}},
+      required:["title","category","xp"],additionalProperties:false}}
+  },
+  required:["reply","xp_awarded","xp_reason","mood","stat_updates","focus","quests"],
+  additionalProperties:false
+};
+
+function stateContext(){
+  const {level} = levelInfo();
+  const st = STATS.map(s=>`${s.name}:${S.stats[s.key]}`).join(" / ");
+  const open = S.quests.filter(q=>!q.done).map(q=>q.title).slice(0,5);
+  return `[現在の状態] 名前:${S.userName||"未設定"} / Lv${level} / 累計XP${S.totalXP} / ${S.streakCount}日連続\n[5軸] ${st}\n[今日のfocus] ${S.focus||"未設定"}\n[進行中クエスト] ${open.length?open.join("、"):"なし"}\n[今日の日付] ${new Date().toLocaleDateString("ja-JP")}`;
+}
+
+async function callClaude(userText){
+  if(!S.apiKey){ openSettings(); throw new Error("APIキーが未設定です"); }
+  // Stable system is cached; volatile state is injected into the user turn.
+  const apiMessages = S.messages.concat([
+    {role:"user", content: stateContext()+"\n\n"+userText}
+  ]);
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key":S.apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true",
+    },
+    body:JSON.stringify({
+      model:S.model,
+      max_tokens:1500,
+      thinking:{type:"disabled"},
+      output_config:{format:{type:"json_schema",schema:SCHEMA}},
+      system:[{type:"text",text:COACH_SYSTEM,cache_control:{type:"ephemeral"}}],
+      messages:apiMessages,
+    })
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`API ${res.status}: ${t.slice(0,300)}`);
+  }
+  const data = await res.json();
+  const block = (data.content||[]).find(b=>b.type==="text");
+  if(!block) throw new Error("空の応答");
+  return JSON.parse(block.text);
+}
+
+/* ---------------- Chat flow ---------------- */
+let busy=false;
+function pushMsg(role,text){
+  const div=document.createElement("div");
+  div.className="msg "+(role==="user"?"me":role==="system"?"sys":"ai");
+  div.textContent=text;
+  $("stream").appendChild(div);
+  $("stream").scrollTop=$("stream").scrollHeight;
+}
+
+async function sendMessage(text){
+  text=(text||$("input").value).trim();
+  if(!text||busy) return;
+  busy=true; $("sendBtn").disabled=true; $("input").value="";
+  touchStreak(); renderHeader();
+  pushMsg("user",text);
+
+  const typing=document.createElement("div");
+  typing.className="typing"; typing.innerHTML="コーチが考え中 <i></i><i></i><i></i>";
+  $("stream").appendChild(typing); $("stream").scrollTop=$("stream").scrollHeight;
+
+  try{
+    const out = await callClaude(text);
+    typing.remove();
+    pushMsg("assistant",out.reply);
+
+    // persist conversation (store the raw user text + assistant reply only)
+    S.messages.push({role:"user",content:text});
+    S.messages.push({role:"assistant",content:out.reply});
+    if(S.messages.length>40) S.messages = S.messages.slice(-40);
+
+    // apply game effects
+    applyStatDeltas(out.stat_updates);
+    if(out.focus){ S.focus=out.focus; save(); renderFocus(); }
+    if(typeof out.mood==="number"){
+      S.moods.push({date:new Date().toISOString().slice(0,10),value:out.mood});
+      if(S.moods.length>30)S.moods=S.moods.slice(-30);
+      save(); renderMood();
+    }
+    if(out.quests&&out.quests.length){ addQuests(out.quests); toast(`🗡️ クエストが${out.quests.length}件追加された！`); }
+    if(out.xp_awarded) addXP(out.xp_awarded,out.xp_reason);
+    save();
+  }catch(e){
+    typing.remove();
+    pushMsg("system","⚠️ "+e.message);
+  }finally{
+    busy=false; $("sendBtn").disabled=false; $("input").focus();
+  }
+}
+
+/* ---------------- UI plumbing ---------------- */
+function $(id){return document.getElementById(id);}
+function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
+function toast(msg,kind=""){
+  const t=document.createElement("div");
+  t.className="toast "+kind; t.textContent=msg;
+  $("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition=".4s";setTimeout(()=>t.remove(),400);},2200);
+}
+function confetti(){
+  const colors=["#ff6b5e","#ffc24b","#3fd6c4","#9b7bff","#5fe08a"];
+  for(let i=0;i<40;i++){
+    const c=document.createElement("div");
+    c.style.cssText=`position:fixed;top:-10px;left:${Math.random()*100}vw;width:9px;height:9px;
+      background:${colors[i%5]};z-index:99;border-radius:2px;pointer-events:none;
+      transition:transform 1.4s ease-in,opacity 1.4s;`;
+    document.body.appendChild(c);
+    requestAnimationFrame(()=>{c.style.transform=`translateY(105vh) rotate(${Math.random()*720}deg)`;c.style.opacity="0";});
+    setTimeout(()=>c.remove(),1500);
+  }
+}
+
+function switchTab(name){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));
+  ["home","dash","quest"].forEach(t=>$("tab-"+t).classList.toggle("hide",t!==name));
+  if(name==="dash"){ renderStats(); renderMood(); }
+}
+
+function openSettings(){
+  $("apiKey").value=S.apiKey; $("modelSel").value=S.model; $("userName").value=S.userName;
+  $("settings").classList.add("show");
+}
+
+/* ---------------- Events ---------------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+document.querySelectorAll(".quick button").forEach(b=>b.onclick=()=>sendMessage(b.dataset.q));
+$("sendBtn").onclick=()=>sendMessage();
+$("input").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();} });
+$("addQuestBtn").onclick=addQuestManual;
+$("newQuest").addEventListener("keydown",e=>{ if(e.key==="Enter")addQuestManual(); });
+$("gearBtn").onclick=openSettings;
+$("saveSettings").onclick=()=>{
+  S.apiKey=$("apiKey").value.trim(); S.model=$("modelSel").value; S.userName=$("userName").value.trim();
+  save(); $("settings").classList.remove("show"); renderHeader();
+  toast("設定を保存しました ✓");
+};
+$("resetBtn").onclick=()=>{ if(confirm("すべてのデータ（XP・ステータス・クエスト・会話履歴）を初期化しますか？")){ localStorage.removeItem("lifequest"); location.reload(); } };
+$("settings").addEventListener("click",e=>{ if(e.target.id==="settings")$("settings").classList.remove("show"); });
+
+/* ---------------- Boot ---------------- */
+renderAll();
+if(!S.apiKey){
+  pushMsg("assistant","やあ！LIFE QUESTへようこそ 🎯\nここは、僕と話すだけで人生がちょっと前に進む場所。会話するとXPが貯まって、ステータスが育って、クエストが生まれるよ。\n\nまずは右上の⚙️からAPIキーを入れてね。準備できたら「おはよう」って話しかけて！");
+}else{
+  pushMsg("assistant","おかえり！今日はどんな一日だった？気軽に話して。チェックインでもふりかえりでも、壁打ちでもOKだよ 🙌");
+}
+</script>
+</body>
+</html>
