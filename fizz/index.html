@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>あなたの炭酸性格は？ | Coca-Cola × フルーティス FIZZ診断</title>
+    <meta name="description" content="10個の質問に答えるだけで、あなたの“炭酸性格”を解析。16タイプからあなた専用の「コーラ × フルーティス」レシピが見つかる、はじける診断コンテンツ。">
+    <meta name="theme-color" content="#0B0B12">
+
+    <!-- OGP -->
+    <meta property="og:title" content="あなたの炭酸性格は？ | Coca-Cola × フルーティス FIZZ診断">
+    <meta property="og:description" content="10の質問で“炭酸性格”を解析。16タイプからあなただけの一杯が見つかる、はじける診断。">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="ogp.png">
+    <meta property="og:url" content="https://example.com/">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="あなたの炭酸性格は？ | Coca-Cola × フルーティス FIZZ診断">
+    <meta name="twitter:description" content="10の質問で“炭酸性格”を解析。16タイプからあなただけの一杯が見つかる。">
+    <meta name="twitter:image" content="ogp.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Anton&family=Pacifico&family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥤</text></svg>">
+</head>
+
+<body>
+    <!-- 背景：立ち上る泡 -->
+    <div class="bg-bubbles" id="bg-bubbles" aria-hidden="true"></div>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <!-- サウンドトグル -->
+    <button class="sound-toggle" id="sound-toggle" aria-pressed="true" aria-label="効果音のオン・オフ">
+        <span class="sound-on" aria-hidden="true">🔊</span>
+        <span class="sound-off" aria-hidden="true">🔇</span>
+    </button>
+
+    <div class="app-container">
+
+        <header class="site-header">
+            <div class="brand-lockup">
+                <span class="brand-coke">Coca&#8209;Cola</span>
+                <span class="brand-x">×</span>
+                <span class="brand-fruitis">フルーティス</span>
+            </div>
+        </header>
+
+        <main id="main">
+
+            <!-- 1. スタート -->
+            <section id="start-screen" class="screen active" aria-labelledby="hero-title">
+                <div class="hero">
+                    <p class="hero-kicker">あなたの“炭酸性格”、まる見え診断</p>
+                    <h1 class="hero-title" id="hero-title">
+                        <span class="hero-fizz">FIZZ</span>
+                        <span class="hero-sub">診断</span>
+                    </h1>
+                    <div class="hero-glass" id="hero-glass" aria-hidden="true"></div>
+                    <p class="hero-desc">
+                        10の質問に答えるだけ。<br>
+                        <strong>16タイプ</strong>から、あなただけの<br>
+                        「コーラ × フルーティス」の一杯が見つかる。
+                    </p>
+                    <button id="start-btn" class="btn primary-btn">
+                        <span>診断をはじめる</span>
+                        <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <p class="start-note">所要時間：約1分 ・ 全10問</p>
+                </div>
+            </section>
+
+            <!-- 2. 設問 -->
+            <section id="question-screen" class="screen hidden" aria-labelledby="question-text">
+                <div class="q-top">
+                    <!-- 満ちていくグラス -->
+                    <div class="q-glass" id="q-glass" aria-hidden="true">
+                        <svg viewBox="0 0 80 96" class="q-glass-svg">
+                            <defs>
+                                <clipPath id="glassClip">
+                                    <path d="M16 8 H64 L58 84 Q57 90 51 90 H29 Q23 90 22 84 Z" />
+                                </clipPath>
+                                <linearGradient id="qLiquid" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0" stop-color="var(--accent, #E4002B)" />
+                                    <stop offset="1" stop-color="var(--accent-2, #7A0019)" />
+                                </linearGradient>
+                            </defs>
+                            <g clip-path="url(#glassClip)">
+                                <rect id="q-liquid" x="0" y="96" width="80" height="96" fill="url(#qLiquid)" />
+                                <g id="q-fizz"></g>
+                            </g>
+                            <path class="q-glass-outline" d="M16 8 H64 L58 84 Q57 90 51 90 H29 Q23 90 22 84 Z" />
+                            <line class="q-glass-shine" x1="26" y1="16" x2="22" y2="78" />
+                        </svg>
+                    </div>
+                    <div class="q-meta">
+                        <span class="q-count">Q<span id="current-q-num">1</span><span class="q-slash">/</span><span id="total-q-num">10</span></span>
+                        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+                    </div>
+                </div>
+
+                <h2 class="question-text" id="question-text">休日の過ごし方は？</h2>
+
+                <div class="options-container" id="options-container"></div>
+
+                <button id="back-btn" class="btn back-btn hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    前の質問に戻る
+                </button>
+            </section>
+
+            <!-- 3. ローディング -->
+            <section id="loading-screen" class="screen hidden" aria-live="polite">
+                <div class="loading-content">
+                    <div class="pour-stage" aria-hidden="true">
+                        <div class="pour-stream"></div>
+                        <div class="pour-glass">
+                            <div class="pour-liquid" id="pour-liquid"></div>
+                            <div class="pour-fizz" id="pour-fizz">
+                                <span style="left:24%;animation-delay:0s"></span>
+                                <span style="left:44%;animation-delay:.4s"></span>
+                                <span style="left:62%;animation-delay:.8s"></span>
+                                <span style="left:36%;animation-delay:1.1s"></span>
+                                <span style="left:72%;animation-delay:.6s"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="loading-text">あなたの一杯を<br><strong id="loading-strong">ブレンド中…</strong></p>
+                </div>
+            </section>
+
+            <!-- 4. 結果 -->
+            <section id="result-screen" class="screen hidden" aria-labelledby="result-type-name">
+                <div class="result-wrapper">
+
+                    <!-- 図鑑プレビュー時のバナー -->
+                    <div class="preview-banner hidden" id="preview-banner">
+                        <span>📖 図鑑プレビュー中 ／ あなたの結果は「<strong id="preview-own-name">—</strong>」</span>
+                        <button class="back-to-own" id="back-to-own-btn">結果に戻る</button>
+                    </div>
+
+                    <div class="result-header">
+                        <p class="result-label">あなたの炭酸性格は…</p>
+                        <p class="result-code" id="result-code">K-T-P-F</p>
+                        <h2 class="result-title" id="result-type-name">ご褒美ストロング</h2>
+                        <p class="result-quote" id="result-quote">「今日のわたし、よく頑張った。」</p>
+                        <p class="result-tagline" id="result-tagline">頑張った自分に、濃いめの一杯を。</p>
+                        <div class="result-rarity">
+                            <span class="rarity-label">出現率</span>
+                            <span class="rarity-value" id="result-rarity">6%</span>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-card" id="recommendation-card">
+                        <div class="rec-visual">
+                            <div class="rec-drink" id="rec-drink" aria-hidden="true"></div>
+                            <div class="rec-badge" id="rec-emoji" aria-hidden="true">🥤</div>
+                        </div>
+
+                        <div class="rec-content">
+                            <div class="rec-label">YOUR SIGNATURE BLEND</div>
+                            <h3 class="rec-product-name" id="rec-product-name">ディープ・ルビーコーク</h3>
+
+                            <div class="rec-meta">
+                                <span class="chip chip-base" id="rec-base">コカ・コーラ</span>
+                                <span class="chip chip-x">×</span>
+                                <span class="chip chip-flavor" id="rec-flavor">フルーティス ザクロ&ブラックベリー</span>
+                            </div>
+
+                            <div class="recipe-box">
+                                <p class="recipe-title">おいしい作り方</p>
+                                <ul class="recipe-list" id="recipe-list"></ul>
+                                <p class="recipe-tip" id="recipe-tip"></p>
+                            </div>
+
+                            <p class="rec-desc" id="result-description"></p>
+
+                            <div class="result-extra">
+                                <div class="extra-block">
+                                    <span class="extra-title">🫧 裏の顔</span>
+                                    <p class="extra-text" id="result-hidden"></p>
+                                </div>
+                                <div class="extra-block match-block">
+                                    <span class="extra-title">💞 相性のいいタイプ</span>
+                                    <p class="extra-text"><strong id="result-match-name">—</strong><span id="result-match-desc"></span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 16タイプ図鑑 -->
+                    <div class="type-dex-section">
+                        <h4 class="section-title">🗺️ 16タイプ図鑑<br><span class="title-sub">タップで全タイプをチェック（<strong id="grid-progress">あなたはこのタイプ</strong>）</span></h4>
+                        <div class="type-grid" id="type-grid"></div>
+                    </div>
+
+                    <!-- シェア画像 -->
+                    <div class="sharecard-section">
+                        <h4 class="section-title">結果をシェアして応募！<br><span class="title-sub">抽選で <strong>100名様</strong> にコーラ×フルーティス体験セットが当たる🎁</span></h4>
+                        <div class="sharecard-preview">
+                            <canvas id="share-canvas" width="1080" height="1350" aria-label="診断結果のシェア画像"></canvas>
+                        </div>
+                        <button class="btn save-btn" id="save-img-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                            </svg>
+                            画像を保存する
+                        </button>
+
+                        <div class="sns-buttons">
+                            <button class="sns-btn x-btn" id="share-x-btn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
+                                <span>Xでシェア</span>
+                            </button>
+                            <button class="sns-btn line-btn" id="share-line-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                                    <path d="M12 2C6.48 2 2 5.69 2 10.23c0 4.07 3.58 7.48 8.42 8.12.33.07.77.22.88.5.1.26.07.66.03.92l-.14.85c-.04.26-.2 1.02.89.56 1.1-.46 5.9-3.47 8.05-5.95C21.5 13.5 22 11.94 22 10.23 22 5.69 17.52 2 12 2zM8.2 12.6H6.16c-.3 0-.54-.24-.54-.54V8.4c0-.3.24-.54.54-.54.3 0 .54.24.54.54v3.12H8.2c.3 0 .54.24.54.54s-.24.54-.54.54zm2.06-.54c0 .3-.24.54-.54.54s-.54-.24-.54-.54V8.4c0-.3.24-.54.54-.54s.54.24.54.54v3.66zm4.42 0c0 .23-.15.44-.37.51-.06.02-.12.03-.17.03-.17 0-.33-.08-.43-.22l-1.87-2.54v2.22c0 .3-.24.54-.54.54s-.54-.24-.54-.54V8.4c0-.23.15-.44.37-.51.05-.02.11-.03.17-.03.17 0 .33.08.43.22l1.87 2.54V8.4c0-.3.24-.54.54-.54s.54.24.54.54v3.66zm3.4-2.37c.3 0 .54.24.54.54s-.24.54-.54.54h-1.5v.75h1.5c.3 0 .54.24.54.54s-.24.54-.54.54h-2.04c-.3 0-.54-.24-.54-.54V8.4c0-.3.24-.54.54-.54h2.04c.3 0 .54.24.54.54s-.24.54-.54.54h-1.5v.75h1.5z" />
+                                </svg>
+                                <span>LINEで送る</span>
+                            </button>
+                        </div>
+                        <p class="hashtag-info">ハッシュタグ <strong>#コーラ炭酸性格診断</strong> <strong>#フルーティス</strong></p>
+                    </div>
+
+                    <!-- リンク -->
+                    <div class="main-links-section">
+                        <h4 class="section-title">この一杯を、おうちで。</h4>
+                        <div class="main-links-grid">
+                            <a href="https://www.mizkan.co.jp/fruity-su/" target="_blank" rel="noopener noreferrer" class="main-link-card">
+                                <span class="link-title">フルーティス ブランドサイト</span>
+                                <span class="link-desc">公式情報・全フレーバー</span>
+                                <svg class="link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                            </a>
+                            <a href="https://www.cocacola.jp/" target="_blank" rel="noopener noreferrer" class="main-link-card">
+                                <span class="link-title">Coca-Cola 公式</span>
+                                <span class="link-desc">キャンペーン情報はこちら</span>
+                                <svg class="link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="retry-btn" class="btn retry-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                <path d="M3 3v5h5" />
+                            </svg>
+                            もう一度診断する
+                        </button>
+                    </div>
+
+                    <p class="result-disclaimer">※本コンテンツはCoca-Cola／ミツカン フルーティスのコラボ企画イメージです。商品名・分量は提案用のサンプルです。</p>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-content">
+                <small>&copy; The Coca-Cola Company / Mizkan Holdings Co., Ltd. — concept by TORIHADA</small>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- 結果リビール時の泡はじけ -->
+    <div class="burst-layer" id="burst-layer" aria-hidden="true"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

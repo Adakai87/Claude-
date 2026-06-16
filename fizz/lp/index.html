@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Coca-Cola × フルーティス｜FIZZ診断 特設サイト</title>
+    <meta name="description" content="キミの“炭酸性格”、まる見え。10の質問で、あなただけの「コーラ × フルーティス」の一杯が見つかる、はじける診断キャンペーン。">
+    <meta name="theme-color" content="#0B0B12">
+    <meta property="og:title" content="Coca-Cola × フルーティス｜FIZZ診断">
+    <meta property="og:description" content="キミの“炭酸性格”、まる見え。あなただけの一杯が見つかる、はじける診断。">
+    <meta property="og:image" content="../ogp.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Pacifico&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥤</text></svg>">
+    <style>
+        :root {
+            --red: #E4002B;
+            --red-deep: #9E0019;
+            --ink: #0B0B12;
+            --foam: #FFF7F2;
+            --muted: #9C9AAA;
+            --glow: rgba(228, 0, 43, .5);
+            --line: rgba(255, 255, 255, .12);
+            --maxw: 560px;
+            --ease: cubic-bezier(.22, 1, .36, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+        body {
+            font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
+            color: var(--foam);
+            background: radial-gradient(120% 60% at 50% -5%, #1c1430 0%, var(--ink) 50%, #050509 100%);
+            line-height: 1.8; overflow-x: hidden; -webkit-font-smoothing: antialiased;
+        }
+
+        .bubbles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .bubbles span {
+            position: absolute; bottom: -40px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, .5), rgba(255, 255, 255, .04) 60%, transparent 70%);
+            animation: rise linear infinite; opacity: 0;
+        }
+        @keyframes rise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 12% { opacity: .8; } 90% { opacity: .4; } 100% { transform: translateY(-112vh) scale(1.1); opacity: 0; } }
+
+        .wrap { position: relative; z-index: 1; max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+        .brand { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 22px 0 6px; font-size: 13px; font-weight: 700; }
+        .brand .ck { font-family: "Pacifico", cursive; color: var(--red); font-size: 18px; transform: rotate(-3deg); text-shadow: 0 0 16px var(--glow); }
+        .brand .x { color: var(--muted); font-size: 12px; }
+        .brand .fr { background: linear-gradient(90deg, #ff7eb3, #ffd86b); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 900; }
+
+        /* hero */
+        .hero { text-align: center; padding: 18px 0 70px; min-height: 88vh; display: flex; flex-direction: column; justify-content: center; }
+        .hero .eyebrow {
+            display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--foam);
+            background: rgba(255, 255, 255, .07); border: 1px solid var(--line); padding: 7px 15px; border-radius: 999px; margin: 0 auto 22px;
+        }
+        .hero h1 { line-height: .9; }
+        .hero .fizz {
+            display: block; font-family: "Anton", sans-serif; font-size: clamp(82px, 26vw, 140px); letter-spacing: .02em;
+            background: linear-gradient(180deg, #fff 0%, #ffd9df 42%, var(--red) 100%);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            filter: drop-shadow(0 10px 30px rgba(228, 0, 43, .4));
+        }
+        .hero .shin { display: inline-block; font-weight: 900; font-size: clamp(22px, 6vw, 30px); letter-spacing: .34em; padding-left: .34em; transform: translateY(-8px); }
+        .hero-glass { width: 150px; height: 190px; margin: 8px auto 22px; filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .55)); animation: floaty 4s ease-in-out infinite; }
+        @keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+        .hero .catch { font-size: clamp(22px, 6vw, 32px); font-weight: 900; margin-bottom: 14px; }
+        .hero .catch .r { color: var(--red); text-shadow: 0 0 30px var(--glow); }
+        .hero .sub { font-size: clamp(14px, 3.6vw, 16px); color: #e7e3ee; margin-bottom: 32px; }
+        .hero .sub strong { color: #fff; background: linear-gradient(transparent 62%, var(--glow) 62%); padding: 0 2px; }
+
+        .cta {
+            display: inline-flex; align-items: center; justify-content: center; gap: 9px; text-decoration: none;
+            font-size: 18px; font-weight: 900; letter-spacing: .03em; color: #fff;
+            padding: 18px 34px; border-radius: 999px;
+            background: linear-gradient(135deg, #ff2f54 0%, var(--red) 45%, var(--red-deep) 100%);
+            box-shadow: 0 16px 38px -12px var(--glow), inset 0 1px 0 rgba(255, 255, 255, .35);
+            position: relative; overflow: hidden; animation: pulse 2.6s ease-in-out infinite;
+        }
+        .cta::after { content: ""; position: absolute; top: 0; left: -120%; width: 55%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .5), transparent); transform: skewX(-20deg); animation: shine 3.6s ease-in-out infinite; }
+        @keyframes shine { 0%, 60% { left: -120%; } 100% { left: 130%; } }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 16px 38px -12px var(--glow), inset 0 1px 0 rgba(255, 255, 255, .35); } 50% { box-shadow: 0 20px 50px -10px var(--glow), inset 0 1px 0 rgba(255, 255, 255, .45); } }
+        .cta-note { font-size: 12px; color: var(--muted); margin-top: 14px; }
+        .scroll-hint { margin-top: 40px; font-size: 12px; color: var(--muted); letter-spacing: .08em; animation: bob 1.8s ease-in-out infinite; }
+        @keyframes bob { 0%, 100% { transform: translateY(0); opacity: .6; } 50% { transform: translateY(6px); opacity: 1; } }
+
+        /* sections */
+        section.block { padding: 60px 0; }
+        .sec-label { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: var(--red); text-align: center; }
+        .sec-label::before { content: "● "; }
+        h2.sec { font-size: clamp(24px, 6.4vw, 34px); font-weight: 900; line-height: 1.35; text-align: center; margin: 14px 0 10px; }
+        h2.sec .r { color: var(--red); }
+        .sec-lead { text-align: center; font-size: 14.5px; color: #d7d3df; max-width: 32ch; margin: 0 auto; }
+
+        .features { margin-top: 34px; display: grid; gap: 14px; }
+        .feat { display: flex; gap: 16px; align-items: center; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+        .feat .ic { font-size: 34px; flex: 0 0 auto; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .4)); }
+        .feat h3 { font-size: 17px; font-weight: 900; }
+        .feat p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+        /* steps + phones */
+        .steps { margin-top: 36px; display: grid; gap: 30px; }
+        .step { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .phone {
+            width: 184px; height: 372px; border-radius: 30px; padding: 12px;
+            background: linear-gradient(160deg, #2a2740, #12121c); border: 1px solid rgba(255, 255, 255, .14);
+            box-shadow: 0 26px 50px -22px rgba(0, 0, 0, .8); position: relative; margin-bottom: 16px;
+        }
+        .phone::before { content: ""; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 50px; height: 5px; background: rgba(255, 255, 255, .2); border-radius: 999px; }
+        .screen { width: 100%; height: 100%; border-radius: 20px; background: radial-gradient(120% 70% at 50% 0%, #1c1430, #0a0a10 70%); overflow: hidden; display: flex; flex-direction: column; padding: 26px 14px 14px; }
+        .mini-prog { height: 5px; background: rgba(255, 255, 255, .14); border-radius: 999px; overflow: hidden; }
+        .mini-prog i { display: block; height: 100%; width: 35%; background: linear-gradient(90deg, var(--red), #ff7a8f); }
+        .mini-q { font-size: 11px; color: var(--muted); margin: 9px 0 4px; }
+        .mini-title { font-size: 13.5px; font-weight: 900; line-height: 1.45; }
+        .mini-opts { margin-top: auto; display: grid; gap: 8px; }
+        .mini-opt { font-size: 11.5px; font-weight: 700; text-align: left; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid var(--line); }
+        .mini-opt.on { border-color: var(--red); background: linear-gradient(135deg, rgba(228, 0, 43, .22), rgba(228, 0, 43, .05)); }
+        .mini-center { margin: auto; text-align: center; }
+        .mini-center .g { width: 64px; height: 80px; margin: 0 auto 14px; }
+        .mini-center .lt { font-size: 13px; font-weight: 700; color: #e7e3ee; }
+        .mini-center .lt b { color: #fff; }
+        .mini-res { text-align: center; margin: auto 0; }
+        .mini-res .lbl { font-size: 10px; color: var(--muted); }
+        .mini-res .nm { font-size: 17px; font-weight: 900; margin: 4px 0 6px; background: linear-gradient(180deg, #fff, #ffd9df); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .mini-res .qt { font-size: 11px; font-weight: 700; color: var(--red); }
+        .mini-res .dg { width: 70px; height: 88px; margin: 12px auto 8px; }
+        .mini-res .pr { font-size: 11px; font-weight: 900; }
+        .step .num { font-family: "Anton", sans-serif; font-size: 20px; color: var(--red); }
+        .step .st { font-size: 16px; font-weight: 900; margin-top: 2px; }
+        .step .sd { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+        /* type teaser */
+        .type-row { margin: 32px -20px 0; padding: 4px 20px 14px; display: flex; gap: 13px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+        .type-row::-webkit-scrollbar { display: none; }
+        .tcard { scroll-snap-align: center; flex: 0 0 200px; background: linear-gradient(160deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .03)); border: 1px solid var(--line); border-radius: 20px; padding: 20px 18px; }
+        .tcard .em { font-size: 34px; }
+        .tcard .nm { font-size: 16px; font-weight: 900; margin: 8px 0 6px; }
+        .tcard .qt { font-size: 12.5px; font-weight: 700; color: var(--red); line-height: 1.5; }
+        .tcard .dr { font-size: 11px; color: var(--muted); margin-top: 10px; }
+        .row-hint { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+        /* campaign */
+        .camp { margin-top: 30px; text-align: center; background: linear-gradient(160deg, rgba(228, 0, 43, .18), rgba(255, 255, 255, .03)); border: 1px solid rgba(228, 0, 43, .3); border-radius: 24px; padding: 30px 22px; }
+        .camp .gift { font-size: 42px; }
+        .camp h3 { font-size: 19px; font-weight: 900; margin: 8px 0 10px; }
+        .camp h3 b { color: var(--red); }
+        .camp p { font-size: 13px; color: #d7d3df; }
+        .camp .tags { margin-top: 16px; font-size: 12px; color: var(--muted); }
+        .camp .tags strong { color: #efeaf2; }
+
+        /* final */
+        .final { text-align: center; padding: 70px 0 40px; }
+        .final h2 { font-size: clamp(26px, 7vw, 38px); font-weight: 900; line-height: 1.3; margin-bottom: 26px; }
+        .final h2 .r { color: var(--red); }
+
+        footer { text-align: center; padding: 28px 0 40px; }
+        footer small { font-size: 10.5px; color: #5f5d6e; }
+
+        /* sticky cta */
+        .sticky { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: center; padding: 0 0 calc(16px + env(safe-area-inset-bottom)); transform: translateY(140%); transition: transform .4s var(--ease); pointer-events: none; }
+        .sticky.show { transform: translateY(0); }
+        .sticky a { pointer-events: auto; font-size: 15px; font-weight: 900; color: #fff; text-decoration: none; padding: 15px 30px; border-radius: 999px; background: linear-gradient(135deg, #ff2f54, var(--red)); box-shadow: 0 14px 30px -10px var(--glow); }
+
+        .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+        .reveal.in { opacity: 1; transform: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+            .bubbles { display: none; }
+            .reveal { opacity: 1; transform: none; }
+        }
+        :focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 6px; }
+    </style>
+</head>
+
+<body>
+    <div class="bubbles" id="bubbles" aria-hidden="true"></div>
+
+    <div class="wrap">
+        <div class="brand"><span class="ck">Coca&#8209;Cola</span><span class="x">×</span><span class="fr">フルーティス</span></div>
+
+        <!-- HERO -->
+        <header class="hero">
+            <span class="eyebrow">あなたの“炭酸性格”、まる見え診断</span>
+            <h1><span class="fizz">FIZZ</span><span class="shin">診断</span></h1>
+            <div class="hero-glass" id="hero-glass" aria-hidden="true"></div>
+            <p class="catch">キミの“炭酸性格”、<span class="r">まる見え。</span></p>
+            <p class="sub">10の質問で、あなただけの<br><strong>「コーラ × フルーティス」</strong>の一杯が見つかる。</p>
+            <a class="cta" href="../" aria-label="診断をはじめる">診断をはじめる
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </a>
+            <p class="cta-note">無料・約1分・全10問</p>
+            <p class="scroll-hint" id="sentinel">どんな感じ？ ↓</p>
+        </header>
+
+        <!-- どんな診断 -->
+        <section class="block">
+            <p class="sec-label reveal">ABOUT</p>
+            <h2 class="sec reveal">「混ぜる」って、<br>こんなに<span class="r">楽しい。</span></h2>
+            <p class="sec-lead reveal">コーラに、フルーティスをひと垂らし。<br>あなたの気分にぴったりの“炭酸性格”を解析して、専用ブレンドを提案します。</p>
+            <div class="features">
+                <div class="feat reveal"><span class="ic">🧬</span><div><h3>16タイプ診断</h3><p>4つの軸で、あなたの炭酸性格を解析。</p></div></div>
+                <div class="feat reveal"><span class="ic">🍹</span><div><h3>あなた専用レシピ</h3><p>分量つき。おうちですぐ作れる一杯。</p></div></div>
+                <div class="feat reveal"><span class="ic">📲</span><div><h3>シェア画像が作れる</h3><p>結果カードを自動生成。保存してSNSへ。</p></div></div>
+            </div>
+        </section>
+
+        <!-- どんな感じ -->
+        <section class="block">
+            <p class="sec-label reveal">HOW IT WORKS</p>
+            <h2 class="sec reveal">どんな感じ？<br><span class="r">約1分</span>の、はじける体験。</h2>
+            <div class="steps">
+                <div class="step reveal">
+                    <div class="phone"><div class="screen">
+                        <div class="mini-prog"><i></i></div>
+                        <div class="mini-q">Q3 / 10</div>
+                        <div class="mini-title">好きな炭酸の強さは？</div>
+                        <div class="mini-opts">
+                            <div class="mini-opt on">⚡ 喉に刺さる“強炭酸”がたまらない</div>
+                            <div class="mini-opt">🫧 やさしく弾ける“微炭酸”が好き</div>
+                        </div>
+                    </div></div>
+                    <div class="num">01</div><div class="st">直感で、10問。</div><div class="sd">サクサク答えるだけ。</div>
+                </div>
+                <div class="step reveal">
+                    <div class="phone"><div class="screen"><div class="mini-center">
+                        <div class="g" id="mini-glass"></div>
+                        <div class="lt">あなたの一杯を<br><b>ブレンド中…</b></div>
+                    </div></div></div>
+                    <div class="num">02</div><div class="st">泡立つ、ブレンド。</div><div class="sd">わくわくの“間”を演出。</div>
+                </div>
+                <div class="step reveal">
+                    <div class="phone"><div class="screen"><div class="mini-res">
+                        <div class="lbl">あなたの炭酸性格は…</div>
+                        <div class="nm">ご褒美ストロング</div>
+                        <div class="qt">「今日のわたし、よく頑張った。」</div>
+                        <div class="dg" id="mini-drink"></div>
+                        <div class="pr">ディープ・ルビーコーク</div>
+                    </div></div></div>
+                    <div class="num">03</div><div class="st">あなたのタイプ＆一杯。</div><div class="sd">そのままシェアできる。</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 16タイプ -->
+        <section class="block">
+            <p class="sec-label reveal">16 TYPES</p>
+            <h2 class="sec reveal">あなたは、<span class="r">どのタイプ？</span></h2>
+            <p class="sec-lead reveal">全16種。口ぐせも、ぴったりの一杯も、ぜんぶ違う。集めたくなる。</p>
+            <div class="type-row" id="type-row">
+                <div class="tcard"><div class="em">🌙</div><div class="nm">ご褒美ストロング</div><div class="qt">「今日のわたし、よく頑張った。」</div><div class="dr">🥤 ディープ・ルビーコーク</div></div>
+                <div class="tcard"><div class="em">🎢</div><div class="nm">未知数のエンタメ番長</div><div class="qt">「考えるな、やってみよう。」</div><div class="dr">🥤 トロピカル・サンダー</div></div>
+                <div class="tcard"><div class="em">🫧</div><div class="nm">みんなのオアシス</div><div class="qt">「まあまあ、座って座って。」</div><div class="dr">🥤 ストロベリー・スマイル</div></div>
+                <div class="tcard"><div class="em">🧪</div><div class="nm">実験室の変人天才</div><div class="qt">「これ、混ぜたらどうなる？」</div><div class="dr">🥤 ミッドナイト・グレープ</div></div>
+                <div class="tcard"><div class="em">📐</div><div class="nm">黄金比の探求者</div><div class="qt">「“いつもの”に、妥協はない。」</div><div class="dr">🥤 パーフェクト・レモンコーク</div></div>
+                <div class="tcard"><div class="em">🌈</div><div class="nm">ハッピー拡散マシン</div><div class="qt">「楽しいは、シェアするもの。」</div><div class="dr">🥤 レインボー・ベリーフロート</div></div>
+            </div>
+            <p class="row-hint reveal">← よこにスクロール →</p>
+        </section>
+
+        <!-- キャンペーン -->
+        <section class="block">
+            <p class="sec-label reveal">CAMPAIGN</p>
+            <h2 class="sec reveal">シェアして、<span class="r">当てよう。</span></h2>
+            <div class="camp reveal">
+                <div class="gift">🎁</div>
+                <h3>抽選で <b>100名様</b> に<br>コーラ×フルーティス体験セット</h3>
+                <p>診断結果をシェアして応募するだけ。<br>ストーリーズ投稿で当選チャンスUP！</p>
+                <p class="tags">ハッシュタグ <strong>#コーラ炭酸性格診断</strong> <strong>#フルーティス</strong></p>
+            </div>
+        </section>
+
+        <!-- FINAL CTA -->
+        <section class="final">
+            <h2 class="reveal">さあ、キミの<br><span class="r">炭酸性格</span>は？</h2>
+            <a class="cta reveal" href="../">今すぐ診断する
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </a>
+            <p class="cta-note reveal">無料・約1分</p>
+        </section>
+
+        <footer>
+            <small>&copy; The Coca-Cola Company / Mizkan Holdings Co., Ltd. — concept by TORIHADA</small>
+        </footer>
+    </div>
+
+    <div class="sticky" id="sticky"><a href="../">🥤 診断する</a></div>
+
+    <script>
+        (function () {
+            // glass SVG (red)
+            function glass(c1, c2) {
+                return '<svg viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">' +
+                    '<defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient>' +
+                    '<clipPath id="gc"><path d="M18 14 H62 L56 86 Q55 92 49 92 H31 Q25 92 24 86 Z"/></clipPath></defs>' +
+                    '<rect x="46" y="2" width="5" height="74" rx="2.5" transform="rotate(10 48 40)" fill="#fff" opacity=".85"/>' +
+                    '<g clip-path="url(#gc)"><rect x="18" y="30" width="44" height="70" fill="url(#lg)"/>' +
+                    '<circle cx="34" cy="60" r="2.5" fill="#fff" opacity=".7"/><circle cx="46" cy="50" r="2" fill="#fff" opacity=".6"/><circle cx="40" cy="72" r="1.8" fill="#fff" opacity=".6"/>' +
+                    '<ellipse cx="40" cy="30" rx="22" ry="4" fill="#fff" opacity=".7"/></g>' +
+                    '<path d="M18 14 H62 L56 86 Q55 92 49 92 H31 Q25 92 24 86 Z" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2.5"/></svg>';
+            }
+            var hg = document.getElementById('hero-glass'); if (hg) hg.innerHTML = glass('#E4002B', '#7A0019');
+            var mg = document.getElementById('mini-glass'); if (mg) mg.innerHTML = glass('#E4002B', '#7A0019');
+            var md = document.getElementById('mini-drink'); if (md) md.innerHTML = glass('#E11D55', '#7A0E3A');
+
+            // bubbles
+            var bw = document.getElementById('bubbles'), frag = document.createDocumentFragment();
+            for (var i = 0; i < 14; i++) {
+                var s = document.createElement('span'), sz = 6 + Math.random() * 16;
+                s.style.cssText = 'left:' + (Math.random() * 100) + '%;width:' + sz + 'px;height:' + sz + 'px;animation-duration:' + (8 + Math.random() * 10) + 's;animation-delay:' + (-Math.random() * 12) + 's;';
+                frag.appendChild(s);
+            }
+            bw.appendChild(frag);
+
+            // reveal on scroll
+            if ('IntersectionObserver' in window) {
+                var io = new IntersectionObserver(function (es) {
+                    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+                }, { threshold: .15 });
+                document.querySelectorAll('.reveal').forEach(function (n) { io.observe(n); });
+
+                // sticky CTA after hero
+                var sticky = document.getElementById('sticky'), sentinel = document.getElementById('sentinel');
+                var so = new IntersectionObserver(function (es) {
+                    sticky.classList.toggle('show', !es[0].isIntersecting);
+                }, { threshold: 0 });
+                so.observe(sentinel);
+            } else {
+                document.querySelectorAll('.reveal').forEach(function (n) { n.classList.add('in'); });
+            }
+        })();
+    </script>
+</body>
+
+</html>
