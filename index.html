@@ -141,11 +141,18 @@
             <section id="result-screen" class="screen hidden" aria-labelledby="result-type-name">
                 <div class="result-wrapper">
 
+                    <!-- 図鑑プレビュー時のバナー -->
+                    <div class="preview-banner hidden" id="preview-banner">
+                        <span>📖 図鑑プレビュー中 ／ あなたの結果は「<strong id="preview-own-name">—</strong>」</span>
+                        <button class="back-to-own" id="back-to-own-btn">結果に戻る</button>
+                    </div>
+
                     <div class="result-header">
                         <p class="result-label">あなたの炭酸性格は…</p>
                         <p class="result-code" id="result-code">K-T-P-F</p>
                         <h2 class="result-title" id="result-type-name">ご褒美ストロング</h2>
-                        <p class="result-tagline" id="result-tagline">一日の終わりに、自分だけの濃いめを。</p>
+                        <p class="result-quote" id="result-quote">「今日のわたし、よく頑張った。」</p>
+                        <p class="result-tagline" id="result-tagline">頑張った自分に、濃いめの一杯を。</p>
                         <div class="result-rarity">
                             <span class="rarity-label">出現率</span>
                             <span class="rarity-value" id="result-rarity">6%</span>
@@ -187,6 +194,12 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- 16タイプ図鑑 -->
+                    <div class="type-dex-section">
+                        <h4 class="section-title">🗺️ 16タイプ図鑑<br><span class="title-sub">タップで全タイプをチェック（<strong id="grid-progress">あなたはこのタイプ</strong>）</span></h4>
+                        <div class="type-grid" id="type-grid"></div>
                     </div>
 
                     <!-- シェア画像 -->
