@@ -358,23 +358,30 @@ main { flex: 1; display: flex; flex-direction: column; }
     backdrop-filter: blur(10px);
 }
 .rec-visual {
-    position: relative; padding: 30px 20px 22px; overflow: hidden;
+    position: relative; padding: 34px 20px 24px; overflow: hidden;
     background:
-        radial-gradient(80% 60% at 50% 0%, var(--accent-glow), transparent 70%),
-        linear-gradient(180deg, rgba(0, 0, 0, .25), transparent);
+        radial-gradient(58% 40% at 50% 34%, rgba(255, 255, 255, .16), transparent 70%),
+        radial-gradient(92% 72% at 50% 4%, var(--accent-glow), transparent 72%),
+        linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .34) 60%, rgba(0, 0, 0, .55));
     display: flex; justify-content: center; align-items: flex-end;
-    min-height: 220px;
+    min-height: 300px;
 }
 .rec-visual::before {
     content: ""; position: absolute; top: 50%; left: 50%; width: 320px; height: 320px;
-    transform: translate(-50%, -42%);
+    transform: translate(-50%, -46%);
     background: conic-gradient(from 0deg, transparent, var(--accent-glow), transparent 55%);
-    border-radius: 50%; opacity: .55; filter: blur(8px);
+    border-radius: 50%; opacity: .3; filter: blur(10px);
     animation: spinAura 9s linear infinite; pointer-events: none;
 }
 @keyframes spinAura { to { transform: translate(-50%, -42%) rotate(360deg); } }
-.rec-drink { position: relative; width: 170px; height: 210px; filter: drop-shadow(0 20px 30px rgba(0, 0, 0, .5)); animation: floaty 4s ease-in-out infinite; }
-.rec-drink svg { width: 100%; height: 100%; display: block; }
+.rec-stage { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; animation: floaty 4s ease-in-out infinite; }
+.rec-drink { position: relative; z-index: 2; width: 168px; height: 210px; filter: drop-shadow(0 20px 16px rgba(0, 0, 0, .5)); }
+.rec-reflect {
+    width: 168px; height: 150px; margin-top: -46px; transform: scaleY(-1); opacity: .15; filter: blur(1px); pointer-events: none;
+    -webkit-mask-image: linear-gradient(to top, rgba(0, 0, 0, .9), transparent 62%);
+    mask-image: linear-gradient(to top, rgba(0, 0, 0, .9), transparent 62%);
+}
+.rec-drink svg, .rec-reflect svg { width: 100%; height: 100%; display: block; }
 .d-bubble { fill: rgba(255, 255, 255, .72); animation: dRise 3.2s ease-in infinite; }
 @keyframes dRise {
     0% { transform: translateY(0); opacity: 0; }
@@ -517,7 +524,8 @@ main { flex: 1; display: flex; flex-direction: column; }
    アクセシビリティ / レスポンシブ
    ========================================================= */
 @media (min-width: 600px) {
-    .rec-drink { width: 190px; height: 235px; }
+    .rec-drink { width: 188px; height: 232px; }
+    .rec-reflect { width: 188px; height: 166px; }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
