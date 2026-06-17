@@ -382,6 +382,12 @@ main { flex: 1; display: flex; flex-direction: column; }
     mask-image: linear-gradient(to top, rgba(0, 0, 0, .9), transparent 62%);
 }
 .rec-drink svg, .rec-reflect svg { width: 100%; height: 100%; display: block; }
+/* 実写写真スロット（img/drinks/<CODE>.jpg があれば自動表示） */
+.rec-photo { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.rec-visual.has-photo .rec-photo { display: block; }
+.rec-visual.has-photo .rec-stage { display: none; }
+.rec-visual.has-photo::before { display: none; }
+.rec-visual.has-photo { background: #000; }
 .d-bubble { fill: rgba(255, 255, 255, .72); animation: dRise 3.2s ease-in infinite; }
 @keyframes dRise {
     0% { transform: translateY(0); opacity: 0; }

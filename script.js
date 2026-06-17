@@ -257,6 +257,7 @@
         loadingStrong: $('loading-strong'),
         rCode: $('result-code'), rName: $('result-type-name'), rTagline: $('result-tagline'),
         rQuote: $('result-quote'), rRarity: $('result-rarity'), rEmoji: $('rec-emoji'), rDrink: $('rec-drink'), rReflect: $('rec-reflect'),
+        recVisual: $('rec-visual'), recPhoto: $('rec-photo'),
         rProduct: $('rec-product-name'), rBase: $('rec-base'), rFlavor: $('rec-flavor'),
         recipeList: $('recipe-list'), recipeTip: $('recipe-tip'), rDesc: $('result-description'),
         rHidden: $('result-hidden'), rMatchName: $('result-match-name'), rMatchDesc: $('result-match-desc'),
@@ -474,6 +475,15 @@
         const _uid = 'r' + (++drawSeq);
         el.rDrink.innerHTML = drinkSVG(fl, _uid, type.drink.topping);
         if (el.rReflect) el.rReflect.innerHTML = drinkSVG(fl, _uid + 'x', type.drink.topping);
+
+        // 実写写真があれば差し替え（img/drinks/<CODE>.jpg／無ければCG風レンダリングのまま）
+        if (el.recVisual && el.recPhoto) {
+            const code = type.code.replace(/-/g, '');
+            el.recVisual.classList.remove('has-photo');
+            el.recPhoto.onload = () => el.recVisual.classList.add('has-photo');
+            el.recPhoto.onerror = () => el.recVisual.classList.remove('has-photo');
+            el.recPhoto.src = 'img/drinks/' + code + '.jpg';
+        }
         el.rProduct.textContent = type.drink.name;
         el.rBase.textContent = type.drink.base;
         el.rFlavor.textContent = 'フルーティス ' + fl.name;
