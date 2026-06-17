@@ -31,7 +31,8 @@ html { -webkit-text-size-adjust: 100%; }
 body {
     font-family: "Zen Kaku Gothic New", "Noto Sans JP", system-ui, sans-serif;
     color: var(--foam);
-    background: radial-gradient(120% 90% at 50% -10%, #1c1430 0%, var(--ink) 55%, #05050a 100%);
+    background: radial-gradient(130% 100% at 50% -12%, #5a0c1c 0%, #1c0509 44%, #060306 100%);
+    background-attachment: fixed;
     min-height: 100dvh;
     line-height: 1.7;
     overflow-x: hidden;
@@ -61,12 +62,45 @@ body {
 .bg-glow {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
     background:
-        radial-gradient(50% 35% at 80% 12%, var(--accent-glow), transparent 70%),
-        radial-gradient(45% 30% at 12% 85%, rgba(120, 0, 255, .22), transparent 70%);
+        radial-gradient(52% 38% at 82% 8%, var(--accent-glow), transparent 70%),
+        radial-gradient(48% 32% at 10% 88%, rgba(228, 0, 43, .26), transparent 70%),
+        radial-gradient(42% 30% at 50% 52%, rgba(158, 0, 25, .15), transparent 72%);
     transition: background .8s var(--ease);
     mix-blend-mode: screen;
-    opacity: .8;
+    opacity: .85;
 }
+
+/* ---- 背景：Coca-Colaウェーブ（白いリボン） ---- */
+.bg-wave { position: fixed; left: 0; width: 100vw; height: 150px; z-index: 0; pointer-events: none; overflow: hidden; }
+.bg-wave svg { width: 200%; height: 100%; display: block; will-change: transform; }
+.bg-wave path { fill: #fff; }
+.bg-wave-1 { top: 21%; opacity: .055; }
+.bg-wave-1 svg { animation: waveDrift 30s linear infinite; }
+.bg-wave-2 { top: 58%; height: 120px; opacity: .04; }
+.bg-wave-2 svg { animation: waveDriftRev 46s linear infinite; }
+@keyframes waveDrift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes waveDriftRev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+
+/* ---- 背景：漂うコンターボトル ---- */
+.bg-bottles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bg-bottles span { position: absolute; bottom: -210px; display: block; opacity: 0; will-change: transform; animation: bottleDrift linear infinite; }
+.bg-bottles svg { width: 100%; height: 100%; display: block; }
+@keyframes bottleDrift {
+    0% { transform: translateY(0) rotate(var(--rot, -8deg)); opacity: 0; }
+    12% { opacity: .07; }
+    85% { opacity: .05; }
+    100% { transform: translateY(-130vh) rotate(var(--rot, -8deg)); opacity: 0; }
+}
+
+/* ---- 背景：きらめき ---- */
+.bg-sparkles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bg-sparkles i {
+    position: absolute; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 6px 1px rgba(255, 255, 255, .75);
+    opacity: 0; animation: twinkle ease-in-out infinite;
+}
+.bg-sparkles i.r { background: #ff6b85; box-shadow: 0 0 6px 1px rgba(255, 107, 133, .7); }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .85; transform: scale(1); } }
 
 /* ---- レイアウト ---- */
 .app-container {
@@ -306,19 +340,6 @@ main { flex: 1; display: flex; flex-direction: column; }
 }
 .result-tagline { font-size: 14px; color: var(--muted); margin-top: 8px; font-weight: 500; }
 
-/* 図鑑プレビューバナー */
-.preview-banner {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16);
-    border-radius: 14px; padding: 10px 12px 10px 16px; margin-bottom: 16px;
-    font-size: 12.5px; color: #efeaf2; backdrop-filter: blur(6px);
-}
-.preview-banner strong { color: var(--accent); }
-.back-to-own {
-    flex: 0 0 auto; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
-    color: #fff; background: var(--accent); border: none; border-radius: 999px; padding: 8px 14px;
-    -webkit-tap-highlight-color: transparent;
-}
 .result-rarity {
     display: inline-flex; align-items: baseline; gap: 8px; margin-top: 18px;
     padding: 9px 18px; border-radius: 999px;
@@ -406,34 +427,6 @@ main { flex: 1; display: flex; flex-direction: column; }
 .extra-title { font-size: 12.5px; font-weight: 900; letter-spacing: .04em; color: #fff; }
 .extra-text { font-size: 13.5px; color: #efeaf2; margin-top: 5px; }
 .match-block .extra-text strong { color: var(--accent); margin-right: 8px; }
-
-/* 16タイプ図鑑 */
-.type-dex-section { margin-top: 8px; }
-.type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.grid-cell {
-    position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
-    padding: 13px 4px 11px; border-radius: 14px; cursor: pointer;
-    background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1);
-    color: #cfcdda; font-family: inherit;
-    transition: transform .15s var(--ease), border-color .2s, background .2s, box-shadow .25s;
-    -webkit-tap-highlight-color: transparent;
-}
-.grid-cell:hover { transform: translateY(-2px); background: rgba(255, 255, 255, .09); }
-.grid-cell:active { transform: scale(.96); }
-.cell-emoji { font-size: 22px; line-height: 1; filter: grayscale(.3); opacity: .85; }
-.cell-name { font-size: 9.5px; font-weight: 700; line-height: 1.25; text-align: center; }
-.grid-cell.active {
-    border-color: var(--accent);
-    background: linear-gradient(160deg, var(--accent-glow), rgba(255, 255, 255, .04));
-    color: #fff; box-shadow: 0 8px 22px -10px var(--accent-glow);
-}
-.grid-cell.active .cell-emoji { filter: none; opacity: 1; }
-.grid-cell.is-you::after {
-    content: "YOU"; position: absolute; top: -6px; right: -4px;
-    font-size: 8px; font-weight: 900; letter-spacing: .04em; color: #fff;
-    background: var(--accent); padding: 2px 5px; border-radius: 999px;
-    box-shadow: 0 2px 8px var(--accent-glow);
-}
 
 /* sharecard */
 .section-title { text-align: center; font-size: 16.5px; font-weight: 900; line-height: 1.6; margin: 38px 0 18px; }
@@ -528,6 +521,6 @@ main { flex: 1; display: flex; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
-    .bg-bubbles { display: none; }
+    .bg-bubbles, .bg-bottles, .bg-sparkles, .bg-wave { display: none; }
 }
 :focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 6px; }
