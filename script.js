@@ -243,9 +243,6 @@
             drink: { name: 'マスカット・ピーチ・スプリッツ', base: 'コカ・コーラ ゼロ', flavor: 'muscat', topping: null, tip: '2種を重ねて注げば、“やさしい二層”のグラデーションに。', recipe: [['氷', 'グラス8分目'], ['コカ・コーラ ゼロ', '120ml'], ['マスカット', '20ml'], ['白桃', '10ml']] }
         }
     };
-    const GRID_ORDER = ['KTPF', 'KTPD', 'KTGF', 'KTGD', 'KBPF', 'KBPD', 'KBGF', 'KBGD',
-        'RTPF', 'RTPD', 'RTGF', 'RTGD', 'RBPF', 'RBPD', 'RBGF', 'RBGD'];
-
     /* ---------------- DOM ---------------- */
     const $ = (id) => document.getElementById(id);
     const screens = {
@@ -258,16 +255,14 @@
         progressFill: $('progress-fill'), qLiquid: $('q-liquid'), qFizz: $('q-fizz'),
         questionText: $('question-text'), options: $('options-container'),
         loadingStrong: $('loading-strong'),
-        previewBanner: $('preview-banner'), previewOwnName: $('preview-own-name'), backToOwnBtn: $('back-to-own-btn'),
         rCode: $('result-code'), rName: $('result-type-name'), rTagline: $('result-tagline'),
         rQuote: $('result-quote'), rRarity: $('result-rarity'), rEmoji: $('rec-emoji'), rDrink: $('rec-drink'),
         rProduct: $('rec-product-name'), rBase: $('rec-base'), rFlavor: $('rec-flavor'),
         recipeList: $('recipe-list'), recipeTip: $('recipe-tip'), rDesc: $('result-description'),
         rHidden: $('result-hidden'), rMatchName: $('result-match-name'), rMatchDesc: $('result-match-desc'),
-        typeGrid: $('type-grid'), gridProgress: $('grid-progress'),
         shareCanvas: $('share-canvas'), saveBtn: $('save-img-btn'),
         shareX: $('share-x-btn'), shareLine: $('share-line-btn'),
-        soundToggle: $('sound-toggle'), bgBubbles: $('bg-bubbles'), burstLayer: $('burst-layer')
+        soundToggle: $('sound-toggle'), bgBubbles: $('bg-bubbles'), bgBottles: $('bg-bottles'), bgSparkles: $('bg-sparkles'), burstLayer: $('burst-layer')
     };
 
     /* ---------------- State ---------------- */
@@ -363,6 +358,38 @@
         }
         el.bgBubbles.appendChild(frag);
     }
+    function bottleSVG(fill) {
+        return '<svg viewBox="0 0 48 152" xmlns="http://www.w3.org/2000/svg" fill="' + fill + '">' +
+            '<rect x="16" y="3" width="16" height="8" rx="2"/>' +
+            '<path d="M19 9 H29 V15 C29 18 31 20 31 24 C31 30 29 33 29 40 C29 50 37 55 37 70 C37 81 30 85 30 95 C30 107 38 113 38 129 C38 143 32 147 24 147 C16 147 10 143 10 129 C10 113 18 107 18 95 C18 85 11 81 11 70 C11 55 19 50 19 40 C19 33 17 30 17 24 C17 20 19 18 19 15 Z"/></svg>';
+    }
+    function buildBgBottles() {
+        if (!el.bgBottles) return;
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < 5; i++) {
+            const s = document.createElement('span');
+            const h = 120 + Math.random() * 130;
+            const rot = (Math.random() * 26 - 13).toFixed(1);
+            s.style.cssText = `left:${(Math.random() * 92).toFixed(1)}%;height:${h.toFixed(0)}px;width:${(h * 0.32).toFixed(0)}px;` +
+                `--rot:${rot}deg;animation-duration:${(26 + Math.random() * 24).toFixed(1)}s;animation-delay:${(-Math.random() * 32).toFixed(1)}s;`;
+            s.innerHTML = bottleSVG(Math.random() < 0.5 ? 'rgba(255,255,255,.92)' : 'rgba(228,0,43,.92)');
+            frag.appendChild(s);
+        }
+        el.bgBottles.appendChild(frag);
+    }
+    function buildBgSparkles() {
+        if (!el.bgSparkles) return;
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < 22; i++) {
+            const sp = document.createElement('i');
+            if (Math.random() < 0.3) sp.className = 'r';
+            const sz = (2 + Math.random() * 2.6).toFixed(1);
+            sp.style.cssText = `left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;` +
+                `width:${sz}px;height:${sz}px;animation-duration:${(2.4 + Math.random() * 3.6).toFixed(1)}s;animation-delay:${(-Math.random() * 6).toFixed(1)}s;`;
+            frag.appendChild(sp);
+        }
+        el.bgSparkles.appendChild(frag);
+    }
     function buildQFizz() {
         let s = '';
         for (let i = 0; i < 5; i++) {
@@ -433,20 +460,8 @@
         return (s.K >= s.R ? 'K' : 'R') + (s.T >= s.B ? 'T' : 'B') +
             (s.P >= s.G ? 'P' : 'G') + (s.F >= s.D ? 'F' : 'D');
     }
-    function buildTypeGrid() {
-        if (el.typeGrid.childElementCount) return;
-        let html = '';
-        GRID_ORDER.forEach(code => {
-            const t = TYPES[code];
-            html += `<button class="grid-cell" type="button" data-code="${code}" aria-label="${t.name}">` +
-                `<span class="cell-emoji">${t.emoji}</span><span class="cell-name">${t.name}</span></button>`;
-        });
-        el.typeGrid.innerHTML = html;
-    }
     function renderResult(type) {
         currentType = type;
-        const key = type.code.replace(/-/g, '');
-        const isPreview = key !== ownCode;
         const fl = FLAVORS[type.drink.flavor];
         applyTheme(fl);
 
@@ -469,21 +484,10 @@
         el.rMatchName.textContent = m.name;
         el.rMatchDesc.textContent = '（' + m.tagline + '）';
 
-        // 図鑑ハイライト
-        Array.from(el.typeGrid.children).forEach(c => {
-            c.classList.toggle('active', c.dataset.code === key);
-            c.classList.toggle('is-you', c.dataset.code === ownCode);
-        });
-        // プレビューバナー
-        el.previewBanner.classList.toggle('hidden', !isPreview);
-        if (isPreview) el.previewOwnName.textContent = TYPES[ownCode].name;
-
         drawShareCard(type, fl);
     }
     function showResult() {
         ownCode = computeCode();
-        buildTypeGrid();
-        if (el.gridProgress) el.gridProgress.textContent = 'あなたは ' + (TYPES[ownCode] || TYPES.KTPF).name;
         renderResult(TYPES[ownCode] || TYPES.KTPF);
         show('result');
         setTimeout(() => {
@@ -739,6 +743,8 @@ ${garnish}
         el.totalNum.textContent = QUESTIONS.length;
         el.soundToggle.setAttribute('aria-pressed', String(soundOn));
         buildBgBubbles();
+        buildBgBottles();
+        buildBgSparkles();
         buildQFizz();
         const heroGlass = $('hero-glass');
         if (heroGlass) heroGlass.innerHTML = drinkSVG(FLAVORS.pom, 'hero', null);
@@ -756,18 +762,6 @@ ${garnish}
         el.shareX.addEventListener('click', onShareX);
         el.shareLine.addEventListener('click', onShareLine);
         el.soundToggle.addEventListener('click', () => setSound(!soundOn));
-
-        // 図鑑タップで他タイプを回遊
-        el.typeGrid.addEventListener('click', (e) => {
-            const cell = e.target.closest('.grid-cell');
-            if (!cell) return;
-            pop();
-            renderResult(TYPES[cell.dataset.code]);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-        el.backToOwnBtn.addEventListener('click', () => {
-            if (ownCode) { renderResult(TYPES[ownCode]); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-        });
 
         // キーボード: 1/2 で選択
         document.addEventListener('keydown', (e) => {

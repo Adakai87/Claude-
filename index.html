@@ -30,9 +30,13 @@
 </head>
 
 <body>
-    <!-- 背景：立ち上る泡 -->
-    <div class="bg-bubbles" id="bg-bubbles" aria-hidden="true"></div>
+    <!-- 背景演出レイヤー -->
     <div class="bg-glow" aria-hidden="true"></div>
+    <div class="bg-wave bg-wave-1" aria-hidden="true"><svg viewBox="0 0 1440 140" preserveAspectRatio="none"><path d="M0 46 Q180 16 360 46 Q540 76 720 46 Q900 16 1080 46 Q1260 76 1440 46 L1440 80 Q1260 110 1080 80 Q900 50 720 80 Q540 110 360 80 Q180 50 0 80 Z"/></svg></div>
+    <div class="bg-wave bg-wave-2" aria-hidden="true"><svg viewBox="0 0 1440 140" preserveAspectRatio="none"><path d="M0 46 Q180 16 360 46 Q540 76 720 46 Q900 16 1080 46 Q1260 76 1440 46 L1440 80 Q1260 110 1080 80 Q900 50 720 80 Q540 110 360 80 Q180 50 0 80 Z"/></svg></div>
+    <div class="bg-bottles" id="bg-bottles" aria-hidden="true"></div>
+    <div class="bg-bubbles" id="bg-bubbles" aria-hidden="true"></div>
+    <div class="bg-sparkles" id="bg-sparkles" aria-hidden="true"></div>
 
     <!-- サウンドトグル -->
     <button class="sound-toggle" id="sound-toggle" aria-pressed="true" aria-label="効果音のオン・オフ">
@@ -141,12 +145,6 @@
             <section id="result-screen" class="screen hidden" aria-labelledby="result-type-name">
                 <div class="result-wrapper">
 
-                    <!-- 図鑑プレビュー時のバナー -->
-                    <div class="preview-banner hidden" id="preview-banner">
-                        <span>📖 図鑑プレビュー中 ／ あなたの結果は「<strong id="preview-own-name">—</strong>」</span>
-                        <button class="back-to-own" id="back-to-own-btn">結果に戻る</button>
-                    </div>
-
                     <div class="result-header">
                         <p class="result-label">あなたの炭酸性格は…</p>
                         <p class="result-code" id="result-code">K-T-P-F</p>
@@ -194,12 +192,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- 16タイプ図鑑 -->
-                    <div class="type-dex-section">
-                        <h4 class="section-title">🗺️ 16タイプ図鑑<br><span class="title-sub">タップで全タイプをチェック（<strong id="grid-progress">あなたはこのタイプ</strong>）</span></h4>
-                        <div class="type-grid" id="type-grid"></div>
                     </div>
 
                     <!-- シェア画像 -->

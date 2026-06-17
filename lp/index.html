@@ -35,7 +35,8 @@
         body {
             font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
             color: var(--foam);
-            background: radial-gradient(120% 60% at 50% -5%, #1c1430 0%, var(--ink) 50%, #050509 100%);
+            background: radial-gradient(130% 75% at 50% -8%, #5a0c1c 0%, #1a0509 46%, #060306 100%);
+            background-attachment: fixed;
             line-height: 1.8; overflow-x: hidden; -webkit-font-smoothing: antialiased;
         }
 
@@ -46,6 +47,40 @@
             animation: rise linear infinite; opacity: 0;
         }
         @keyframes rise { 0% { transform: translateY(0) scale(.6); opacity: 0; } 12% { opacity: .8; } 90% { opacity: .4; } 100% { transform: translateY(-112vh) scale(1.1); opacity: 0; } }
+
+        /* 背景：レッドグロー */
+        .glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; mix-blend-mode: screen; opacity: .85;
+            background:
+                radial-gradient(52% 36% at 82% 6%, var(--glow), transparent 70%),
+                radial-gradient(46% 30% at 10% 80%, rgba(228, 0, 43, .24), transparent 70%),
+                radial-gradient(42% 28% at 50% 50%, rgba(158, 0, 25, .14), transparent 72%); }
+
+        /* 背景：Coca-Colaウェーブ */
+        .wave { position: fixed; left: 0; width: 100vw; height: 150px; z-index: 0; pointer-events: none; overflow: hidden; }
+        .wave svg { width: 200%; height: 100%; display: block; will-change: transform; }
+        .wave path { fill: #fff; }
+        .wave-1 { top: 20%; opacity: .05; }
+        .wave-1 svg { animation: waveDrift 30s linear infinite; }
+        .wave-2 { top: 64%; height: 120px; opacity: .038; }
+        .wave-2 svg { animation: waveDriftRev 46s linear infinite; }
+        @keyframes waveDrift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes waveDriftRev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+
+        /* 背景：漂うコンターボトル */
+        .bottles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .bottles span { position: absolute; bottom: -210px; display: block; opacity: 0; will-change: transform; animation: bottleDrift linear infinite; }
+        .bottles svg { width: 100%; height: 100%; display: block; }
+        @keyframes bottleDrift {
+            0% { transform: translateY(0) rotate(var(--rot, -8deg)); opacity: 0; }
+            12% { opacity: .065; } 85% { opacity: .045; }
+            100% { transform: translateY(-130vh) rotate(var(--rot, -8deg)); opacity: 0; }
+        }
+
+        /* 背景：きらめき */
+        .sparkles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .sparkles i { position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 1px rgba(255, 255, 255, .7); opacity: 0; animation: twinkle ease-in-out infinite; }
+        .sparkles i.r { background: #ff6b85; box-shadow: 0 0 6px 1px rgba(255, 107, 133, .65); }
+        @keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: .8; transform: scale(1); } }
 
         .wrap { position: relative; z-index: 1; max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
 
@@ -113,7 +148,7 @@
             box-shadow: 0 26px 50px -22px rgba(0, 0, 0, .8); position: relative; margin-bottom: 16px;
         }
         .phone::before { content: ""; position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 50px; height: 5px; background: rgba(255, 255, 255, .2); border-radius: 999px; }
-        .screen { width: 100%; height: 100%; border-radius: 20px; background: radial-gradient(120% 70% at 50% 0%, #1c1430, #0a0a10 70%); overflow: hidden; display: flex; flex-direction: column; padding: 26px 14px 14px; }
+        .screen { width: 100%; height: 100%; border-radius: 20px; background: radial-gradient(120% 70% at 50% 0%, #3a0a14, #0a0608 70%); overflow: hidden; display: flex; flex-direction: column; padding: 26px 14px 14px; }
         .mini-prog { height: 5px; background: rgba(255, 255, 255, .14); border-radius: 999px; overflow: hidden; }
         .mini-prog i { display: block; height: 100%; width: 35%; background: linear-gradient(90deg, var(--red), #ff7a8f); }
         .mini-q { font-size: 11px; color: var(--muted); margin: 9px 0 4px; }
@@ -172,7 +207,7 @@
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
-            .bubbles { display: none; }
+            .bubbles, .bottles, .sparkles, .wave { display: none; }
             .reveal { opacity: 1; transform: none; }
         }
         :focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 6px; }
@@ -180,7 +215,12 @@
 </head>
 
 <body>
+    <div class="glow" aria-hidden="true"></div>
+    <div class="wave wave-1" aria-hidden="true"><svg viewBox="0 0 1440 140" preserveAspectRatio="none"><path d="M0 46 Q180 16 360 46 Q540 76 720 46 Q900 16 1080 46 Q1260 76 1440 46 L1440 80 Q1260 110 1080 80 Q900 50 720 80 Q540 110 360 80 Q180 50 0 80 Z"/></svg></div>
+    <div class="wave wave-2" aria-hidden="true"><svg viewBox="0 0 1440 140" preserveAspectRatio="none"><path d="M0 46 Q180 16 360 46 Q540 76 720 46 Q900 16 1080 46 Q1260 76 1440 46 L1440 80 Q1260 110 1080 80 Q900 50 720 80 Q540 110 360 80 Q180 50 0 80 Z"/></svg></div>
+    <div class="bottles" id="bottles" aria-hidden="true"></div>
     <div class="bubbles" id="bubbles" aria-hidden="true"></div>
+    <div class="sparkles" id="sparkles" aria-hidden="true"></div>
 
     <div class="wrap">
         <div class="brand"><span class="ck">Coca&#8209;Cola</span><span class="x">×</span><span class="fr">フルーティス</span></div>
@@ -317,6 +357,38 @@
                 frag.appendChild(s);
             }
             bw.appendChild(frag);
+
+            // contour bottle silhouettes
+            function bottle(fill) {
+                return '<svg viewBox="0 0 48 152" xmlns="http://www.w3.org/2000/svg" fill="' + fill + '">' +
+                    '<rect x="16" y="3" width="16" height="8" rx="2"/>' +
+                    '<path d="M19 9 H29 V15 C29 18 31 20 31 24 C31 30 29 33 29 40 C29 50 37 55 37 70 C37 81 30 85 30 95 C30 107 38 113 38 129 C38 143 32 147 24 147 C16 147 10 143 10 129 C10 113 18 107 18 95 C18 85 11 81 11 70 C11 55 19 50 19 40 C19 33 17 30 17 24 C17 20 19 18 19 15 Z"/></svg>';
+            }
+            var bottlesEl = document.getElementById('bottles');
+            if (bottlesEl) {
+                var bf = document.createDocumentFragment();
+                for (var j = 0; j < 5; j++) {
+                    var bs = document.createElement('span'), bh = 120 + Math.random() * 130, rot = (Math.random() * 26 - 13).toFixed(1);
+                    bs.style.cssText = 'left:' + (Math.random() * 92).toFixed(1) + '%;height:' + bh.toFixed(0) + 'px;width:' + (bh * 0.32).toFixed(0) + 'px;--rot:' + rot + 'deg;animation-duration:' + (26 + Math.random() * 24).toFixed(1) + 's;animation-delay:' + (-Math.random() * 32).toFixed(1) + 's;';
+                    bs.innerHTML = bottle(Math.random() < 0.5 ? 'rgba(255,255,255,.92)' : 'rgba(228,0,43,.92)');
+                    bf.appendChild(bs);
+                }
+                bottlesEl.appendChild(bf);
+            }
+
+            // sparkles (きらめき)
+            var sparklesEl = document.getElementById('sparkles');
+            if (sparklesEl) {
+                var sf = document.createDocumentFragment();
+                for (var k = 0; k < 22; k++) {
+                    var sk = document.createElement('i');
+                    if (Math.random() < 0.3) sk.className = 'r';
+                    var sz = (2 + Math.random() * 2.6).toFixed(1);
+                    sk.style.cssText = 'left:' + (Math.random() * 100).toFixed(1) + '%;top:' + (Math.random() * 100).toFixed(1) + '%;width:' + sz + 'px;height:' + sz + 'px;animation-duration:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;animation-delay:' + (-Math.random() * 6).toFixed(1) + 's;';
+                    sf.appendChild(sk);
+                }
+                sparklesEl.appendChild(sf);
+            }
 
             // reveal on scroll
             if ('IntersectionObserver' in window) {
