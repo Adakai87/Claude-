@@ -256,7 +256,7 @@
         questionText: $('question-text'), options: $('options-container'),
         loadingStrong: $('loading-strong'),
         rCode: $('result-code'), rName: $('result-type-name'), rTagline: $('result-tagline'),
-        rQuote: $('result-quote'), rRarity: $('result-rarity'), rEmoji: $('rec-emoji'), rDrink: $('rec-drink'),
+        rQuote: $('result-quote'), rRarity: $('result-rarity'), rEmoji: $('rec-emoji'), rDrink: $('rec-drink'), rReflect: $('rec-reflect'),
         rProduct: $('rec-product-name'), rBase: $('rec-base'), rFlavor: $('rec-flavor'),
         recipeList: $('recipe-list'), recipeTip: $('recipe-tip'), rDesc: $('result-description'),
         rHidden: $('result-hidden'), rMatchName: $('result-match-name'), rMatchDesc: $('result-match-desc'),
@@ -471,7 +471,9 @@
         el.rQuote.textContent = '「' + type.quote + '」';
         el.rRarity.textContent = type.rarity;
         el.rEmoji.textContent = type.emoji;
-        el.rDrink.innerHTML = drinkSVG(fl, 'r' + (++drawSeq), type.drink.topping);
+        const _uid = 'r' + (++drawSeq);
+        el.rDrink.innerHTML = drinkSVG(fl, _uid, type.drink.topping);
+        if (el.rReflect) el.rReflect.innerHTML = drinkSVG(fl, _uid + 'x', type.drink.topping);
         el.rProduct.textContent = type.drink.name;
         el.rBase.textContent = type.drink.base;
         el.rFlavor.textContent = 'フルーティス ' + fl.name;
@@ -525,37 +527,63 @@
     }
     function drinkSVG(fl, uid, topping) {
         uid = uid || 'd';
+        // 立ち上る炭酸
         let bubbles = '';
-        for (let i = 0; i < 8; i++) {
-            const x = 52 + Math.random() * 66, y = 80 + Math.random() * 110;
-            const r = 1.6 + Math.random() * 2.6, d = (Math.random() * 3).toFixed(2);
+        for (let i = 0; i < 13; i++) {
+            const x = 52 + Math.random() * 66, y = 96 + Math.random() * 104;
+            const r = 1.3 + Math.random() * 2.6, d = (Math.random() * 3).toFixed(2);
             bubbles += `<circle class="d-bubble" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" style="transform-box:fill-box;transform-origin:center;animation-delay:${d}s"></circle>`;
         }
-        const glass = 'M40 30 H130 L119 196 Q118 204 110 204 H60 Q52 204 51 196 Z';
-        const garnish = topping ? toppingSVG(topping) : `<text x="122" y="40" font-size="27" text-anchor="middle">${fl.emoji}</text>`;
-        return `<svg viewBox="0 0 170 220" xmlns="http://www.w3.org/2000/svg">
+        // グラス外側の結露
+        let drops = '';
+        for (let i = 0; i < 11; i++) {
+            const x = 50 + Math.random() * 70, y = 78 + Math.random() * 124, r = 1 + Math.random() * 2.2;
+            drops += `<g opacity="${(0.4 + Math.random() * 0.4).toFixed(2)}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.55)" stroke-width=".5"/><circle cx="${(x - r * 0.3).toFixed(1)}" cy="${(y - r * 0.35).toFixed(1)}" r="${(r * 0.32).toFixed(1)}" fill="#fff"/></g>`;
+        }
+        // 立体的な氷
+        function ice(x, y, s, rot) {
+            return `<g transform="rotate(${rot} ${x} ${y})">` +
+                `<rect x="${(x - s / 2).toFixed(0)}" y="${(y - s / 2).toFixed(0)}" width="${s}" height="${s}" rx="${(s * 0.16).toFixed(1)}" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/>` +
+                `<path d="M${(x - s / 2 + 2).toFixed(0)} ${(y - s / 2 + 2).toFixed(0)} h${(s * 0.52).toFixed(0)} l${(-s * 0.52).toFixed(0)} ${(s * 0.52).toFixed(0)} Z" fill="rgba(255,255,255,.3)"/>` +
+                `<circle cx="${(x - s * 0.2).toFixed(0)}" cy="${(y - s * 0.2).toFixed(0)}" r="1.5" fill="#fff" opacity=".95"/></g>`;
+        }
+        const ices = ice(73, 150, 32, -12) + ice(99, 176, 27, 15) + ice(80, 197, 23, 6);
+        const glass = 'M40 30 H130 L122 212 Q121 221 112 221 H58 Q49 221 48 212 Z';
+        const inner = 'M45 35 H125 L117 209 Q116 216 109 216 H61 Q54 216 53 209 Z';
+        const garnish = topping ? toppingSVG(topping) : `<text x="120" y="44" font-size="26" text-anchor="middle">${fl.emoji}</text>`;
+        return `<svg viewBox="0 0 170 244" xmlns="http://www.w3.org/2000/svg">
 <defs>
-  <linearGradient id="dLiq${uid}" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
+  <linearGradient id="dLiq${uid}" x1="0" y1="0" x2="0.15" y2="1">
+    <stop offset="0" stop-color="${fl.c1}"/><stop offset=".55" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
   </linearGradient>
-  <clipPath id="dClip${uid}"><path d="${glass}"/></clipPath>
-  <radialGradient id="dShine${uid}" cx="0.3" cy="0.18" r="0.9">
-    <stop offset="0" stop-color="rgba(255,255,255,.45)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
+  <linearGradient id="dGla${uid}" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="rgba(255,255,255,.5)"/><stop offset=".16" stop-color="rgba(255,255,255,.04)"/>
+    <stop offset=".5" stop-color="rgba(255,255,255,0)"/><stop offset=".84" stop-color="rgba(255,255,255,.05)"/><stop offset="1" stop-color="rgba(255,255,255,.24)"/>
+  </linearGradient>
+  <clipPath id="dClip${uid}"><path d="${inner}"/></clipPath>
+  <radialGradient id="dMen${uid}" cx="0.42" cy="0.4" r="0.7">
+    <stop offset="0" stop-color="rgba(255,255,255,.55)"/><stop offset=".7" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
   </radialGradient>
 </defs>
-<rect x="96" y="4" width="9" height="160" rx="4.5" transform="rotate(11 100 84)" fill="#fff" opacity=".85"/>
-<rect x="96" y="4" width="9" height="160" rx="4.5" transform="rotate(11 100 84)" fill="${fl.c2}" opacity=".35"/>
+<rect x="98" y="6" width="8" height="150" rx="4" transform="rotate(10 100 80)" fill="#fff" opacity=".9"/>
+<rect x="98" y="6" width="8" height="150" rx="4" transform="rotate(10 100 80)" fill="${fl.c2}" opacity=".22"/>
 <g clip-path="url(#dClip${uid})">
-  <rect x="40" y="66" width="90" height="150" fill="url(#dLiq${uid})"/>
-  <rect x="55" y="92" width="34" height="34" rx="8" fill="#fff" opacity=".22" transform="rotate(-12 72 109)"/>
-  <rect x="84" y="124" width="30" height="30" rx="7" fill="#fff" opacity=".18" transform="rotate(14 99 139)"/>
-  <rect x="60" y="156" width="26" height="26" rx="6" fill="#fff" opacity=".15" transform="rotate(8 73 169)"/>
+  <rect x="40" y="70" width="90" height="160" fill="url(#dLiq${uid})"/>
+  <rect x="45" y="70" width="13" height="160" fill="rgba(0,0,0,.16)"/>
+  <rect x="116" y="70" width="9" height="160" fill="rgba(255,255,255,.06)"/>
+  ${ices}
   ${bubbles}
-  <ellipse cx="85" cy="66" rx="46" ry="8.5" fill="#fff" opacity=".7"/>
+  <ellipse cx="85" cy="72" rx="40" ry="8" fill="url(#dMen${uid})"/>
+  <ellipse cx="85" cy="71" rx="40" ry="7" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.3"/>
 </g>
-<path d="${glass}" fill="url(#dShine${uid})"/>
-<path d="${glass}" fill="none" stroke="rgba(255,255,255,.92)" stroke-width="3.5"/>
-<line x1="50" y1="42" x2="46" y2="182" stroke="rgba(255,255,255,.5)" stroke-width="3" stroke-linecap="round"/>
+<path d="${glass}" fill="url(#dGla${uid})"/>
+<ellipse cx="85" cy="30" rx="45" ry="7.5" fill="rgba(255,255,255,.05)"/>
+<ellipse cx="85" cy="30" rx="45" ry="7.5" fill="none" stroke="rgba(255,255,255,.95)" stroke-width="3"/>
+<path d="${glass}" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2.4"/>
+<path d="M56 46 Q51 130 61 204" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="5" stroke-linecap="round" opacity=".75"/>
+<path d="M65 52 Q61 122 68 196" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M114 60 Q119 132 111 200" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="3" stroke-linecap="round"/>
+${drops}
 ${garnish}
 </svg>`;
     }
