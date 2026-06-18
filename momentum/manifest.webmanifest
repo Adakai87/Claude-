@@ -1,0 +1,26 @@
+{
+  "name": "MOMENTUM — 目標達成OS",
+  "short_name": "MOMENTUM",
+  "description": "意志力に頼らず、ビジョン→目標→ロードマップ→毎日の一歩を一本の線でつなぎ、勢い(Momentum)を可視化して続ける目標達成アプリ。",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "id": "/momentum/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait-primary",
+  "background_color": "#080810",
+  "theme_color": "#080810",
+  "categories": ["productivity", "lifestyle", "utilities"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "今日の一歩", "short_name": "今日", "url": "./index.html?view=today", "description": "今日のアクションをチェック" },
+    { "name": "ロードマップ", "short_name": "Roadmap", "url": "./index.html?view=roadmap", "description": "目標までの道のりを見る" }
+  ]
+}
