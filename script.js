@@ -539,60 +539,88 @@
         uid = uid || 'd';
         // 立ち上る炭酸
         let bubbles = '';
-        for (let i = 0; i < 13; i++) {
+        for (let i = 0; i < 14; i++) {
             const x = 52 + Math.random() * 66, y = 96 + Math.random() * 104;
-            const r = 1.3 + Math.random() * 2.6, d = (Math.random() * 3).toFixed(2);
+            const r = 1.2 + Math.random() * 2.6, d = (Math.random() * 3).toFixed(2);
             bubbles += `<circle class="d-bubble" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" style="transform-box:fill-box;transform-origin:center;animation-delay:${d}s"></circle>`;
         }
-        // グラス外側の結露
+        // 壁に張り付く静止泡
+        let wall = '';
+        for (let i = 0; i < 9; i++) {
+            const x = 50 + Math.random() * 70, y = 90 + Math.random() * 112, r = 1 + Math.random() * 1.8;
+            wall += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".7"/><circle cx="${(x - r * 0.3).toFixed(1)}" cy="${(y - r * 0.3).toFixed(1)}" r="${(r * 0.3).toFixed(1)}" fill="rgba(255,255,255,.85)"/>`;
+        }
+        // 液面のフィズ（細かい泡）
+        let collar = '';
+        for (let i = 0; i < 16; i++) {
+            const x = 49 + Math.random() * 72, y = 68 + Math.random() * 7, r = 0.8 + Math.random() * 1.7;
+            collar += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,255,255,.8)"/>`;
+        }
+        // 結露（外側の水滴・一部は伝う筋）
         let drops = '';
-        for (let i = 0; i < 11; i++) {
-            const x = 50 + Math.random() * 70, y = 78 + Math.random() * 124, r = 1 + Math.random() * 2.2;
-            drops += `<g opacity="${(0.4 + Math.random() * 0.4).toFixed(2)}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.55)" stroke-width=".5"/><circle cx="${(x - r * 0.3).toFixed(1)}" cy="${(y - r * 0.35).toFixed(1)}" r="${(r * 0.32).toFixed(1)}" fill="#fff"/></g>`;
+        for (let i = 0; i < 12; i++) {
+            const x = 48 + Math.random() * 74, y = 80 + Math.random() * 122, r = 1 + Math.random() * 2.3;
+            const trail = Math.random() < 0.4 ? `<rect x="${(x - 0.5).toFixed(1)}" y="${y.toFixed(1)}" width="1" height="${(5 + Math.random() * 11).toFixed(0)}" rx=".5" fill="rgba(255,255,255,.1)"/>` : '';
+            drops += `<g opacity="${(0.45 + Math.random() * 0.4).toFixed(2)}">${trail}<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.55)" stroke-width=".5"/><circle cx="${(x - r * 0.3).toFixed(1)}" cy="${(y - r * 0.35).toFixed(1)}" r="${(r * 0.32).toFixed(1)}" fill="#fff"/></g>`;
         }
-        // 立体的な氷
-        function ice(x, y, s, rot) {
-            return `<g transform="rotate(${rot} ${x} ${y})">` +
-                `<rect x="${(x - s / 2).toFixed(0)}" y="${(y - s / 2).toFixed(0)}" width="${s}" height="${s}" rx="${(s * 0.16).toFixed(1)}" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/>` +
-                `<path d="M${(x - s / 2 + 2).toFixed(0)} ${(y - s / 2 + 2).toFixed(0)} h${(s * 0.52).toFixed(0)} l${(-s * 0.52).toFixed(0)} ${(s * 0.52).toFixed(0)} Z" fill="rgba(255,255,255,.3)"/>` +
-                `<circle cx="${(x - s * 0.2).toFixed(0)}" cy="${(y - s * 0.2).toFixed(0)}" r="1.5" fill="#fff" opacity=".95"/></g>`;
+        // 立体的な氷（アイソメ・キューブ）
+        function ice(cx, cy, r, rot) {
+            const p = (a, b) => a.toFixed(1) + ' ' + b.toFixed(1);
+            const top = `M ${p(cx, cy - r)} L ${p(cx + r, cy - r * 0.5)} L ${p(cx, cy)} L ${p(cx - r, cy - r * 0.5)} Z`;
+            const lf = `M ${p(cx - r, cy - r * 0.5)} L ${p(cx, cy)} L ${p(cx, cy + r)} L ${p(cx - r, cy + r * 0.55)} Z`;
+            const rt = `M ${p(cx + r, cy - r * 0.5)} L ${p(cx, cy)} L ${p(cx, cy + r)} L ${p(cx + r, cy + r * 0.55)} Z`;
+            return `<g transform="rotate(${rot} ${cx} ${cy})" stroke="rgba(255,255,255,.45)" stroke-width=".8" stroke-linejoin="round">` +
+                `<path d="${lf}" fill="rgba(255,255,255,.13)"/><path d="${rt}" fill="rgba(255,255,255,.07)"/>` +
+                `<path d="${top}" fill="rgba(255,255,255,.34)"/>` +
+                `<circle cx="${(cx - r * 0.32).toFixed(1)}" cy="${(cy - r * 0.42).toFixed(1)}" r="1.3" fill="#fff"/></g>`;
         }
-        const ices = ice(73, 150, 32, -12) + ice(99, 176, 27, 15) + ice(80, 197, 23, 6);
+        const ices = ice(74, 150, 14, -8) + ice(97, 175, 12, 13) + ice(79, 197, 10, 5);
         const glass = 'M40 30 H130 L122 212 Q121 221 112 221 H58 Q49 221 48 212 Z';
         const inner = 'M45 35 H125 L117 209 Q116 216 109 216 H61 Q54 216 53 209 Z';
         const garnish = topping ? toppingSVG(topping) : '';
         return `<svg viewBox="0 0 170 244" xmlns="http://www.w3.org/2000/svg">
 <defs>
-  <linearGradient id="dLiq${uid}" x1="0" y1="0" x2="0.15" y2="1">
-    <stop offset="0" stop-color="${fl.c1}"/><stop offset=".55" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
+  <linearGradient id="dLiq${uid}" x1="0" y1="0" x2="0.16" y2="1">
+    <stop offset="0" stop-color="${fl.c1}"/><stop offset=".5" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
   </linearGradient>
-  <linearGradient id="dGla${uid}" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0" stop-color="rgba(255,255,255,.5)"/><stop offset=".16" stop-color="rgba(255,255,255,.04)"/>
-    <stop offset=".5" stop-color="rgba(255,255,255,0)"/><stop offset=".84" stop-color="rgba(255,255,255,.05)"/><stop offset="1" stop-color="rgba(255,255,255,.24)"/>
-  </linearGradient>
-  <clipPath id="dClip${uid}"><path d="${inner}"/></clipPath>
-  <radialGradient id="dMen${uid}" cx="0.42" cy="0.4" r="0.7">
-    <stop offset="0" stop-color="rgba(255,255,255,.55)"/><stop offset=".7" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
+  <radialGradient id="dBack${uid}" cx="0.5" cy="0.44" r="0.5">
+    <stop offset="0" stop-color="rgba(255,255,255,.32)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
   </radialGradient>
+  <linearGradient id="dGla${uid}" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="rgba(255,255,255,.55)"/><stop offset=".14" stop-color="rgba(255,255,255,.05)"/>
+    <stop offset=".5" stop-color="rgba(255,255,255,0)"/><stop offset=".82" stop-color="rgba(255,255,255,.05)"/><stop offset="1" stop-color="rgba(255,255,255,.26)"/>
+  </linearGradient>
+  <radialGradient id="dMen${uid}" cx="0.42" cy="0.4" r="0.7">
+    <stop offset="0" stop-color="rgba(255,255,255,.6)"/><stop offset=".7" stop-color="${fl.c1}"/><stop offset="1" stop-color="${fl.c2}"/>
+  </radialGradient>
+  <clipPath id="dClip${uid}"><path d="${inner}"/></clipPath>
 </defs>
-<rect x="98" y="6" width="8" height="150" rx="4" transform="rotate(10 100 80)" fill="#fff" opacity=".9"/>
-<rect x="98" y="6" width="8" height="150" rx="4" transform="rotate(10 100 80)" fill="${fl.c2}" opacity=".22"/>
+<g transform="rotate(10 100 80)">
+  <rect x="98" y="6" width="8" height="150" rx="4" fill="#fff" opacity=".9"/>
+  <rect x="99.6" y="6" width="2.2" height="150" rx="1.1" fill="#fff"/>
+  <rect x="98" y="6" width="8" height="150" rx="4" fill="${fl.c2}" opacity=".16"/>
+</g>
 <g clip-path="url(#dClip${uid})">
   <rect x="40" y="70" width="90" height="160" fill="url(#dLiq${uid})"/>
-  <rect x="45" y="70" width="13" height="160" fill="rgba(0,0,0,.16)"/>
-  <rect x="116" y="70" width="9" height="160" fill="rgba(255,255,255,.06)"/>
+  <ellipse cx="85" cy="150" rx="44" ry="72" fill="url(#dBack${uid})"/>
+  <rect x="45" y="70" width="12" height="160" fill="rgba(0,0,0,.18)"/>
+  <rect x="117" y="70" width="8" height="160" fill="rgba(255,255,255,.06)"/>
   ${ices}
+  ${wall}
   ${bubbles}
+  <ellipse cx="85" cy="205" rx="30" ry="7" fill="rgba(255,255,255,.2)"/>
+  <ellipse cx="85" cy="209" rx="25" ry="4.5" fill="rgba(0,0,0,.2)"/>
   <ellipse cx="85" cy="72" rx="40" ry="8" fill="url(#dMen${uid})"/>
+  ${collar}
   <ellipse cx="85" cy="71" rx="40" ry="7" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.3"/>
 </g>
 <path d="${glass}" fill="url(#dGla${uid})"/>
 <ellipse cx="85" cy="30" rx="45" ry="7.5" fill="rgba(255,255,255,.05)"/>
 <ellipse cx="85" cy="30" rx="45" ry="7.5" fill="none" stroke="rgba(255,255,255,.95)" stroke-width="3"/>
 <path d="${glass}" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2.4"/>
-<path d="M56 46 Q51 130 61 204" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="5" stroke-linecap="round" opacity=".75"/>
-<path d="M65 52 Q61 122 68 196" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M114 60 Q119 132 111 200" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="3" stroke-linecap="round"/>
+<path d="M56 46 Q50 128 61 204" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+<path d="M65 52 Q61 122 69 196" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M115 60 Q119 132 111 200" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="3" stroke-linecap="round"/>
 ${drops}
 ${garnish}
 </svg>`;
