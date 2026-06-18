@@ -254,16 +254,11 @@ main { flex: 1; display: flex; flex-direction: column; }
     font-family: inherit; font-size: 16px; font-weight: 700; color: var(--foam);
     background: rgba(255, 255, 255, .055);
     border: 1.5px solid rgba(255, 255, 255, .12);
-    border-radius: var(--radius); padding: 18px 20px 18px 58px;
+    border-radius: var(--radius); padding: 18px 20px;
     cursor: pointer; overflow: hidden;
     transition: transform .18s var(--ease), border-color .2s, background .2s, box-shadow .25s;
     -webkit-tap-highlight-color: transparent;
     backdrop-filter: blur(4px);
-}
-.option-btn .opt-emoji {
-    position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
-    font-size: 22px; line-height: 1;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4));
 }
 .option-btn .opt-sub { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
 .option-btn:hover { border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .09); transform: translateY(-2px); }
@@ -394,15 +389,6 @@ main { flex: 1; display: flex; flex-direction: column; }
     18% { opacity: .9; }
     100% { transform: translateY(-92px); opacity: 0; }
 }
-.rec-badge {
-    position: absolute; top: 18px; right: 18px; font-size: 30px;
-    width: 54px; height: 54px; display: grid; place-items: center;
-    background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .2);
-    border-radius: 50%; backdrop-filter: blur(4px);
-    animation: badgePop .6s var(--ease) both .3s;
-}
-@keyframes badgePop { from { transform: scale(0) rotate(-30deg); } to { transform: scale(1) rotate(0); } }
-
 .rec-content { padding: 24px 22px 26px; }
 .rec-label { font-size: 11px; font-weight: 700; letter-spacing: .22em; color: var(--accent); }
 .rec-product-name { font-size: 25px; font-weight: 900; line-height: 1.3; margin: 8px 0 16px; }
@@ -421,7 +407,6 @@ main { flex: 1; display: flex; flex-direction: column; }
     border-radius: var(--radius); padding: 18px 18px 16px; margin-bottom: 20px;
 }
 .recipe-title { font-size: 13px; font-weight: 900; letter-spacing: .06em; margin-bottom: 12px; color: #fff; }
-.recipe-title::before { content: "🥄 "; }
 .recipe-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
 .recipe-list li {
     display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
@@ -431,7 +416,6 @@ main { flex: 1; display: flex; flex-direction: column; }
 .recipe-list .ing { color: #efeaf2; }
 .recipe-list .amt { font-family: "Anton", sans-serif; font-size: 16px; color: var(--accent); white-space: nowrap; letter-spacing: .02em; }
 .recipe-tip { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
-.recipe-tip::before { content: "💡 "; }
 
 .rec-desc { font-size: 14.5px; line-height: 1.85; color: #efeaf2; }
 

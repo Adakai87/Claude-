@@ -26,7 +26,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥤</text></svg>">
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23E4002B%22/><text x=%2250%22 y=%2272%22 font-size=%2264%22 font-family=%22Arial%22 font-weight=%22bold%22 text-anchor=%22middle%22 fill=%22white%22>F</text></svg>">
 </head>
 
 <body>
@@ -40,8 +40,8 @@
 
     <!-- サウンドトグル -->
     <button class="sound-toggle" id="sound-toggle" aria-pressed="true" aria-label="効果音のオン・オフ">
-        <span class="sound-on" aria-hidden="true">🔊</span>
-        <span class="sound-off" aria-hidden="true">🔇</span>
+        <span class="sound-on" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+        <span class="sound-off" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6M17 9l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
     </button>
 
     <div class="app-container">
@@ -164,7 +164,6 @@
                                 <div class="rec-drink" id="rec-drink"></div>
                                 <div class="rec-reflect" id="rec-reflect"></div>
                             </div>
-                            <div class="rec-badge" id="rec-emoji" aria-hidden="true">🥤</div>
                         </div>
 
                         <div class="rec-content">
@@ -187,11 +186,11 @@
 
                             <div class="result-extra">
                                 <div class="extra-block">
-                                    <span class="extra-title">🫧 裏の顔</span>
+                                    <span class="extra-title">裏の顔</span>
                                     <p class="extra-text" id="result-hidden"></p>
                                 </div>
                                 <div class="extra-block match-block">
-                                    <span class="extra-title">💞 相性のいいタイプ</span>
+                                    <span class="extra-title">相性のいいタイプ</span>
                                     <p class="extra-text"><strong id="result-match-name">—</strong><span id="result-match-desc"></span></p>
                                 </div>
                             </div>
@@ -200,7 +199,7 @@
 
                     <!-- シェア画像 -->
                     <div class="sharecard-section">
-                        <h4 class="section-title">結果をシェアして応募！<br><span class="title-sub">抽選で <strong>100名様</strong> にコーラ×フルーティス体験セットが当たる🎁</span></h4>
+                        <h4 class="section-title">結果をシェアして応募！<br><span class="title-sub">抽選で <strong>100名様</strong> にコーラ×フルーティス体験セットが当たる</span></h4>
                         <div class="sharecard-preview">
                             <canvas id="share-canvas" width="1080" height="1350" aria-label="診断結果のシェア画像"></canvas>
                         </div>
