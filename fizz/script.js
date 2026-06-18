@@ -256,7 +256,7 @@
         questionText: $('question-text'), options: $('options-container'),
         loadingStrong: $('loading-strong'),
         rCode: $('result-code'), rName: $('result-type-name'), rTagline: $('result-tagline'),
-        rQuote: $('result-quote'), rRarity: $('result-rarity'), rEmoji: $('rec-emoji'), rDrink: $('rec-drink'), rReflect: $('rec-reflect'),
+        rQuote: $('result-quote'), rRarity: $('result-rarity'), rDrink: $('rec-drink'), rReflect: $('rec-reflect'),
         recVisual: $('rec-visual'), recPhoto: $('rec-photo'),
         rProduct: $('rec-product-name'), rBase: $('rec-base'), rFlavor: $('rec-flavor'),
         recipeList: $('recipe-list'), recipeTip: $('recipe-tip'), rDesc: $('result-description'),
@@ -421,8 +421,7 @@
             btn.type = 'button';
             btn.dataset.idx = i;
             btn.style.animationDelay = (i * 0.07) + 's';
-            btn.innerHTML = `<span class="opt-emoji">${opt.emoji}</span>` +
-                `<span>${opt.label}<span class="opt-sub">${opt.sub}</span></span>`;
+            btn.innerHTML = `<span>${opt.label}<span class="opt-sub">${opt.sub}</span></span>`;
             el.options.appendChild(btn);
         });
     }
@@ -471,18 +470,19 @@
         el.rTagline.textContent = type.tagline;
         el.rQuote.textContent = '「' + type.quote + '」';
         el.rRarity.textContent = type.rarity;
-        el.rEmoji.textContent = type.emoji;
         const _uid = 'r' + (++drawSeq);
         el.rDrink.innerHTML = drinkSVG(fl, _uid, type.drink.topping);
         if (el.rReflect) el.rReflect.innerHTML = drinkSVG(fl, _uid + 'x', type.drink.topping);
 
-        // 実写写真があれば差し替え（img/drinks/<CODE>.jpg／無ければCG風レンダリングのまま）
+        // 実写写真があれば差し替え（img/drinks/<CODE>.jpg|png|webp／無ければCG風レンダリング）
         if (el.recVisual && el.recPhoto) {
-            const code = type.code.replace(/-/g, '');
+            const code = type.code.replace(/-/g, ''), exts = ['jpg', 'png', 'webp'];
+            let ei = 0;
             el.recVisual.classList.remove('has-photo');
+            const tryNext = () => { if (ei < exts.length) el.recPhoto.src = 'img/drinks/' + code + '.' + exts[ei++]; };
             el.recPhoto.onload = () => el.recVisual.classList.add('has-photo');
-            el.recPhoto.onerror = () => el.recVisual.classList.remove('has-photo');
-            el.recPhoto.src = 'img/drinks/' + code + '.jpg';
+            el.recPhoto.onerror = tryNext;
+            tryNext();
         }
         el.rProduct.textContent = type.drink.name;
         el.rBase.textContent = type.drink.base;
@@ -560,7 +560,7 @@
         const ices = ice(73, 150, 32, -12) + ice(99, 176, 27, 15) + ice(80, 197, 23, 6);
         const glass = 'M40 30 H130 L122 212 Q121 221 112 221 H58 Q49 221 48 212 Z';
         const inner = 'M45 35 H125 L117 209 Q116 216 109 216 H61 Q54 216 53 209 Z';
-        const garnish = topping ? toppingSVG(topping) : `<text x="120" y="44" font-size="26" text-anchor="middle">${fl.emoji}</text>`;
+        const garnish = topping ? toppingSVG(topping) : '';
         return `<svg viewBox="0 0 170 244" xmlns="http://www.w3.org/2000/svg">
 <defs>
   <linearGradient id="dLiq${uid}" x1="0" y1="0" x2="0.15" y2="1">
@@ -633,9 +633,6 @@ ${garnish}
             ctx.fillStyle = '#FFF3E0'; ctx.beginPath(); ctx.ellipse(cx, topY - 6, w * 0.42, 34, 0, 0, 7); ctx.fill();
             ctx.fillStyle = '#FFF8F0'; ctx.beginPath(); ctx.ellipse(cx, topY - 16, w * 0.3, 26, 0, 0, 7); ctx.fill();
             ctx.fillStyle = '#E11D3A'; ctx.beginPath(); ctx.arc(cx + 10, topY - 34, 13, 0, 7); ctx.fill();
-        } else {
-            ctx.font = '64px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(fl.emoji, rightX + 6, rimY + 6);
         }
         ctx.restore();
     }
@@ -743,7 +740,7 @@ ${garnish}
 
     /* ---------------- Share / Save ---------------- */
     function shareText(type) {
-        return `【炭酸性格診断】私は「${type.name}」でした${type.emoji}\n口ぐせは「${type.quote}」\nおすすめは「${type.drink.name}」🥤\nあなたの炭酸性格は？`;
+        return `【炭酸性格診断】私は「${type.name}」でした。\n口ぐせは「${type.quote}」\nおすすめは「${type.drink.name}」\nあなたの炭酸性格は？`;
     }
     function onShareX() {
         if (!currentType) return;
