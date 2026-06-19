@@ -61,9 +61,13 @@
       }
       raf = requestAnimationFrame(tick);
     }
+    // 多重起動防止：既存のループ/リスナを止めてから開始
+    if (window._sfStop) window._sfStop();
+    if (window._sfResize) removeEventListener('resize', window._sfResize);
+    window._sfResize = resize;
     resize(); addEventListener('resize', resize);
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches && !document.body.classList.contains('reduce-motion')) tick();
-    window._sfStop = () => raf && cancelAnimationFrame(raf);
+    window._sfStop = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } };
   }
 
   /* ---------- state ---------- */
@@ -405,7 +409,6 @@
         <svg class="spark-chart" id="home-spark" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
       </div>`;
     drawSpark($('#home-spark'), momentumHistory(30), 600, 120);
-    if (score > 0) setTimeout(() => { const c = $('.home-orb circle:last-child'); }, 50);
   }
 
   function actionItemHTML(a) {
@@ -1053,7 +1056,7 @@
     const dg = closest('[data-del-goal]'); if (dg) return delGoal(dg.dataset.delGoal);
 
     // mood
-    const mood = closest('[data-mood]'); if (mood) { $$('#mood-pick .mood-btn').forEach((b) => b.classList.toggle('sel', b === mood)); mood.dataset._sel = '1'; return; }
+    const mood = closest('[data-mood]'); if (mood) { $$('#mood-pick .mood-btn').forEach((b) => b.classList.toggle('sel', b === mood)); return; }
 
     // onboarding controls
     const onbBtn = closest('[data-onb]'); if (onbBtn) return handleOnb(onbBtn.dataset.onb, onbBtn);
@@ -1081,7 +1084,7 @@
   function handleOnb(cmd, btn) {
     if (cmd === 'back') { onb.step = Math.max(0, onb.step - 1); return renderOnb(); }
     if (cmd === 'addaction') { const i = $('#onb-action'); if (i && i.value.trim()) { onb.actions.push(i.value.trim()); i.value = ''; renderOnbActions(document); } return; }
-    if (cmd === 'finish') { commitOnboarding(); goApp('home'); bigCelebrate(); toast('🚀 ようこそMOMENTUMへ！'); const fab = $('#install-fab'); return; }
+    if (cmd === 'finish') { commitOnboarding(); goApp('home'); bigCelebrate(); toast('🚀 ようこそMOMENTUMへ！'); return; }
     if (cmd === 'next') {
       if (onb.step === 0) { S.settings.name = ($('#onb-name') && $('#onb-name').value.trim()) || ''; }
       if (onb.step === 1) { onb.vision.northStar = ($('#onb-northstar') || {}).value || ''; onb.vision.identity = ($('#onb-identity') || {}).value || ''; }
