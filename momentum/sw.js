@@ -1,5 +1,5 @@
 /* MOMENTUM Service Worker — オフライン対応（アプリシェルのキャッシュ） */
-const CACHE = 'momentum-v1';
+const CACHE = 'momentum-v2';
 const ASSETS = [
   './',
   './index.html',
