@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>MOMENTUM — 意志力に頼らず、夢を毎日動く現実に。</title>
+<meta name="description" content="意志力に頼らない目標達成アプリ。ビジョン→目標→ロードマップ→今日の一歩を一本の線でつなぎ、あなたの“勢い(Momentum)”を可視化して続けさせる。スマホ・PC・Webで使えるPWA。" />
+<meta name="theme-color" content="#080810" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MOMENTUM" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<!-- OGP -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="MOMENTUM — 意志力に頼らず、夢を毎日動く現実に。" />
+<meta property="og:description" content="“勢い(Momentum)”を可視化して続けさせる、目標達成のためのフレームワーク・アプリ。" />
+<meta property="og:image" content="icons/icon-512.png" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body data-theme="cosmic">
+<canvas id="starfield" aria-hidden="true"></canvas>
+<div class="aurora aurora-1" aria-hidden="true"></div>
+<div class="aurora aurora-2" aria-hidden="true"></div>
+
+<!-- ════════════════════════ LANDING (販売LP) ════════════════════════ -->
+<div id="landing" class="screen">
+  <header class="lp-nav">
+    <a class="brand" href="#top" data-scroll>
+      <span class="brand-mark"></span>
+      <span class="brand-name">MOMENTUM</span>
+    </a>
+    <nav class="lp-nav-links">
+      <a href="#framework" data-scroll>メソッド</a>
+      <a href="#features" data-scroll>機能</a>
+      <a href="#pricing" data-scroll>料金</a>
+      <a href="#faq" data-scroll>FAQ</a>
+    </nav>
+    <div class="lp-nav-cta">
+      <button class="btn btn-ghost" data-action="open-app">アプリを開く</button>
+      <button class="btn btn-primary" data-action="start">無料ではじめる</button>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot"></span>目標達成のためのフレームワーク・OS</p>
+        <h1 class="hero-title">
+          意志力に頼らず、<br />
+          <span class="grad-text">夢を毎日動く現実に。</span>
+        </h1>
+        <p class="hero-sub">
+          続かないのは、あなたの意志が弱いからじゃない。<strong>仕組み</strong>が無いだけ。<br />
+          MOMENTUMは「ビジョン → 目標 → ロードマップ → 今日の一歩」を一本の線でつなぎ、
+          あなたの<strong>“勢い(Momentum)”を数値で可視化</strong>して、止まらせない。
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary btn-lg" data-action="start">無料ではじめる →</button>
+          <button class="btn btn-ghost btn-lg" data-action="demo">サンプルで体験する</button>
+        </div>
+        <ul class="hero-trust">
+          <li><b>3分</b>で最初のロードマップ</li>
+          <li><b>0円</b>ではじめられる</li>
+          <li>スマホ・PC・Web <b>全部</b>対応</li>
+        </ul>
+      </div>
+      <div class="hero-visual">
+        <div class="momentum-orb" id="hero-orb">
+          <svg viewBox="0 0 240 240" class="orb-ring">
+            <circle class="orb-track" cx="120" cy="120" r="104" />
+            <circle class="orb-fill" id="hero-orb-fill" cx="120" cy="120" r="104" />
+          </svg>
+          <div class="orb-center">
+            <div class="orb-label">勢い</div>
+            <div class="orb-value" id="hero-orb-value">0</div>
+            <div class="orb-state" id="hero-orb-state">始動</div>
+          </div>
+        </div>
+        <div class="hero-chips">
+          <span class="chip chip-violet">🔥 12日連続</span>
+          <span class="chip chip-cyan">🎯 目標まで 68%</span>
+          <span class="chip chip-amber">⚡ 加速中</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROBLEM -->
+    <section class="lp-section" id="problem">
+      <h2 class="sec-title">「やる気」は、いちばん当てにならない燃料。</h2>
+      <p class="sec-lead">自己管理が苦手なのは、性格のせいじゃない。続く人は“続く仕組み”を持っているだけ。</p>
+      <div class="prob-grid">
+        <div class="prob-card">
+          <div class="prob-emoji">🌫️</div>
+          <h3>大きな夢が、遠すぎる</h3>
+          <p>ゴールはあるのに、今日何をすればいいか分からない。だから動けない。</p>
+        </div>
+        <div class="prob-card">
+          <div class="prob-emoji">📉</div>
+          <h3>三日坊主で、勢いが消える</h3>
+          <p>頑張った成果が見えないと、人は必ず止まる。可視化されない努力は続かない。</p>
+        </div>
+        <div class="prob-card">
+          <div class="prob-emoji">🧩</div>
+          <h3>ツールがバラバラ</h3>
+          <p>夢はノート、タスクはアプリ、習慣はまた別。線がつながらず、迷子になる。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FRAMEWORK -->
+    <section class="lp-section" id="framework">
+      <p class="eyebrow center"><span class="dot"></span>THE MOMENTUM METHOD</p>
+      <h2 class="sec-title">夢を、止まらない“勢い”に変える5ステップ。</h2>
+      <p class="sec-lead">一冊の本のように体系化された、たった5つの流れ。アプリがこの順番をそのまま導きます。</p>
+      <ol class="method-flow">
+        <li class="method-step" style="--c:#8b5cf6">
+          <span class="ms-num">01</span>
+          <h3>DREAM<small>描く</small></h3>
+          <p>“どんな自分になりたいか”=北極星を定める。すべての行動の理由になる。</p>
+        </li>
+        <li class="method-arrow">→</li>
+        <li class="method-step" style="--c:#7c8cf8">
+          <span class="ms-num">02</span>
+          <h3>GOAL<small>決める</small></h3>
+          <p>年→四半期→月→週へ。大きな夢を、手が届くサイズに砕く。</p>
+        </li>
+        <li class="method-arrow">→</li>
+        <li class="method-step" style="--c:#22d3ee">
+          <span class="ms-num">03</span>
+          <h3>MAP<small>並べる</small></h3>
+          <p>ロードマップ（時間軸）に「いつ・何を」を配置。道のりが一目で見える。</p>
+        </li>
+        <li class="method-arrow">→</li>
+        <li class="method-step" style="--c:#34d399">
+          <span class="ms-num">04</span>
+          <h3>MOVE<small>動く</small></h3>
+          <p>今日の“たった一歩”に落とす。習慣化エンジンが毎日そっと背中を押す。</p>
+        </li>
+        <li class="method-arrow">→</li>
+        <li class="method-step" style="--c:#fbbf24">
+          <span class="ms-num">05</span>
+          <h3>MOMENTUM<small>積む</small></h3>
+          <p>勢いスコアで継続を可視化。振り返り、ループを回し、加速し続ける。</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- MOMENTUM HOOK -->
+    <section class="lp-section hook" id="hook">
+      <div class="hook-copy">
+        <p class="eyebrow"><span class="dot"></span>独自の発明</p>
+        <h2 class="sec-title">あなたの“勢い”を、初めて数値にした。</h2>
+        <p class="sec-lead">
+          物理の運動量＝<b>勢い × 継続</b>。MOMENTUMは毎日の行動から「勢いスコア」を計算します。
+          動けば増え、止まれば静かに減る。だから人は、止まりたくなくなる。
+        </p>
+        <ul class="hook-list">
+          <li><span>🔥</span>連続記録（ストリーク）で達成感をデイリーに</li>
+          <li><span>⚡</span>加速・減速のトレンドが一目で分かる</li>
+          <li><span>🌌</span>サボった日も責めない。そっと“再点火”を促す</li>
+        </ul>
+      </div>
+      <div class="hook-visual">
+        <div class="meter-demo">
+          <div class="meter-demo-label">MOMENTUM SCORE</div>
+          <div class="meter-demo-value"><span id="hook-meter-val">0</span><small>/100</small></div>
+          <div class="meter-bar"><div class="meter-fill" id="hook-meter-fill"></div></div>
+          <div class="meter-states">
+            <span>静止</span><span>始動</span><span>加速</span><span>巡航</span><span>超加速</span>
+          </div>
+          <svg class="spark" id="hook-spark" viewBox="0 0 300 80" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="lp-section" id="features">
+      <h2 class="sec-title">夢から今日まで、ぜんぶ一本でつながる。</h2>
+      <p class="sec-lead">バラバラのツールはもういらない。これ一つで完結します。</p>
+      <div class="feat-grid">
+        <article class="feat-card span-2">
+          <div class="feat-ico">🗺️</div>
+          <h3>ロードマップ（時間軸）</h3>
+          <p>週・月・四半期・年。ズームで切り替わるタイムラインに、目標とマイルストーンを配置。「今どこにいて、次どこへ」が直感で分かる、本アプリの心臓部。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">⚡</div>
+          <h3>勢いスコア</h3>
+          <p>継続を数値化。止まらない仕組みの核。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">🎯</div>
+          <h3>目標の階層化</h3>
+          <p>夢→年→四半期→月→週へ自動でブレイクダウン。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">🔁</div>
+          <h3>習慣化エンジン</h3>
+          <p>今日の一歩をチェック。連続記録で背中を押す。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">📓</div>
+          <h3>振り返り日記</h3>
+          <p>気分と学びを記録。続ける感情をデザインする。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">🕸️</div>
+          <h3>人生バランス</h3>
+          <p>8領域のレーダーで、偏りに気づく。</p>
+        </article>
+        <article class="feat-card">
+          <div class="feat-ico">📱</div>
+          <h3>どこでも</h3>
+          <p>スマホ・PCにインストール。オフラインでも動く。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- PRICING -->
+    <section class="lp-section" id="pricing">
+      <h2 class="sec-title">まずは無料で。続けたくなったら、Proへ。</h2>
+      <p class="sec-lead">価格は仮（ローンチ価格）。あなたの「これなら払う」を一緒に決めていきます。</p>
+      <div class="price-grid">
+        <article class="price-card">
+          <div class="price-name">Free</div>
+          <div class="price-amount">¥0<small>/ずっと</small></div>
+          <p class="price-desc">まず仕組みを体験する。</p>
+          <ul class="price-feats">
+            <li>北極星（ビジョン）1つ</li>
+            <li>目標 3つまで</li>
+            <li>ロードマップ・勢いスコア</li>
+            <li>習慣 / 振り返り日記</li>
+            <li>端末内に安全保存（オフライン）</li>
+          </ul>
+          <button class="btn btn-ghost btn-block" data-action="start">無料ではじめる</button>
+        </article>
+        <article class="price-card price-pro">
+          <div class="price-badge">おすすめ</div>
+          <div class="price-name">Pro</div>
+          <div class="price-amount">¥780<small>/月</small></div>
+          <p class="price-desc">本気で、人生を動かす。<small>（年額 ¥6,800 / 約27%お得）</small></p>
+          <ul class="price-feats">
+            <li><b>すべて無制限</b>（夢・目標）</li>
+            <li>AIコーチ（次の一歩を提案）<span class="soon">近日</span></li>
+            <li>クラウド同期・複数端末<span class="soon">近日</span></li>
+            <li>日記のSNS自動投稿連携<span class="soon">近日</span></li>
+            <li>リマインド通知 / データ書き出し</li>
+          </ul>
+          <button class="btn btn-primary btn-block" data-action="start">Proを試す（仮）</button>
+        </article>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="lp-section" id="faq">
+      <h2 class="sec-title">よくある質問</h2>
+      <div class="faq-list" id="faq-list">
+        <details class="faq-item"><summary>本当に「自己管理が苦手」でも続きますか？</summary><p>はい。意志力ではなく「勢いの可視化」と「今日の一歩への分解」で続く設計です。止まりかけたらアプリが再点火を促します。</p></details>
+        <details class="faq-item"><summary>データはどこに保存されますか？</summary><p>初期状態ではお使いの端末内（ブラウザ）に保存され、オフラインでも動きます。Proのクラウド同期は近日対応予定です。</p></details>
+        <details class="faq-item"><summary>スマホアプリですか？PCでも使えますか？</summary><p>両方です。Webアプリ(PWA)なので、スマホ・PCの「ホーム画面に追加 / インストール」でアプリのように使えます。</p></details>
+        <details class="faq-item"><summary>料金は確定ですか？</summary><p>いいえ、ローンチ価格の仮設定です。早期ユーザーの声を聞きながら最終価格を決めます。</p></details>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="cta-final">
+      <h2>勢いは、才能を超える。</h2>
+      <p>今日の小さな一歩が、止まらない流れになる。3分で始めよう。</p>
+      <button class="btn btn-primary btn-lg" data-action="start">無料ではじめる →</button>
+    </section>
+
+    <footer class="lp-footer">
+      <span class="brand-name">MOMENTUM</span>
+      <span class="foot-note">© <span id="year"></span> MOMENTUM. 意志力に頼らない目標達成OS.</span>
+    </footer>
+  </main>
+</div>
+
+<!-- ════════════════════════ ONBOARDING ════════════════════════ -->
+<div id="onboarding" class="screen" hidden>
+  <div class="onb-wrap">
+    <div class="onb-progress"><div class="onb-progress-fill" id="onb-progress"></div></div>
+    <div id="onb-body"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════ APP ════════════════════════ -->
+<div id="app" class="screen" hidden>
+  <aside class="app-side">
+    <a class="brand brand-sm" href="#" data-action="goto-landing">
+      <span class="brand-mark"></span><span class="brand-name">MOMENTUM</span>
+    </a>
+    <nav class="side-nav" id="side-nav">
+      <button class="nav-item" data-view="home"><span class="nav-ico">🏠</span><span>ホーム</span></button>
+      <button class="nav-item" data-view="roadmap"><span class="nav-ico">🗺️</span><span>ロードマップ</span></button>
+      <button class="nav-item" data-view="goals"><span class="nav-ico">🎯</span><span>目標</span></button>
+      <button class="nav-item" data-view="today"><span class="nav-ico">⚡</span><span>今日</span></button>
+      <button class="nav-item" data-view="stats"><span class="nav-ico">📈</span><span>軌跡</span></button>
+      <button class="nav-item" data-view="settings"><span class="nav-ico">⚙️</span><span>設定</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="side-momentum" id="side-momentum"></div>
+    </div>
+  </aside>
+
+  <main class="app-main">
+    <header class="app-top">
+      <div class="app-top-left">
+        <button class="icon-btn only-mobile" data-action="goto-landing" title="トップ">‹</button>
+        <h1 class="view-title" id="view-title">ホーム</h1>
+      </div>
+      <div class="app-top-right">
+        <div class="momentum-chip" id="momentum-chip" data-view-link="stats"></div>
+      </div>
+    </header>
+
+    <div class="app-scroll">
+      <section class="view" id="view-home"></section>
+      <section class="view" id="view-roadmap" hidden></section>
+      <section class="view" id="view-goals" hidden></section>
+      <section class="view" id="view-today" hidden></section>
+      <section class="view" id="view-stats" hidden></section>
+      <section class="view" id="view-settings" hidden></section>
+    </div>
+  </main>
+
+  <nav class="app-tabbar">
+    <button class="tab-item" data-view="home"><span class="nav-ico">🏠</span><small>ホーム</small></button>
+    <button class="tab-item" data-view="roadmap"><span class="nav-ico">🗺️</span><small>マップ</small></button>
+    <button class="tab-item tab-fab" data-view="today"><span class="nav-ico">⚡</span><small>今日</small></button>
+    <button class="tab-item" data-view="goals"><span class="nav-ico">🎯</span><small>目標</small></button>
+    <button class="tab-item" data-view="stats"><span class="nav-ico">📈</span><small>軌跡</small></button>
+  </nav>
+</div>
+
+<!-- overlays -->
+<div id="toast" class="toast" hidden></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div id="modal-root"></div>
+<button id="install-fab" class="install-fab" hidden>📲 アプリを追加</button>
+
+<script src="js/app.js"></script>
+</body>
+</html>
