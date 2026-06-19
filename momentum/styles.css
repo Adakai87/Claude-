@@ -597,3 +597,20 @@ select.fld { appearance: none; background-image: linear-gradient(45deg, transpar
 }
 body.reduce-motion #starfield { display: none; }
 body.reduce-motion .aurora { animation: none; opacity: 0.2; }
+
+/* ════════════════════ LINE ICONS ════════════════════ */
+svg.ic { display: inline-block; vertical-align: -0.18em; flex: none; }
+.card-h h2 { display: inline-flex; align-items: center; gap: 7px; }
+.im-ic { display: inline-flex; align-items: center; gap: 4px; }
+.item-streak.im-ic { gap: 3px; }
+.nav-ico { display: inline-flex; align-items: center; justify-content: center; }
+.nav-ico svg.ic { vertical-align: middle; }
+.feat-ico, .prob-emoji, .e-emoji { line-height: 0; }
+.feat-ico svg.ic, .prob-emoji svg.ic, .e-emoji svg.ic { vertical-align: middle; }
+.hk-ic { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.btn svg.ic { vertical-align: -0.2em; }
+.mini-btn svg.ic { vertical-align: -0.18em; }
+.mood-btn { display: flex; align-items: center; justify-content: center; color: var(--text-dim); filter: none; }
+.mood-btn.sel { color: var(--violet); filter: none; }
+.preset-chip svg.ic { vertical-align: -0.2em; margin-right: 2px; }
+.orb-state svg.ic, .stat-lbl svg.ic { vertical-align: -0.15em; }
