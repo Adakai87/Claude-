@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#dd2476" />
+  <title>推しリマインダー</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="overlay.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+</head>
+<body>
+  <main class="app">
+    <header class="app-hd">
+      <span id="hd-emoji" class="app-emoji">🔥</span>
+      <h1>推しリマインダー</h1>
+      <p class="app-tag">見すぎたら、推しが喝を入れてくれる。</p>
+    </header>
+
+    <!-- タイマー設定 -->
+    <section class="panel">
+      <h2>⏱ リマインダーをセット</h2>
+      <p class="desc">この時間スマホを触ったら、推しが登場して教えてくれます。</p>
+      <div class="minute-chips" id="minute-chips">
+        <button class="chip" data-min="1">1分</button>
+        <button class="chip" data-min="15">15分</button>
+        <button class="chip sel" data-min="30">30分</button>
+        <button class="chip" data-min="60">60分</button>
+      </div>
+      <div class="timer-display" id="timer-display">30:00</div>
+      <div class="timer-actions">
+        <button id="start-btn" class="big-btn primary">スタート</button>
+        <button id="stop-btn" class="big-btn ghost" hidden>ストップ</button>
+      </div>
+      <p class="status" id="status"></p>
+    </section>
+
+    <!-- キャラ選択 -->
+    <section class="panel">
+      <h2>キャラクター</h2>
+      <div class="char-grid" id="char-grid"></div>
+      <div id="custom-fields" hidden>
+        <label>推しの画像URL</label>
+        <input type="url" id="custom-img" placeholder="https://.../oshi.png" />
+        <label>自作の名言（1行に1つ）</label>
+        <textarea id="custom-quotes" rows="3" placeholder="顔を上げよう！"></textarea>
+      </div>
+    </section>
+
+    <!-- テスト -->
+    <section class="panel center">
+      <button id="preview-btn" class="big-btn ghost">👀 今すぐ登場をプレビュー</button>
+      <button id="notif-btn" class="link-btn">🔔 通知を許可する</button>
+    </section>
+
+    <footer class="app-ft">
+      <p>ホーム画面に追加すると、アプリのように使えます。</p>
+    </footer>
+  </main>
+
+  <script src="characters.js"></script>
+  <script src="overlay.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

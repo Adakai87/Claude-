@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "推しリマインダー — Screen Time Reminder",
+  "version": "1.0.0",
+  "description": "特定サイトの見すぎを検知して、松岡修造（風）や猫など好きなキャラが画面に登場して喝を入れてくれる拡張機能。",
+  "default_locale": "ja",
+  "permissions": ["tabs", "storage", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "推しリマインダー"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["characters.js", "overlay.js", "content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

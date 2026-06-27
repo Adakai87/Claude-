@@ -1,0 +1,40 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+  background: #f2f2f7; color: #1c1c1e; padding: 24px;
+}
+.wrap { max-width: 640px; margin: 0 auto; }
+h1 { font-size: 22px; margin-bottom: 18px; }
+h2 { font-size: 15px; margin-bottom: 12px; }
+.card { background: #fff; border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+.hint { font-size: 12px; color: #888; margin: 6px 0 10px; }
+label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 6px; }
+input, textarea { width: 100%; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit; }
+textarea { resize: vertical; }
+
+.char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.char-opt {
+  border: 2px solid #e5e5ea; border-radius: 14px; padding: 14px 8px; text-align: center;
+  cursor: pointer; transition: all .15s ease; background: #fafafa;
+}
+.char-opt:hover { border-color: #c7c7cc; }
+.char-opt.sel { border-color: #007aff; background: #eaf3ff; }
+.char-opt .em { font-size: 36px; }
+.char-opt .nm { font-size: 12px; font-weight: 700; margin-top: 6px; }
+
+.watched-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.w-item { display: flex; align-items: center; gap: 8px; background: #f7f7fa; border-radius: 10px; padding: 8px 10px; }
+.w-item .host { flex: 1; font-size: 14px; font-weight: 600; }
+.w-item input { width: 70px; }
+.w-item .del { background: #ffe5e5; color: #ff3b30; border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 700; }
+
+.add-row { display: flex; gap: 8px; }
+.add-row #new-host { flex: 1; }
+.add-row #new-limit { width: 80px; }
+
+.btn { border: none; border-radius: 10px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.btn.primary { background: #007aff; color: #fff; }
+.btn.small { padding: 10px 14px; background: #34c759; color: #fff; }
+
+.save-row { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+.saved-msg { color: #34c759; font-weight: 700; font-size: 13px; }
