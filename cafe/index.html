@@ -9,7 +9,8 @@
          --accent:#e0894a; --gold:#ffce4d; --green:#7fc77f; }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
   html,body{margin:0; height:100%; overflow:hidden; background:#10141a;
-    font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; color:var(--txt);}
+    font-family:"游ゴシック体","YuGothic","Yu Gothic Medium","Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",-apple-system,"Segoe UI",Roboto,sans-serif;
+    color:var(--txt); -webkit-font-smoothing:antialiased; letter-spacing:.02em;}
   #app{position:fixed; inset:0;}
   canvas{display:block; touch-action:none;}
 
@@ -64,8 +65,9 @@
   .dash-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
   .dash-kpis{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px;}
   .kpi{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 10px;}
-  .kpi .v{font-size:18px; font-weight:800;} .kpi .l{font-size:10px; color:var(--sub);}
-  .dash-h{font-size:12px; color:var(--sub); margin:12px 2px 6px; font-weight:800;}
+  .kpi{padding:9px 11px;}
+  .kpi .v{font-size:18px; font-weight:800;} .kpi .l{font-size:11px; color:var(--sub); margin-top:3px;}
+  .dash-h{font-size:13px; color:var(--sub); margin:14px 2px 7px; font-weight:800;}
   .barrow{display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px;}
   .barrow .nm{width:84px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .barrow .bar{flex:1; height:14px; background:var(--panel2); border-radius:7px; overflow:hidden;}
@@ -77,32 +79,33 @@
     background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px;
     padding:8px 12px; font-size:16px; cursor:pointer;}
   #btn-manage.alert{border-color:var(--red); box-shadow:0 0 0 2px rgba(224,104,94,.4);}
-  .m-tab{flex:1; padding:7px 3px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
-    color:var(--sub); font-weight:800; font-size:12px; cursor:pointer; text-align:center; white-space:nowrap;}
-  .dash-tabs{flex-wrap:wrap;}
+  .m-tab{flex:0 0 auto; padding:8px 14px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--sub); font-weight:800; font-size:13px; cursor:pointer; text-align:center; white-space:nowrap;}
+  .dash-tabs{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; scrollbar-width:none;}
+  .dash-tabs::-webkit-scrollbar{display:none;}
   .m-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
   .mrow{display:flex; align-items:center; gap:7px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px;}
   .mrow .nm{flex:1; min-width:0;}
-  .mrow .sub2{font-size:10px; color:var(--sub); margin-top:2px;}
+  .mrow .sub2{font-size:11px; color:var(--sub); margin-top:3px; line-height:1.5;}
   .mbtn{border:1px solid var(--line); background:var(--panel2); color:var(--txt); border-radius:8px; padding:5px 9px; font-weight:800; font-size:12px; cursor:pointer;}
   .mbtn.on{background:var(--green); color:#06301c; border-color:var(--green);}
   .mbtn.sel{background:var(--accent); color:#231400; border-color:var(--accent);}
   .mbtn:disabled{filter:grayscale(.6) brightness(.6); cursor:not-allowed;}
   .low{color:var(--red); font-weight:800;}
-  .note{font-size:11px; color:var(--sub); margin-top:8px; line-height:1.5;}
+  .note{font-size:12px; color:var(--sub); margin-top:10px; line-height:1.65;}
 
   /* カード型の選択肢（画像つき） */
   .dash-sheet{max-height:86vh; overflow-y:auto;}
-  .mcard{display:flex; gap:11px; align-items:center; background:var(--panel2); border:1px solid var(--line);
-    border-radius:13px; padding:9px; margin-bottom:9px;}
+  .mcard{display:flex; gap:12px; align-items:center; background:var(--panel2); border:1px solid var(--line);
+    border-radius:13px; padding:11px; margin-bottom:10px;}
   .mcard.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
   .thumb{width:58px; height:58px; border-radius:11px; overflow:hidden; flex-shrink:0; background:#11131c;}
   .thumb svg, .thumb .ethumb{width:100%; height:100%; display:block;}
   .ethumb{display:flex; align-items:center; justify-content:center; font-size:31px; line-height:1;}
   .mcard .info{flex:1; min-width:0;}
-  .mcard .ttl{font-weight:800; font-size:14px; line-height:1.2;}
-  .mcard .meta{font-size:11px; color:var(--sub); margin-top:4px; line-height:1.4;}
-  .mcard .act{display:flex; flex-direction:column; gap:5px; align-items:stretch; flex-shrink:0;}
+  .mcard .ttl{font-weight:800; font-size:14.5px; line-height:1.3;}
+  .mcard .meta{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.55;}
+  .mcard .act{display:flex; flex-direction:column; gap:6px; align-items:stretch; flex-shrink:0;}
   .stepper{display:flex; align-items:center; gap:4px;}
   .stepper .pz{width:48px; text-align:center; font-weight:800; font-size:13px;}
   .step-btn{width:28px; height:28px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
