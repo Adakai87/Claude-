@@ -72,6 +72,24 @@
   .barrow .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--gold)); border-radius:7px;}
   .barrow .vv{width:54px; text-align:right; flex-shrink:0; color:var(--sub); font-variant-numeric:tabular-nums;}
 
+  /* 経営パネル */
+  #btn-manage{position:fixed; top:118px; right:12px; z-index:30; pointer-events:auto;
+    background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px;
+    padding:8px 12px; font-size:16px; cursor:pointer;}
+  #btn-manage.alert{border-color:var(--red); box-shadow:0 0 0 2px rgba(224,104,94,.4);}
+  .m-tab{flex:1; padding:7px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--sub); font-weight:800; font-size:13px; cursor:pointer; text-align:center;}
+  .m-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+  .mrow{display:flex; align-items:center; gap:7px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px;}
+  .mrow .nm{flex:1; min-width:0;}
+  .mrow .sub2{font-size:10px; color:var(--sub); margin-top:2px;}
+  .mbtn{border:1px solid var(--line); background:var(--panel2); color:var(--txt); border-radius:8px; padding:5px 9px; font-weight:800; font-size:12px; cursor:pointer;}
+  .mbtn.on{background:var(--green); color:#06301c; border-color:var(--green);}
+  .mbtn.sel{background:var(--accent); color:#231400; border-color:var(--accent);}
+  .mbtn:disabled{filter:grayscale(.6) brightness(.6); cursor:not-allowed;}
+  .low{color:var(--red); font-weight:800;}
+  .note{font-size:11px; color:var(--sub); margin-top:8px; line-height:1.5;}
+
   /* ---- speech / dialog ---- */
   .bubble{position:fixed; background:#fff; color:#1a140e; border-radius:14px; padding:8px 12px; font-size:13px; font-weight:700;
     transform:translate(-50%,-100%); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.4); max-width:220px; line-height:1.4;}
@@ -123,11 +141,26 @@
 
 <div class="carrybadge" id="carry" style="display:none"></div>
 <button id="btn-dash" title="ダッシュボード">📊</button>
+<button id="btn-manage" title="経営（事務所）">🏢</button>
 <div class="hint" id="hint"></div>
 
 <div class="bottom">
   <button class="btn ghost" id="btn-mode">店に入る</button>
   <button class="btn" id="btn-close">閉店する</button>
+</div>
+
+<div class="modal" id="modal-manage">
+  <div class="sheet dash-sheet">
+    <h2>🏢 経営（事務所）</h2>
+    <div class="dash-tabs">
+      <button class="m-tab active" data-mtab="menu">メニュー</button>
+      <button class="m-tab" data-mtab="supply">仕入れ</button>
+      <button class="m-tab" data-mtab="equip">設備</button>
+      <button class="m-tab" data-mtab="store">店舗</button>
+    </div>
+    <div id="manage-body"></div>
+    <button class="btn ghost" style="width:100%; margin-top:14px" id="manage-close">閉じる</button>
+  </div>
 </div>
 
 <div class="modal" id="modal-dash">
@@ -448,7 +481,7 @@ function arriveTask(){
   queue.shift();                                 // 列から外す（後続が前進）
   removeOrderTag(c);
   const ratio = Math.max(0, c.patience/c.patienceMax);
-  const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1));   // 待たせない×ペルソナ×常連
+  const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1)*qualityMult());   // 待たせない×ペルソナ×常連×設備品質
   const total = c.pay + tip;
   sim.money += total; sim.revToday += total; sim.servedToday++;
   dayStats.sold[c.order.emoji] = (dayStats.sold[c.order.emoji]||0) + 1;  // 商品別の販売を記録
@@ -540,10 +573,85 @@ function pickPersona(){
   for(let i=0;i<PERSONAS.length;i++){ r-=weights[i]; if(r<=0) return PERSONAS[i]; }
   return PERSONAS[0];
 }
+// 原材料（在庫＆仕入れ）。serveで消費、仕入れで補充（仕入れ＝COGS）
+const materials = {
+  bean:  { name:'コーヒー豆', unit:'g',  stock:600, cost:3,  buyAmt:300, buyCost:600 },
+  milk:  { name:'ミルク',     unit:'ml', stock:600, cost:1,  buyAmt:500, buyCost:400 },
+  matcha:{ name:'抹茶',       unit:'g',  stock:200, cost:6,  buyAmt:100, buyCost:500 },
+  flour: { name:'生地・材料', unit:'個', stock:60,  cost:45, buyAmt:30,  buyCost:1200 },
+  cup:   { name:'カップ',     unit:'個', stock:400, cost:8,  buyAmt:200, buyCost:1500 },
+};
+// メニュー（価格・レシピ付き）。enabled=提供中
 const MENU = [
-  {emoji:'☕', name:'ブレンド'}, {emoji:'🥛', name:'ラテ'}, {emoji:'🍵', name:'抹茶'},
-  {emoji:'🧋', name:'タピオカ'}, {emoji:'🍰', name:'ケーキ'}, {emoji:'🥐', name:'クロワッサン'},
+  {emoji:'☕', name:'ブレンド',     basePrice:450, price:450, enabled:true, recipe:{bean:18, cup:1}},
+  {emoji:'🥛', name:'ラテ',         basePrice:550, price:550, enabled:true, recipe:{bean:18, milk:150, cup:1}},
+  {emoji:'🍵', name:'抹茶ラテ',     basePrice:600, price:600, enabled:true, recipe:{matcha:5, milk:150, cup:1}},
+  {emoji:'🧋', name:'タピオカ',     basePrice:580, price:580, enabled:true, recipe:{milk:120, flour:1, cup:1}},
+  {emoji:'🍰', name:'ケーキ',       basePrice:520, price:520, enabled:true, recipe:{flour:1}},
+  {emoji:'🥐', name:'クロワッサン', basePrice:380, price:380, enabled:true, recipe:{flour:1}},
 ];
+// 開発候補（メニュー制作で解放）
+const DEV_CATALOG = [
+  {emoji:'🍮', name:'プリン',     basePrice:480, recipe:{milk:100, flour:1}, devCost:2500},
+  {emoji:'🥪', name:'サンド',     basePrice:650, recipe:{flour:2}, devCost:3500},
+  {emoji:'🧉', name:'季節ドリンク', basePrice:640, recipe:{matcha:3, milk:120, cup:1}, devCost:3000},
+];
+
+// ---- メニュー/在庫のヘルパー ----
+const materialCost = item => Object.entries(item.recipe).reduce((a,[m,q])=>a + q*(materials[m]?.cost||0), 0);
+const inStock = item => Object.entries(item.recipe).every(([m,q])=> (materials[m]?.stock||0) >= q);
+function consume(item){ for(const [m,q] of Object.entries(item.recipe)){ if(materials[m]) materials[m].stock -= q; } }
+function recomputePriceLevel(){
+  const en = MENU.filter(m=>m.enabled);
+  store.priceLevel = en.length ? en.reduce((a,m)=>a+m.price/m.basePrice,0)/en.length : 1.0;
+}
+function restock(key){
+  const mt = materials[key]; if(!mt) return false;
+  if(sim.money < mt.buyCost) return false;
+  sim.money -= mt.buyCost; mt.stock += mt.buyAmt; return true;
+}
+// ペルソナ/常連の希望から、提供中＆在庫ありの一品を選ぶ
+function chooseOrder(persona, regular){
+  const avail = MENU.filter(m=>m.enabled && inStock(m));
+  if(avail.length===0) return null;
+  if(regular){ const f = avail.find(m=>m.emoji===regular.fav); if(f) return f; }
+  const liked = avail.filter(m=>persona.menu.includes(m.emoji));
+  const pool = liked.length ? liked : avail;
+  return pool[(Math.random()*pool.length)|0];
+}
+
+// ---- 設備投資 & 家具（店内デザイン）----
+const equip = {
+  machine:{ name:'エスプレッソマシン', lv:1, max:5, base:4000, desc:'ドリンク品質→チップUP' },
+  pos:    { name:'POSレジ',            lv:1, max:4, base:3500, desc:'行列の収容数 +1' },
+  decor:  { name:'内装グレード / BGM',  lv:1, max:5, base:3000, desc:'居心地→我慢が長く・常連化UP' },
+};
+const equipCost   = e => Math.round(e.base * Math.pow(1.6, e.lv-1));
+const queueCap    = () => QUEUE_MAX + (equip.pos.lv-1);     // 行列の収容数
+const qualityMult = () => 1 + (equip.machine.lv-1)*0.15;    // 品質→チップ倍率
+const ambianceMult= () => 1 + (equip.decor.lv-1)*0.10;      // 居心地→我慢/常連
+function upgradeEquip(key){
+  const e=equip[key]; if(!e || e.lv>=e.max) return false;
+  const c=equipCost(e); if(sim.money<c) return false;
+  sim.money-=c; e.lv++; return true;
+}
+// 家具（テーブル席の増設）。買うと3D店内に席が増える
+const EXTRA_SLOTS = [ {x:6,z:-2},{x:6,z:1.2},{x:6,z:4.4},{x:-6,z:1.2},{x:-6,z:4.4} ];
+let extraUsed = 0;
+const furnitureCost = () => 1500 + extraUsed*1000;
+function buyFurniture(){
+  if(extraUsed>=EXTRA_SLOTS.length) return false;
+  const c=furnitureCost(); if(sim.money<c) return false;
+  sim.money-=c;
+  const s=EXTRA_SLOTS[extraUsed++];
+  addTable(s.x, s.z);
+  return true;
+}
+function addTable(x,z){
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.9,12), new THREE.MeshStandardMaterial({ color:0x3a2a1c }));
+  table.position.set(x,0.45,z); table.castShadow=table.receiveShadow=true; storeScene.add(table);
+  seats.push({ pos:new THREE.Vector3(x,0,z+0.05), occupied:false, mesh:table });
+}
 
 function trySpawnCustomer(dtGameMin){
   // 営業時間内のみ。時間あたりの来店ペース（仮）
@@ -551,14 +659,14 @@ function trySpawnCustomer(dtGameMin){
   const interval = 7; // ゲーム内7分ごとに来店判定
   while(spawnAccum >= interval){
     spawnAccum -= interval;
-    if(queue.length >= QUEUE_MAX) continue;   // 行列が一杯なら入店しない
+    if(queue.length >= queueCap()) continue;   // 行列が一杯なら入店しない（設備で拡張）
     if(Math.random() < 0.6) spawnCustomer();
   }
 }
 
 function spawnCustomer(){
   // 常連が来るか？（日が経つほど確率UP、最大45%）
-  const regChance = Math.min(0.45, 0.08 + sim.day*0.04);
+  const regChance = Math.min(0.5, 0.08 + sim.day*0.04 + (equip.decor.lv-1)*0.02);
   let regular=null, persona;
   if(Math.random() < regChance){
     regular = REGULARS[(Math.random()*REGULARS.length)|0];
@@ -566,18 +674,20 @@ function spawnCustomer(){
   } else {
     persona = pickPersona();           // 店の属性×時間帯で客層が偏る
   }
+  // 注文：提供中＆在庫ありから（常連は"いつもの"優先）。何も作れなければ入店せず帰る
+  const order = chooseOrder(persona, regular);
+  if(!order) return;                             // 在庫切れ等＝入店せず
+  consume(order);                                // 材料を消費（仕込み）
   const color = regular ? regular.color : persona.color;
   const g = makeHuman(color, persona.acc);
   g.position.set(0,0, STORE.d/2 - 1);   // 入口から
   storeScene.add(g);
-  // 注文：常連は"いつもの"、他はペルソナの好みから
-  const order = regular ? menuByEmoji(regular.fav) : menuByEmoji(persona.menu[(Math.random()*persona.menu.length)|0]);
   const loy = regular ? loyalty[regular.name] : 0;
   const cust = {
     group:g, seat:null, state:'QUEUE', t:0, persona, regular, order,
     stay: rrange(persona.stay),                  // 着席後の滞在(ゲーム分)
-    patience: rrange(persona.patience),          // 列で待てる時間(ゲーム分)
-    pay: Math.round(SEAT_PRICE * persona.spend * (0.8+Math.random()*0.5)),
+    patience: rrange(persona.patience) * ambianceMult(), // 居心地が良いほど待てる
+    pay: order.price,                            // 客単価＝メニュー価格
     tipFactor: persona.tip + loy*0.05,           // 常連は通うほどチップが厚い
     tag:null, nameTag:null,
   };
@@ -882,6 +992,102 @@ document.querySelectorAll('.dash-tab').forEach(t=>{
     renderDash();
   };
 });
+
+// =====================================================================
+//  経営パネル（メニュー価格/開発・仕入れ・立地/内装）
+// =====================================================================
+const LOC_JP  = { downtown:'オフィス街', college:'学生街', residential:'住宅街', tourist:'観光地' };
+const VIBE_JP = { cozy:'ナチュラル', chic:'シック（高級感）', pop:'ポップ' };
+const RELOCATE_COST = 5000, RENOVATE_COST = 3000;
+let mtab = 'menu';
+function renderManage(){
+  const el = document.getElementById('manage-body');
+  let h = '';
+  if(mtab==='menu'){
+    for(const m of MENU){
+      const cost = materialCost(m), margin = m.price-cost, rate = Math.round(margin/m.price*100);
+      h += `<div class="mrow">
+        <div class="nm">${m.emoji} ${m.name}<div class="sub2">原価¥${cost}・粗利¥${margin}（${rate}%）${inStock(m)?'':' <span class="low">在庫切れ</span>'}</div></div>
+        <button class="mbtn" data-price="${m.emoji}|-">−</button>
+        <span style="width:50px;text-align:center">¥${m.price}</span>
+        <button class="mbtn" data-price="${m.emoji}|+">＋</button>
+        <button class="mbtn ${m.enabled?'on':''}" data-toggle="${m.emoji}">${m.enabled?'提供中':'停止'}</button>
+      </div>`;
+    }
+    h += `<div class="dash-h">🧪 メニュー開発</div>`;
+    DEV_CATALOG.forEach((d,i)=>{
+      const exists = MENU.some(m=>m.name===d.name);
+      h += `<div class="mrow"><div class="nm">${d.emoji} ${d.name}<div class="sub2">想定価格¥${d.basePrice}・開発費¥${d.devCost}</div></div>
+        <button class="mbtn" data-dev="${i}" ${exists||sim.money<d.devCost?'disabled':''}>${exists?'開発済':'開発'}</button></div>`;
+    });
+    h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。現在の価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
+  } else if(mtab==='supply'){
+    for(const [k,mt] of Object.entries(materials)){
+      const low = mt.stock < mt.buyAmt*0.5;
+      h += `<div class="mrow"><div class="nm">${mt.name}<div class="sub2">原価¥${mt.cost}/${mt.unit}</div></div>
+        <span style="width:72px;text-align:right" class="${low?'low':''}">${mt.stock}${mt.unit}</span>
+        <button class="mbtn" data-buy="${k}" ${sim.money<mt.buyCost?'disabled':''}>+${mt.buyAmt}（¥${mt.buyCost}）</button></div>`;
+    }
+    h += `<div class="note">提供するたび材料を消費。在庫が無い品は注文されません（仕入れ＝原価の支払い）。</div>`;
+  } else if(mtab==='equip'){
+    h += `<div class="dash-h">🪑 家具（店内デザイン）</div>`;
+    const full = extraUsed>=EXTRA_SLOTS.length;
+    h += `<div class="mrow"><div class="nm">テーブル席を増設<div class="sub2">現在 ${seats.length}席（満席だと客を逃す）</div></div>
+      <button class="mbtn" data-furniture="1" ${full||sim.money<furnitureCost()?'disabled':''}>${full?'増設不可':'＋1席（¥'+furnitureCost().toLocaleString('ja-JP')+'）'}</button></div>`;
+    h += `<div class="dash-h">⚙️ 設備投資</div>`;
+    for(const [k,e] of Object.entries(equip)){
+      const max = e.lv>=e.max;
+      h += `<div class="mrow"><div class="nm">${e.name} <b>Lv.${e.lv}</b><div class="sub2">${e.desc}</div></div>
+        <button class="mbtn" data-equip="${k}" ${max||sim.money<equipCost(e)?'disabled':''}>${max?'最大':'強化（¥'+equipCost(e).toLocaleString('ja-JP')+'）'}</button></div>`;
+    }
+    h += `<div class="note">席を増やすと満席の取りこぼしが減る。マシン＝チップ、POS＝行列収容、内装＝居心地（我慢・常連化）が上がります。</div>`;
+  } else {
+    h += `<div class="dash-h">📍 立地（移転 ¥${RELOCATE_COST.toLocaleString('ja-JP')}）</div>`;
+    for(const k in LOC_JP) h += `<button class="mbtn ${store.location===k?'sel':''}" data-loc="${k}" style="margin:3px">${LOC_JP[k]}</button>`;
+    h += `<div class="dash-h">🎨 内装の雰囲気（改装 ¥${RENOVATE_COST.toLocaleString('ja-JP')}）</div>`;
+    for(const k in VIBE_JP) h += `<button class="mbtn ${store.vibe===k?'sel':''}" data-vibe="${k}" style="margin:3px">${VIBE_JP[k]}</button>`;
+    h += `<div class="note">立地×内装×価格で来る客層が変わります。例：オフィス街×シック＝会社員が多い／学生街×ポップ＝学生が多い。</div>`;
+  }
+  el.innerHTML = h;
+}
+document.getElementById('manage-body').addEventListener('click', e=>{
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.price){
+    const [em,dir] = t.dataset.price.split('|'); const m = MENU.find(x=>x.emoji===em);
+    if(m){ m.price = Math.max(100, m.price + (dir==='+'?50:-50)); recomputePriceLevel(); }
+  } else if(t.dataset.toggle){
+    const m = MENU.find(x=>x.emoji===t.dataset.toggle); if(m){ m.enabled=!m.enabled; recomputePriceLevel(); }
+  } else if(t.dataset.dev!==undefined){
+    const d = DEV_CATALOG[+t.dataset.dev];
+    if(d && sim.money>=d.devCost && !MENU.some(m=>m.name===d.name)){
+      sim.money -= d.devCost;
+      MENU.push({ emoji:d.emoji, name:d.name, basePrice:d.basePrice, price:d.basePrice, enabled:true, recipe:d.recipe });
+      recomputePriceLevel();
+    }
+  } else if(t.dataset.buy){
+    restock(t.dataset.buy);
+  } else if(t.dataset.furniture){
+    buyFurniture();
+  } else if(t.dataset.equip){
+    upgradeEquip(t.dataset.equip);
+  } else if(t.dataset.loc){
+    if(store.location!==t.dataset.loc && sim.money>=RELOCATE_COST){ sim.money-=RELOCATE_COST; store.location=t.dataset.loc; }
+  } else if(t.dataset.vibe){
+    if(store.vibe!==t.dataset.vibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; store.vibe=t.dataset.vibe; }
+  }
+  renderManage();
+});
+const manageModal = document.getElementById('modal-manage');
+document.getElementById('btn-manage').onclick = ()=>{ renderManage(); manageModal.classList.add('show'); };
+document.getElementById('manage-close').onclick = ()=> manageModal.classList.remove('show');
+document.querySelectorAll('.m-tab').forEach(t=>{
+  t.onclick = ()=>{
+    mtab = t.dataset.mtab;
+    document.querySelectorAll('.m-tab').forEach(x=>x.classList.toggle('active', x===t));
+    renderManage();
+  };
+});
+recomputePriceLevel();   // 起動時に価格帯を算出
 
 // =====================================================================
 //  HUD更新
