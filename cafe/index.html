@@ -90,6 +90,23 @@
   .low{color:var(--red); font-weight:800;}
   .note{font-size:11px; color:var(--sub); margin-top:8px; line-height:1.5;}
 
+  /* カード型の選択肢（画像つき） */
+  .dash-sheet{max-height:86vh; overflow-y:auto;}
+  .mcard{display:flex; gap:11px; align-items:center; background:var(--panel2); border:1px solid var(--line);
+    border-radius:13px; padding:9px; margin-bottom:9px;}
+  .mcard.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .thumb{width:58px; height:58px; border-radius:11px; overflow:hidden; flex-shrink:0; background:#11131c;}
+  .thumb svg, .thumb .ethumb{width:100%; height:100%; display:block;}
+  .ethumb{display:grid; place-items:center; font-size:31px;}
+  .mcard .info{flex:1; min-width:0;}
+  .mcard .ttl{font-weight:800; font-size:14px; line-height:1.2;}
+  .mcard .meta{font-size:11px; color:var(--sub); margin-top:4px; line-height:1.4;}
+  .mcard .act{display:flex; flex-direction:column; gap:5px; align-items:stretch; flex-shrink:0;}
+  .stepper{display:flex; align-items:center; gap:4px;}
+  .stepper .pz{width:48px; text-align:center; font-weight:800; font-size:13px;}
+  .step-btn{width:28px; height:28px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
+    color:var(--txt); font-weight:800; font-size:15px; cursor:pointer; line-height:1;}
+
   /* ---- speech / dialog ---- */
   .bubble{position:fixed; background:#fff; color:#1a140e; border-radius:14px; padding:8px 12px; font-size:13px; font-weight:700;
     transform:translate(-50%,-100%); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.4); max-width:220px; line-height:1.4;}
@@ -999,6 +1016,29 @@ document.querySelectorAll('.dash-tab').forEach(t=>{
 const LOC_JP  = { downtown:'オフィス街', college:'学生街', residential:'住宅街', tourist:'観光地' };
 const VIBE_JP = { cozy:'ナチュラル', chic:'シック（高級感）', pop:'ポップ' };
 const RELOCATE_COST = 5000, RENOVATE_COST = 3000;
+
+// ---- イラスト（インラインSVG）：各選択肢のイメージ画像 ----
+const svgArt = (bg, inner)=>`<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" rx="12" fill="${bg}"/>${inner}</svg>`;
+const ART = {
+  machine: svgArt('#5b6470', `<rect x="13" y="13" width="38" height="19" rx="4" fill="#e7eaee"/><rect x="13" y="13" width="38" height="7" rx="4" fill="#aeb6c0"/><circle cx="20" cy="25" r="2.4" fill="#e0894a"/><circle cx="27" cy="25" r="2.4" fill="#7fc77f"/><rect x="30" y="32" width="8" height="5" fill="#9aa1ab"/><rect x="31" y="37" width="6" height="3" fill="#5b6470"/><rect x="28" y="42" width="12" height="9" rx="2" fill="#fff"/>`),
+  pos: svgArt('#2f6f57', `<rect x="20" y="15" width="24" height="17" rx="3" fill="#3ddc97"/><rect x="23" y="19" width="18" height="3" rx="1.5" fill="#0c3a2a"/><rect x="23" y="24" width="11" height="3" rx="1.5" fill="#0c3a2a"/><rect x="16" y="33" width="32" height="16" rx="3" fill="#222831"/><rect x="20" y="37" width="7" height="5" rx="1" fill="#9aa1ab"/><rect x="29" y="37" width="7" height="5" rx="1" fill="#9aa1ab"/><rect x="38" y="37" width="6" height="9" rx="1" fill="#e0894a"/>`),
+  decor: svgArt('#6b4f8a', `<rect x="25" y="33" width="14" height="15" rx="2" fill="#b3744a"/><path d="M32 33 C25 27 25 18 31 14" stroke="#6ec47f" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M32 33 C39 28 41 20 37 15" stroke="#6ec47f" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="45" cy="22" r="3" fill="#ffce4d"/><rect x="47" y="13" width="2" height="9" fill="#ffce4d"/>`),
+  table: svgArt('#7a5a3a', `<ellipse cx="30" cy="26" rx="16" ry="5.5" fill="#caa24a"/><rect x="28" y="26" width="4" height="15" fill="#5e4226"/><rect x="20" y="40" width="20" height="3" rx="1.5" fill="#5e4226"/><rect x="44" y="29" width="10" height="10" rx="4" fill="#e0894a"/><rect x="46" y="20" width="6" height="11" rx="2" fill="#c9602e"/>`),
+  downtown: svgArt('#3f5d7a', `<rect x="14" y="26" width="10" height="26" fill="#d2dcea"/><rect x="26" y="16" width="12" height="36" fill="#eaf1f8"/><rect x="40" y="30" width="10" height="22" fill="#d2dcea"/><g fill="#6a86a6"><rect x="17" y="30" width="2" height="2"/><rect x="21" y="34" width="2" height="2"/><rect x="29" y="20" width="2" height="2"/><rect x="33" y="26" width="2" height="2"/><rect x="43" y="34" width="2" height="2"/></g>`),
+  college: svgArt('#7a5238', `<rect x="20" y="38" width="24" height="9" rx="1" fill="#e0894a"/><path d="M32 18 L52 26 L32 34 L12 26 Z" fill="#2a2e36"/><rect x="30" y="33" width="4" height="6" fill="#2a2e36"/><circle cx="48" cy="29" r="2" fill="#ffce4d"/><path d="M48 27 V24" stroke="#ffce4d" stroke-width="1.5"/>`),
+  residential: svgArt('#557a4a', `<path d="M15 33 L32 17 L49 33 Z" fill="#e0685e"/><rect x="20" y="33" width="24" height="18" fill="#f3e4cf"/><rect x="29" y="40" width="6" height="11" fill="#8a6c4a"/><rect x="23" y="37" width="5" height="5" fill="#9fc6e8"/><rect x="36" y="37" width="5" height="5" fill="#9fc6e8"/>`),
+  tourist: svgArt('#3f7a7a', `<rect x="14" y="25" width="36" height="23" rx="4" fill="#222831"/><rect x="22" y="20" width="11" height="6" rx="2" fill="#222831"/><circle cx="32" cy="37" r="9" fill="#9aa1ab"/><circle cx="32" cy="37" r="5" fill="#3ddc97"/><rect x="42" y="29" width="4" height="3" rx="1" fill="#ffce4d"/>`),
+  cozy: svgArt('#8a6440', `<path d="M23 31 L41 31 L36 18 L28 18 Z" fill="#ffce4d"/><rect x="31" y="31" width="2" height="15" fill="#6b4f36"/><ellipse cx="32" cy="47" rx="9" ry="3" fill="#6b4f36"/><circle cx="32" cy="36" r="4" fill="#fff3c4" opacity="0.6"/>`),
+  chic: svgArt('#3a3a4d', `<path d="M32 15 L41 25 L32 47 L23 25 Z" fill="#bfe3ff"/><path d="M23 25 H41" stroke="#fff" stroke-width="1.3"/><path d="M32 15 V47" stroke="#9fc6e8" stroke-width="1"/><circle cx="45" cy="18" r="1.6" fill="#fff"/>`),
+  pop: svgArt('#b8447f', `<circle cx="23" cy="27" r="8" fill="#ffce4d"/><rect x="33" y="19" width="13" height="13" rx="2" fill="#3ddc97"/><polygon points="32,38 42,50 22,50" fill="#6aa0ff"/><circle cx="44" cy="43" r="4" fill="#e0685e"/>`),
+};
+const MAT_EMOJI = { bean:'🫘', milk:'🥛', matcha:'🍵', flour:'🌾', cup:'🥤' };
+const emojiTile = (emoji,bg)=>`<div class="ethumb" style="background:${bg}">${emoji}</div>`;
+const menuThumb = emoji => emojiTile(emoji, 'linear-gradient(135deg,#3a2a1c,#5a3a22)');
+const matThumb  = key   => emojiTile(MAT_EMOJI[key]||'📦', 'linear-gradient(135deg,#1d3a32,#143028)');
+const mcard = (thumb, ttl, meta, act, sel=false)=>
+  `<div class="mcard${sel?' sel':''}"><div class="thumb">${thumb}</div><div class="info"><div class="ttl">${ttl}</div><div class="meta">${meta}</div></div><div class="act">${act}</div></div>`;
+
 let mtab = 'menu';
 function renderManage(){
   const el = document.getElementById('manage-body');
@@ -1006,47 +1046,52 @@ function renderManage(){
   if(mtab==='menu'){
     for(const m of MENU){
       const cost = materialCost(m), margin = m.price-cost, rate = Math.round(margin/m.price*100);
-      h += `<div class="mrow">
-        <div class="nm">${m.emoji} ${m.name}<div class="sub2">原価¥${cost}・粗利¥${margin}（${rate}%）${inStock(m)?'':' <span class="low">在庫切れ</span>'}</div></div>
-        <button class="mbtn" data-price="${m.emoji}|-">−</button>
-        <span style="width:50px;text-align:center">¥${m.price}</span>
-        <button class="mbtn" data-price="${m.emoji}|+">＋</button>
-        <button class="mbtn ${m.enabled?'on':''}" data-toggle="${m.emoji}">${m.enabled?'提供中':'停止'}</button>
-      </div>`;
+      const meta = `原価¥${cost}・粗利¥${margin}（${rate}%）${inStock(m)?'':' <span class="low">在庫切れ</span>'}`;
+      const act = `<div class="stepper"><button class="step-btn" data-price="${m.emoji}|-">−</button><span class="pz">¥${m.price}</span><button class="step-btn" data-price="${m.emoji}|+">＋</button></div>
+        <button class="mbtn ${m.enabled?'on':''}" data-toggle="${m.emoji}">${m.enabled?'提供中':'停止'}</button>`;
+      h += mcard(menuThumb(m.emoji), m.name, meta, act);
     }
     h += `<div class="dash-h">🧪 メニュー開発</div>`;
     DEV_CATALOG.forEach((d,i)=>{
       const exists = MENU.some(m=>m.name===d.name);
-      h += `<div class="mrow"><div class="nm">${d.emoji} ${d.name}<div class="sub2">想定価格¥${d.basePrice}・開発費¥${d.devCost}</div></div>
-        <button class="mbtn" data-dev="${i}" ${exists||sim.money<d.devCost?'disabled':''}>${exists?'開発済':'開発'}</button></div>`;
+      const act = `<button class="mbtn" data-dev="${i}" ${exists||sim.money<d.devCost?'disabled':''}>${exists?'開発済':'開発'}</button>`;
+      h += mcard(menuThumb(d.emoji), d.name, `想定価格¥${d.basePrice}・開発費¥${d.devCost.toLocaleString('ja-JP')}`, act);
     });
-    h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。現在の価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
+    h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
   } else if(mtab==='supply'){
     for(const [k,mt] of Object.entries(materials)){
       const low = mt.stock < mt.buyAmt*0.5;
-      h += `<div class="mrow"><div class="nm">${mt.name}<div class="sub2">原価¥${mt.cost}/${mt.unit}</div></div>
-        <span style="width:72px;text-align:right" class="${low?'low':''}">${mt.stock}${mt.unit}</span>
-        <button class="mbtn" data-buy="${k}" ${sim.money<mt.buyCost?'disabled':''}>+${mt.buyAmt}（¥${mt.buyCost}）</button></div>`;
+      const meta = `原価¥${mt.cost}/${mt.unit}・在庫 <span class="${low?'low':''}">${mt.stock}${mt.unit}</span>`;
+      const act = `<button class="mbtn" data-buy="${k}" ${sim.money<mt.buyCost?'disabled':''}>+${mt.buyAmt}<br>¥${mt.buyCost.toLocaleString('ja-JP')}</button>`;
+      h += mcard(matThumb(k), mt.name, meta, act);
     }
-    h += `<div class="note">提供するたび材料を消費。在庫が無い品は注文されません（仕入れ＝原価の支払い）。</div>`;
+    h += `<div class="note">提供で材料を消費。在庫切れの品は注文されません（仕入れ＝原価の支払い）。</div>`;
   } else if(mtab==='equip'){
     h += `<div class="dash-h">🪑 家具（店内デザイン）</div>`;
     const full = extraUsed>=EXTRA_SLOTS.length;
-    h += `<div class="mrow"><div class="nm">テーブル席を増設<div class="sub2">現在 ${seats.length}席（満席だと客を逃す）</div></div>
-      <button class="mbtn" data-furniture="1" ${full||sim.money<furnitureCost()?'disabled':''}>${full?'増設不可':'＋1席（¥'+furnitureCost().toLocaleString('ja-JP')+'）'}</button></div>`;
+    h += mcard(ART.table, 'テーブル席を増設', `現在 ${seats.length}席（満席だと客を逃す）`,
+      `<button class="mbtn" data-furniture="1" ${full||sim.money<furnitureCost()?'disabled':''}>${full?'増設不可':'＋1席<br>¥'+furnitureCost().toLocaleString('ja-JP')}</button>`);
     h += `<div class="dash-h">⚙️ 設備投資</div>`;
     for(const [k,e] of Object.entries(equip)){
       const max = e.lv>=e.max;
-      h += `<div class="mrow"><div class="nm">${e.name} <b>Lv.${e.lv}</b><div class="sub2">${e.desc}</div></div>
-        <button class="mbtn" data-equip="${k}" ${max||sim.money<equipCost(e)?'disabled':''}>${max?'最大':'強化（¥'+equipCost(e).toLocaleString('ja-JP')+'）'}</button></div>`;
+      h += mcard(ART[k], `${e.name} <b>Lv.${e.lv}</b>`, e.desc,
+        `<button class="mbtn" data-equip="${k}" ${max||sim.money<equipCost(e)?'disabled':''}>${max?'最大':'強化<br>¥'+equipCost(e).toLocaleString('ja-JP')}</button>`);
     }
-    h += `<div class="note">席を増やすと満席の取りこぼしが減る。マシン＝チップ、POS＝行列収容、内装＝居心地（我慢・常連化）が上がります。</div>`;
+    h += `<div class="note">席＝取りこぼし減／マシン＝チップ／POS＝行列収容／内装＝居心地（我慢・常連化）。</div>`;
   } else {
     h += `<div class="dash-h">📍 立地（移転 ¥${RELOCATE_COST.toLocaleString('ja-JP')}）</div>`;
-    for(const k in LOC_JP) h += `<button class="mbtn ${store.location===k?'sel':''}" data-loc="${k}" style="margin:3px">${LOC_JP[k]}</button>`;
+    const locHint = { downtown:'会社員が多い', college:'学生が多い', residential:'家族が多い', tourist:'観光客が多い' };
+    for(const k in LOC_JP){
+      const cur = store.location===k;
+      h += mcard(ART[k], LOC_JP[k], locHint[k], `<button class="mbtn ${cur?'sel':''}" data-loc="${k}" ${cur?'disabled':''}>${cur?'選択中':'移転'}</button>`, cur);
+    }
     h += `<div class="dash-h">🎨 内装の雰囲気（改装 ¥${RENOVATE_COST.toLocaleString('ja-JP')}）</div>`;
-    for(const k in VIBE_JP) h += `<button class="mbtn ${store.vibe===k?'sel':''}" data-vibe="${k}" style="margin:3px">${VIBE_JP[k]}</button>`;
-    h += `<div class="note">立地×内装×価格で来る客層が変わります。例：オフィス街×シック＝会社員が多い／学生街×ポップ＝学生が多い。</div>`;
+    const vibeHint = { cozy:'家族・学生に好相性', chic:'会社員・観光客に好相性', pop:'学生に好相性' };
+    for(const k in VIBE_JP){
+      const cur = store.vibe===k;
+      h += mcard(ART[k], VIBE_JP[k], vibeHint[k], `<button class="mbtn ${cur?'sel':''}" data-vibe="${k}" ${cur?'disabled':''}>${cur?'選択中':'改装'}</button>`, cur);
+    }
+    h += `<div class="note">立地×内装×価格で来る客層が変わります。</div>`;
   }
   el.innerHTML = h;
 }
