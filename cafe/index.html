@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cafe Tycoon — 第1スライス（グレーボックス試作）</title>
+<style>
+  :root{ --txt:#f3ece0; --sub:#b9a98f; --panel:rgba(26,20,14,.82); --line:#4a3b2a;
+         --accent:#e0894a; --gold:#ffce4d; --green:#7fc77f; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0; height:100%; overflow:hidden; background:#10141a;
+    font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; color:var(--txt);}
+  #app{position:fixed; inset:0;}
+  canvas{display:block; touch-action:none;}
+
+  /* ---- HUD ---- */
+  .hud{position:fixed; left:0; right:0; top:0; padding:12px; display:flex; gap:10px; align-items:flex-start; pointer-events:none;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 12px; backdrop-filter:blur(6px); pointer-events:auto;}
+  .stats{display:flex; gap:16px;}
+  .stat{flex-shrink:0;}
+  .stat .v{font-size:18px; font-weight:800; line-height:1; white-space:nowrap;}
+  .stat .l{font-size:10px; color:var(--sub); margin-top:3px; white-space:nowrap;}
+  .gold{color:var(--gold);} .green{color:var(--green);} .acc{color:var(--accent);}
+  .clock{font-variant-numeric:tabular-nums;}
+  .spacer{flex:1;}
+
+  .timectrl{display:flex; gap:6px; align-items:center;}
+  .tbtn{border:1px solid var(--line); background:rgba(0,0,0,.25); color:var(--txt);
+    border-radius:8px; padding:6px 10px; font-weight:800; font-size:12px; cursor:pointer;}
+  .tbtn.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+
+  /* ---- bottom controls ---- */
+  .bottom{position:fixed; left:0; right:0; bottom:0; padding:12px; display:flex; gap:10px; justify-content:center; pointer-events:none;}
+  .btn{pointer-events:auto; border:0; border-radius:12px; padding:12px 18px; font-weight:800; font-size:14px; cursor:pointer; color:#fff;
+    background:linear-gradient(135deg,var(--accent),#c9602e); box-shadow:0 6px 20px rgba(0,0,0,.4);}
+  .btn.ghost{background:var(--panel); border:1px solid var(--line);}
+  .btn:active{transform:scale(.96);}
+
+  .hint{position:fixed; left:50%; transform:translateX(-50%); bottom:70px; background:var(--panel); border:1px solid var(--line);
+    border-radius:20px; padding:6px 14px; font-size:12px; color:var(--sub); pointer-events:none; white-space:nowrap;}
+
+  /* ---- speech / dialog ---- */
+  .bubble{position:fixed; background:#fff; color:#1a140e; border-radius:14px; padding:8px 12px; font-size:13px; font-weight:700;
+    transform:translate(-50%,-100%); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.4); max-width:220px; line-height:1.4;}
+  .bubble:after{content:""; position:absolute; left:50%; bottom:-7px; transform:translateX(-50%);
+    border:7px solid transparent; border-top-color:#fff; border-bottom:0;}
+
+  /* ---- day summary modal ---- */
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; place-items:center; z-index:50;}
+  .modal.show{display:grid;}
+  .sheet{background:#241a12; border:1px solid var(--line); border-radius:18px; padding:22px; width:min(420px,90vw); text-align:center;}
+  .sheet h2{margin:0 0 6px;} .sheet .row{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:14px;}
+  .sheet .row b{color:var(--gold);}
+
+  /* ---- loading ---- */
+  #load{position:fixed; inset:0; display:grid; place-items:center; background:#10141a; z-index:100; font-size:14px; color:var(--sub);}
+
+  /* ---- スマホ縦画面の調整 ---- */
+  @media (max-width:480px){
+    .hud{padding:8px; gap:6px; flex-wrap:wrap;}
+    .stats{gap:12px;}
+    .panel{padding:6px 9px;}
+    .stat .v{font-size:15px;}
+    .timectrl{gap:5px;}
+    .tbtn{padding:6px 9px;}
+    .hint{font-size:11px; max-width:92vw; white-space:normal; text-align:center; line-height:1.4; bottom:66px;}
+    .bottom{padding:10px;}
+    .btn{padding:12px 14px; font-size:13px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="load">☕ 読み込み中…</div>
+
+<div class="hud">
+  <div class="panel stats">
+    <div class="stat"><div class="v gold" id="s-money">¥0</div><div class="l">所持金</div></div>
+    <div class="stat"><div class="v" id="s-day">1日目</div><div class="l">経営日数</div></div>
+    <div class="stat"><div class="v acc" id="s-cust">0</div><div class="l">本日の来客</div></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="panel timectrl">
+    <div class="stat" style="margin-right:6px"><div class="v clock" id="s-clock">08:00</div><div class="l">店内時刻</div></div>
+    <button class="tbtn" data-speed="0" id="sp-pause">⏸</button>
+    <button class="tbtn active" data-speed="1" id="sp-1">▶</button>
+    <button class="tbtn" data-speed="3" id="sp-3">▶▶</button>
+  </div>
+</div>
+
+<div class="hint" id="hint"></div>
+
+<div class="bottom">
+  <button class="btn ghost" id="btn-mode">店に入る</button>
+  <button class="btn" id="btn-close">閉店する</button>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h2 id="m-title">1日目 閉店</h2>
+    <div class="row"><span>来客数</span><span id="m-cust">0人</span></div>
+    <div class="row"><span>売上</span><b id="m-rev">¥0</b></div>
+    <div class="row"><span>所持金</span><b id="m-money">¥0</b></div>
+    <button class="btn" style="width:100%; margin-top:16px" id="m-next">翌日へ ▶</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// =====================================================================
+// Cafe Tycoon — 第1スライス（グレーボックス試作）
+//  目的：俯瞰↔店内3人称の行き来 / 常時進行する時計 / 客の入店→着席→退店 / 会話 / 閉店サマリー
+//  すべて簡素なジオメトリ（箱）で構築。アートは後フェーズで差し替える前提。
+// =====================================================================
+
+// ---- シミュレーション状態（表示と分離した"頭脳"の芽） ----
+const sim = {
+  money: 30000,
+  day: 1,
+  custToday: 0,
+  revToday: 0,
+  // 時間：分単位で保持。リアル1秒=ゲーム1分（=リアル1分でゲーム1時間）
+  minutes: 8 * 60,   // 08:00 開店
+  speed: 1,          // 0=停止, 1=等速, 3=倍速
+  mode: 'store',     // 'overview' | 'store'
+};
+const OPEN_MIN = 8 * 60;
+const SEAT_PRICE = 600; // 1組あたりの平均客単価（仮）
+
+// ---- Three.js 基本セット ----
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
+
+// 2つのシーン：店内 / 俯瞰（依存する定数の宣言後、最下部で初期化する）
+let storeScene, overScene;
+
+// ---- ライト共通生成 ----
+function addLights(scene, intensity=1){
+  const hemi = new THREE.HemisphereLight(0xfff3e0, 0x402a1a, 0.9*intensity);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffe8c8, 1.0*intensity);
+  dir.position.set(8, 16, 6);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(1024,1024);
+  dir.shadow.camera.left=-20; dir.shadow.camera.right=20; dir.shadow.camera.top=20; dir.shadow.camera.bottom=-20;
+  scene.add(dir);
+}
+
+// =====================================================================
+//  店内シーン
+// =====================================================================
+const STORE = { w: 16, d: 12 };   // 店の床サイズ
+const seats = [];                 // 座席 {pos, occupied}
+let player;                       // プレイヤー（店長）
+let storeFloor;                   // 床（タップ移動のレイキャスト対象）
+let moveMarker;                   // タップ先マーカー
+const customers = [];             // 客リスト
+
+function buildStoreScene(){
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1d160f);
+  scene.fog = new THREE.Fog(0x1d160f, 30, 60);
+  addLights(scene);
+
+  // 床
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(STORE.w, STORE.d),
+    new THREE.MeshStandardMaterial({ color:0x6b4f36 })
+  );
+  floor.rotation.x = -Math.PI/2; floor.receiveShadow = true;
+  scene.add(floor);
+  storeFloor = floor;
+
+  // タップ移動の目的地マーカー（リング）
+  moveMarker = new THREE.Mesh(
+    new THREE.RingGeometry(0.3, 0.46, 22),
+    new THREE.MeshBasicMaterial({ color:0xffce4d, transparent:true, opacity:0, side:THREE.DoubleSide })
+  );
+  moveMarker.rotation.x = -Math.PI/2; moveMarker.position.y = 0.03;
+  scene.add(moveMarker);
+
+  // 壁（3面・正面は開口＝入口側）
+  const wallMat = new THREE.MeshStandardMaterial({ color:0x8a6c4a });
+  const wallH = 3;
+  const mkWall = (w,h,d,x,y,z)=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; scene.add(m); };
+  mkWall(STORE.w, wallH, 0.3, 0, wallH/2, -STORE.d/2);          // 奥
+  mkWall(0.3, wallH, STORE.d, -STORE.w/2, wallH/2, 0);          // 左
+  mkWall(0.3, wallH, STORE.d,  STORE.w/2, wallH/2, 0);          // 右
+
+  // カウンター（奥）
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(6,1.1,1.2), new THREE.MeshStandardMaterial({ color:0x4a3b2a }));
+  counter.position.set(-3, 0.55, -STORE.d/2 + 1.4); counter.castShadow=counter.receiveShadow=true;
+  scene.add(counter);
+
+  // 入口マット（手前中央）
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.6), new THREE.MeshStandardMaterial({ color:0xcaa24a }));
+  door.rotation.x=-Math.PI/2; door.position.set(0,0.01, STORE.d/2 - 0.9);
+  scene.add(door);
+
+  // テーブル＆席（2x3 配置）
+  const tableMat = new THREE.MeshStandardMaterial({ color:0x3a2a1c });
+  for(let r=0;r<3;r++){
+    for(let c=0;c<2;c++){
+      const x = -3 + c*6;
+      const z = -2 + r*3.2;
+      const table = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.9,12), tableMat);
+      table.position.set(x,0.45,z); table.castShadow=table.receiveShadow=true; scene.add(table);
+      seats.push({ pos:new THREE.Vector3(x, 0, z+0.05), occupied:false, mesh:table });
+    }
+  }
+
+  // プレイヤー（店長＝箱人間）
+  player = makeHuman(0xffd27f);
+  player.position.set(0,0, STORE.d/2 - 3);
+  scene.add(player);
+
+  scene._isStore = true;
+  return scene;
+}
+
+// 箱人間（体＋頭）。Group を返す
+function makeHuman(color){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 10), new THREE.MeshStandardMaterial({ color }));
+  body.position.y = 0.75; body.castShadow=true; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color:0xf3d6b0 }));
+  head.position.y = 1.45; head.castShadow=true; g.add(head);
+  g.userData.body = body;
+  return g;
+}
+
+// =====================================================================
+//  俯瞰シーン（街）
+// =====================================================================
+let myCafeMesh;
+function buildOverviewScene(){
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9fc6e8);
+  scene.fog = new THREE.Fog(0x9fc6e8, 60, 140);
+  addLights(scene, 1.1);
+
+  // 地面
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120,120), new THREE.MeshStandardMaterial({ color:0x5b7d52 }));
+  ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+  // 道路（十字）
+  const roadMat = new THREE.MeshStandardMaterial({ color:0x3a3a40 });
+  const r1 = new THREE.Mesh(new THREE.PlaneGeometry(120,8), roadMat); r1.rotation.x=-Math.PI/2; r1.position.y=0.02; scene.add(r1);
+  const r2 = new THREE.Mesh(new THREE.PlaneGeometry(8,120), roadMat); r2.rotation.x=-Math.PI/2; r2.position.y=0.02; scene.add(r2);
+
+  // 街のビル（ランダム箱）
+  for(let i=0;i<40;i++){
+    const w=2+Math.random()*4, h=3+Math.random()*14, d=2+Math.random()*4;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+      new THREE.MeshStandardMaterial({ color:new THREE.Color().setHSL(0.08+Math.random()*0.08, 0.25, 0.45+Math.random()*0.2) }));
+    let x,z; do{ x=(Math.random()-0.5)*100; z=(Math.random()-0.5)*100; }while(Math.abs(x)<8||Math.abs(z)<8);
+    b.position.set(x,h/2,z); b.castShadow=b.receiveShadow=true; scene.add(b);
+  }
+
+  // 自分のカフェ（クリックで店内へ）— 目立つ色＋看板
+  myCafeMesh = new THREE.Mesh(new THREE.BoxGeometry(6,4,6), new THREE.MeshStandardMaterial({ color:0xe0894a, emissive:0x3a1c00 }));
+  myCafeMesh.position.set(10,2,10); myCafeMesh.castShadow=myCafeMesh.receiveShadow=true;
+  myCafeMesh.userData.isCafe = true;
+  scene.add(myCafeMesh);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(6.4,1.1,0.3), new THREE.MeshStandardMaterial({ color:0x2a1a0e }));
+  sign.position.set(10,4.6,13.1); scene.add(sign);
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.4,0.7,12), new THREE.MeshStandardMaterial({ color:0xfff0d0 }));
+  cup.position.set(10,6.0,10); scene.add(cup);
+  myCafeMesh.userData.cup = cup;
+
+  scene._isStore = false;
+  return scene;
+}
+
+// =====================================================================
+//  入力（キーボード移動 / クリック）
+// =====================================================================
+const keys = {};
+addEventListener('keydown', e=>{ keys[e.code]=true; });
+addEventListener('keyup',   e=>{ keys[e.code]=false; });
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', onClick);
+function onClick(e){
+  pointer.x = (e.clientX/innerWidth)*2-1;
+  pointer.y = -(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(pointer, camera);
+
+  if(sim.mode==='overview'){
+    const hit = raycaster.intersectObject(myCafeMesh, false)[0];
+    if(hit) enterStore();
+  } else {
+    // 客タップ＝会話を優先
+    const meshes = customers.map(c=>c.group.userData.body);
+    const chit = raycaster.intersectObjects(meshes, false)[0];
+    if(chit){
+      const cust = customers.find(c=>c.group.userData.body===chit.object);
+      if(cust){ talkTo(cust); return; }
+    }
+    // それ以外は床タップ＝その地点へ移動
+    const fhit = raycaster.intersectObject(storeFloor, false)[0];
+    if(fhit) setMoveTarget(fhit.point);
+  }
+}
+
+// タップした床地点へ歩く目的地をセット
+function setMoveTarget(point){
+  const x = THREE.MathUtils.clamp(point.x, -STORE.w/2+0.6, STORE.w/2-0.6);
+  const z = THREE.MathUtils.clamp(point.z, -STORE.d/2+0.6, STORE.d/2-0.6);
+  player.userData.moveTarget = new THREE.Vector3(x, 0, z);
+  moveMarker.position.set(x, 0.03, z);
+  moveMarker.material.opacity = 0.95;
+}
+
+// =====================================================================
+//  モード切替
+// =====================================================================
+const btnMode = document.getElementById('btn-mode');
+const hint = document.getElementById('hint');
+function enterStore(){ sim.mode='store'; if(player) player.userData.moveTarget=null; btnMode.textContent='街に出る（俯瞰）'; updateHint(); }
+function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTarget=null; btnMode.textContent='店に入る'; clearBubble(); updateHint(); }
+btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
+function updateHint(){
+  hint.textContent = sim.mode==='store'
+    ? '床をタップした場所へ移動 ・ 客をタップで会話 ・ 時間は常に進行中（PCはWASDも可）'
+    : '自分のカフェ（オレンジの建物）をタップして中に入る';
+}
+
+// =====================================================================
+//  客の生成・行動（簡易ステートマシン）
+//   states: ENTER(席へ歩く) → SEATED(寛ぐ) → LEAVE(出口へ) → 退場
+// =====================================================================
+const CUST_COLORS = [0xff8a8a,0x8ab4ff,0x9ee59e,0xd6a0ff,0xffd27f,0x8fe0d8];
+let spawnAccum = 0;
+const PERSONAS = [
+  { name:'学生', say:['課題やらなきゃ…','Wi-Fiありがたい','長居しちゃう'] },
+  { name:'サラリーマン', say:['ふぅ、一服','打合せ前に一杯','深煎り好き'] },
+  { name:'家族連れ', say:['子どもと休憩','パンケーキある？','落ち着くね'] },
+  { name:'常連さん', say:['いつもの！','このブレンド最高','また来たよ'] },
+];
+
+function trySpawnCustomer(dtGameMin){
+  // 営業時間内のみ。時間あたりの来店ペース（仮）
+  spawnAccum += dtGameMin;
+  const interval = 6; // ゲーム内6分ごとに来店判定
+  while(spawnAccum >= interval){
+    spawnAccum -= interval;
+    const free = seats.find(s=>!s.occupied);
+    if(!free) continue;                 // 満席なら来ない
+    if(Math.random() < 0.7) spawnCustomer(free);
+  }
+}
+
+function spawnCustomer(seat){
+  seat.occupied = true;
+  const persona = PERSONAS[(Math.random()*PERSONAS.length)|0];
+  const g = makeHuman(CUST_COLORS[(Math.random()*CUST_COLORS.length)|0]);
+  g.position.set(0,0, STORE.d/2 - 1);   // 入口から
+  storeScene.add(g);
+  const cust = { group:g, seat, state:'ENTER', t:0, persona,
+                 stay: 90 + Math.random()*120 }; // 着席滞在(ゲーム分)
+  customers.push(cust);
+  sim.custToday++;
+  // 着席＝注文確定で売上（簡易）
+  const pay = Math.round(SEAT_PRICE*(0.7+Math.random()*0.8));
+  cust.pay = pay;
+}
+
+function updateCustomers(dtReal, dtGameMin){
+  const speed = 2.2 * dtReal; // 歩行速度
+  for(let i=customers.length-1;i>=0;i--){
+    const c = customers[i];
+    if(c.state==='ENTER'){
+      const target = c.seat.pos;
+      if(stepToward(c.group.position, target, speed)){
+        c.state='SEATED'; c.t=0;
+        sim.money += c.pay; sim.revToday += c.pay;
+        floatText(c.group, '+¥'+c.pay);
+      }
+    } else if(c.state==='SEATED'){
+      c.t += dtGameMin;
+      if(c.t >= c.stay){ c.state='LEAVE'; }
+    } else if(c.state==='LEAVE'){
+      const exit = new THREE.Vector3(0,0, STORE.d/2 - 0.5);
+      if(stepToward(c.group.position, exit, speed)){
+        c.seat.occupied=false;
+        storeScene.remove(c.group);
+        if(c._bubble) c._bubble.remove();
+        customers.splice(i,1);
+      }
+    }
+  }
+}
+
+// xz平面で target に向けて step。到達したら true
+function stepToward(pos, target, step){
+  const dx=target.x-pos.x, dz=target.z-pos.z;
+  const dist=Math.hypot(dx,dz);
+  if(dist < 0.12) return true;
+  pos.x += dx/dist*Math.min(step,dist);
+  pos.z += dz/dist*Math.min(step,dist);
+  return false;
+}
+
+// =====================================================================
+//  会話バブル / フロートテキスト
+// =====================================================================
+let bubbleEl=null, bubbleTarget=null, bubbleTimer=0;
+function talkTo(cust){
+  clearBubble();
+  const line = cust.persona.say[(Math.random()*cust.persona.say.length)|0];
+  bubbleEl = document.createElement('div');
+  bubbleEl.className='bubble';
+  bubbleEl.innerHTML = `<span style="color:#c9602e">${cust.persona.name}</span><br>${line}`;
+  document.body.appendChild(bubbleEl);
+  bubbleTarget = cust.group; bubbleTimer = 3.0;
+}
+function clearBubble(){ if(bubbleEl){ bubbleEl.remove(); bubbleEl=null; bubbleTarget=null; } }
+function updateBubble(dt){
+  if(!bubbleEl) return;
+  bubbleTimer -= dt;
+  if(bubbleTimer<=0 || !bubbleTarget){ clearBubble(); return; }
+  const p = bubbleTarget.position.clone(); p.y += 2.0;
+  p.project(camera);
+  bubbleEl.style.left = (p.x*0.5+0.5)*innerWidth + 'px';
+  bubbleEl.style.top  = (-p.y*0.5+0.5)*innerHeight + 'px';
+}
+
+// 簡易フロートテキスト（売上表示）
+const floats=[];
+function floatText(obj, text){
+  const el=document.createElement('div'); el.className='bubble'; el.style.background='#fff7e6'; el.textContent=text;
+  document.body.appendChild(el);
+  floats.push({el, obj:obj, t:1.4, y:2.2});
+}
+function updateFloats(dt){
+  for(let i=floats.length-1;i>=0;i--){
+    const f=floats[i]; f.t-=dt; f.y+=dt*0.6;
+    if(f.t<=0){ f.el.remove(); floats.splice(i,1); continue; }
+    const p=f.obj.position.clone(); p.y+=f.y; p.project(camera);
+    f.el.style.left=(p.x*0.5+0.5)*innerWidth+'px';
+    f.el.style.top =(-p.y*0.5+0.5)*innerHeight+'px';
+    f.el.style.opacity=Math.min(1,f.t);
+  }
+}
+
+// =====================================================================
+//  プレイヤー移動（店内のみ）
+// =====================================================================
+function updatePlayer(dt){
+  if(sim.mode!=='store') return;
+  const sp = 4.5*dt;
+  let vx=0, vz=0;
+  if(keys.KeyW||keys.ArrowUp) vz-=1;
+  if(keys.KeyS||keys.ArrowDown) vz+=1;
+  if(keys.KeyA||keys.ArrowLeft) vx-=1;
+  if(keys.KeyD||keys.ArrowRight) vx+=1;
+
+  if(vx||vz){
+    // キーボード操作（タップ移動は中断）
+    player.userData.moveTarget = null;
+    const l=Math.hypot(vx,vz); vx/=l; vz/=l;
+    player.position.x = THREE.MathUtils.clamp(player.position.x+vx*sp, -STORE.w/2+0.6, STORE.w/2-0.6);
+    player.position.z = THREE.MathUtils.clamp(player.position.z+vz*sp, -STORE.d/2+0.6, STORE.d/2-0.6);
+    player.rotation.y = Math.atan2(vx,vz);
+  } else if(player.userData.moveTarget){
+    // タップ移動：目的地へ歩く
+    const t = player.userData.moveTarget;
+    const dx=t.x-player.position.x, dz=t.z-player.position.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist<0.15){ player.userData.moveTarget=null; }
+    else{
+      player.position.x += dx/dist*Math.min(sp,dist);
+      player.position.z += dz/dist*Math.min(sp,dist);
+      player.rotation.y = Math.atan2(dx,dz);
+    }
+  }
+
+  // マーカーをゆっくりフェードアウト
+  if(moveMarker && moveMarker.material.opacity>0){
+    moveMarker.material.opacity = Math.max(0, moveMarker.material.opacity - dt*0.5);
+  }
+}
+
+// =====================================================================
+//  カメラ追従
+// =====================================================================
+function updateCamera(dt){
+  if(sim.mode==='store'){
+    // 3人称：プレイヤーの斜め後ろ上
+    const target = player.position;
+    const desired = new THREE.Vector3(target.x, 6.5, target.z + 9);
+    camera.position.lerp(desired, 1-Math.pow(0.001,dt));
+    camera.lookAt(target.x, 1.0, target.z);
+  } else {
+    // 俯瞰：街を斜め見下ろし、カフェ中心
+    const c = myCafeMesh.position;
+    const desired = new THREE.Vector3(c.x-2, 38, c.z+34);
+    camera.position.lerp(desired, 1-Math.pow(0.0005,dt));
+    camera.lookAt(c.x, 0, c.z);
+  }
+}
+
+// =====================================================================
+//  時間・速度コントロール
+// =====================================================================
+document.querySelectorAll('.tbtn').forEach(b=>{
+  b.onclick = ()=>{
+    sim.speed = +b.dataset.speed;
+    document.querySelectorAll('.tbtn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  };
+});
+
+function fmtClock(min){
+  const h=Math.floor(min/60)%24, m=Math.floor(min%60);
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+
+// =====================================================================
+//  閉店 / 日次サマリー
+// =====================================================================
+const modal = document.getElementById('modal');
+document.getElementById('btn-close').onclick = ()=>{
+  sim.speed = 0; syncSpeedUI();
+  document.getElementById('m-title').textContent = sim.day+'日目 閉店';
+  document.getElementById('m-cust').textContent = sim.custToday+'人';
+  document.getElementById('m-rev').textContent = '¥'+sim.revToday.toLocaleString('ja-JP');
+  document.getElementById('m-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
+  modal.classList.add('show');
+};
+document.getElementById('m-next').onclick = ()=>{
+  // 翌日リセット
+  sim.day++; sim.custToday=0; sim.revToday=0; sim.minutes=OPEN_MIN;
+  // 居残り客を片付け
+  for(const c of customers){ c.seat.occupied=false; storeScene.remove(c.group); if(c._bubble)c._bubble.remove(); }
+  customers.length=0; spawnAccum=0;
+  modal.classList.remove('show');
+  sim.speed=1; syncSpeedUI();
+};
+function syncSpeedUI(){
+  document.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', +x.dataset.speed===sim.speed));
+}
+
+// =====================================================================
+//  HUD更新
+// =====================================================================
+function updateHUD(){
+  document.getElementById('s-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
+  document.getElementById('s-day').textContent = sim.day+'日目';
+  document.getElementById('s-cust').textContent = sim.custToday;
+  document.getElementById('s-clock').textContent = fmtClock(sim.minutes);
+}
+
+// =====================================================================
+//  シーン初期化（依存定数がすべて宣言された後に実行）
+// =====================================================================
+storeScene = buildStoreScene();
+overScene  = buildOverviewScene();
+
+// =====================================================================
+//  メインループ
+// =====================================================================
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05); // リアル秒（スパイク抑制）
+
+  // ゲーム内時間の進行：リアル1秒 = ゲーム1分 × speed
+  const dtGameMin = dt * 60 * sim.speed / 60; // = dt*speed (分) … 1秒で1分
+  if(sim.speed>0){
+    sim.minutes += dt * sim.speed; // 1リアル秒で speed ゲーム分
+    if(sim.mode==='store' || true) trySpawnCustomer(dt*sim.speed);
+  }
+
+  updatePlayer(dt);
+  if(sim.speed>0) updateCustomers(dt, dt*sim.speed);
+  updateCamera(dt);
+  updateBubble(dt);
+  updateFloats(dt);
+
+  // 俯瞰のカップを回す（ちょい演出）
+  if(myCafeMesh.userData.cup) myCafeMesh.userData.cup.rotation.y += dt;
+
+  updateHUD();
+  renderer.render(sim.mode==='store' ? storeScene : overScene, camera);
+}
+
+// =====================================================================
+//  起動
+// =====================================================================
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+btnMode.textContent = sim.mode==='store' ? '街に出る（俯瞰）' : '店に入る';
+updateHint();
+document.getElementById('load').style.display='none';
+animate();
+</script>
+</body>
+</html>
