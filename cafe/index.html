@@ -48,6 +48,30 @@
   .ordertag .pat{width:42px; height:5px; background:rgba(0,0,0,.55); border-radius:3px; margin:3px auto 0; overflow:hidden;}
   .ordertag .pat > i{display:block; height:100%; width:100%; background:#7fc77f; transition:width .2s linear;}
 
+  /* 常連の名前タグ */
+  .nametag{position:fixed; transform:translate(-50%,-100%); pointer-events:none; z-index:39;
+    background:rgba(255,142,199,.92); color:#3a0a22; font-size:11px; font-weight:800;
+    border-radius:10px; padding:1px 8px; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,.4);}
+
+  /* ダッシュボード */
+  #btn-dash{position:fixed; top:70px; right:12px; z-index:30; pointer-events:auto;
+    background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px;
+    padding:8px 12px; font-size:16px; cursor:pointer;}
+  .dash-sheet{max-width:480px; text-align:left;}
+  .dash-tabs{display:flex; gap:8px; margin-bottom:10px;}
+  .dash-tab{flex:1; padding:7px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--sub); font-weight:800; font-size:13px; cursor:pointer; text-align:center;}
+  .dash-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+  .dash-kpis{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px;}
+  .kpi{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 10px;}
+  .kpi .v{font-size:18px; font-weight:800;} .kpi .l{font-size:10px; color:var(--sub);}
+  .dash-h{font-size:12px; color:var(--sub); margin:12px 2px 6px; font-weight:800;}
+  .barrow{display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px;}
+  .barrow .nm{width:84px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .barrow .bar{flex:1; height:14px; background:var(--panel2); border-radius:7px; overflow:hidden;}
+  .barrow .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--gold)); border-radius:7px;}
+  .barrow .vv{width:54px; text-align:right; flex-shrink:0; color:var(--sub); font-variant-numeric:tabular-nums;}
+
   /* ---- speech / dialog ---- */
   .bubble{position:fixed; background:#fff; color:#1a140e; border-radius:14px; padding:8px 12px; font-size:13px; font-weight:700;
     transform:translate(-50%,-100%); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.4); max-width:220px; line-height:1.4;}
@@ -98,11 +122,24 @@
 </div>
 
 <div class="carrybadge" id="carry" style="display:none"></div>
+<button id="btn-dash" title="ダッシュボード">📊</button>
 <div class="hint" id="hint"></div>
 
 <div class="bottom">
   <button class="btn ghost" id="btn-mode">店に入る</button>
   <button class="btn" id="btn-close">閉店する</button>
+</div>
+
+<div class="modal" id="modal-dash">
+  <div class="sheet dash-sheet">
+    <h2>📊 経営ダッシュボード</h2>
+    <div class="dash-tabs">
+      <button class="dash-tab active" data-range="today">本日</button>
+      <button class="dash-tab" data-range="total">累計</button>
+    </div>
+    <div id="dash-body"></div>
+    <button class="btn ghost" style="width:100%; margin-top:14px" id="dash-close">閉じる</button>
+  </div>
 </div>
 
 <div class="modal" id="modal">
@@ -111,6 +148,7 @@
     <div class="row"><span>来客数</span><span id="m-cust">0人</span></div>
     <div class="row"><span>売上</span><b id="m-rev">¥0</b></div>
     <div class="row"><span>所持金</span><b id="m-money">¥0</b></div>
+    <div id="m-breakdown" style="margin-top:10px"></div>
     <button class="btn" style="width:100%; margin-top:16px" id="m-next">翌日へ ▶</button>
   </div>
 </div>
@@ -143,6 +181,16 @@ const sim = {
 };
 const OPEN_MIN = 8 * 60;
 const SEAT_PRICE = 600; // 1組あたりの平均客単価（仮）
+
+// ---- 集計データ（客層・商品別の売上をためる）----
+const blankStats = ()=>({ visits:{}, sold:{}, served:0, lost:0, tips:0, revenue:0 });
+let dayStats = blankStats();      // 本日分
+let totalStats = blankStats();    // これまでの累計（前日まで）
+function mergeInto(t, s){
+  t.served+=s.served; t.lost+=s.lost; t.tips+=s.tips; t.revenue+=s.revenue;
+  for(const k in s.visits) t.visits[k]=(t.visits[k]||0)+s.visits[k];
+  for(const k in s.sold)   t.sold[k]  =(t.sold[k]  ||0)+s.sold[k];
+}
 
 // ---- Three.js 基本セット ----
 const app = document.getElementById('app');
@@ -261,13 +309,31 @@ function buildStoreScene(){
 }
 
 // 箱人間（体＋頭）。Group を返す
-function makeHuman(color){
+function makeHuman(color, accessory){
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 10), new THREE.MeshStandardMaterial({ color }));
   body.position.y = 0.75; body.castShadow=true; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color:0xf3d6b0 }));
   head.position.y = 1.45; head.castShadow=true; g.add(head);
   g.userData.body = body;
+  // ペルソナ別アクセサリ（見分け用）
+  if(accessory==='bag'){            // 学生：リュック
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.52,0.24), new THREE.MeshStandardMaterial({color:0x2f9e63}));
+    m.position.set(0,0.95,-0.33); m.castShadow=true; g.add(m);
+  } else if(accessory==='case'){    // 会社員：ブリーフケース
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.26,0.1), new THREE.MeshStandardMaterial({color:0x20242b}));
+    m.position.set(0.44,0.6,0.12); m.castShadow=true; g.add(m);
+  } else if(accessory==='kid'){     // 家族連れ：子ども（横）
+    const k=new THREE.Group();
+    const kb=new THREE.Mesh(new THREE.CapsuleGeometry(0.18,0.34,4,8), new THREE.MeshStandardMaterial({color:0xffd27f}));
+    kb.position.y=0.42; kb.castShadow=true; k.add(kb);
+    const kh=new THREE.Mesh(new THREE.SphereGeometry(0.16,12,10), new THREE.MeshStandardMaterial({color:0xf3d6b0}));
+    kh.position.y=0.8; k.add(kh);
+    k.position.set(0.52,0,0.1); g.add(k);
+  } else if(accessory==='cam'){     // 観光客：カメラ
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.12), new THREE.MeshStandardMaterial({color:0x111418}));
+    m.position.set(0,1.02,0.3); m.castShadow=true; g.add(m);
+  }
   return g;
 }
 
@@ -382,11 +448,14 @@ function arriveTask(){
   queue.shift();                                 // 列から外す（後続が前進）
   removeOrderTag(c);
   const ratio = Math.max(0, c.patience/c.patienceMax);
-  const tip = Math.round(c.pay*ratio*0.3);       // 待たせないほどチップ
+  const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1));   // 待たせない×ペルソナ×常連
   const total = c.pay + tip;
   sim.money += total; sim.revToday += total; sim.servedToday++;
+  dayStats.sold[c.order.emoji] = (dayStats.sold[c.order.emoji]||0) + 1;  // 商品別の販売を記録
+  dayStats.served++; dayStats.tips += tip; dayStats.revenue += total;
+  if(c.regular) loyalty[c.regular.name]++;                    // 常連の親密度UP
   // 受け取ったドリンクを頭上に（演出）
-  floatText(c.group, '☕ +¥'+total + (tip>0?' ⭐':''));
+  floatText(c.group, (c.regular?('💖'+c.regular.name+' '):'☕ ')+'+¥'+total + (tip>0?' ⭐':''));
   // 空席があれば席へ、満席ならテイクアウトで退店（支払い済み）
   const seat = seats.find(s=>!s.occupied);
   if(seat){ seat.occupied=true; c.seat=seat; c.state='GO_SEAT'; }
@@ -411,14 +480,66 @@ function updateHint(){
 //  客の生成・行動（簡易ステートマシン）
 //   states: ENTER(席へ歩く) → SEATED(寛ぐ) → LEAVE(出口へ) → 退場
 // =====================================================================
-const CUST_COLORS = [0xff8a8a,0x8ab4ff,0x9ee59e,0xd6a0ff,0xffd27f,0x8fe0d8];
 let spawnAccum = 0;
+
+// ---- 店の属性（将来：立地選び・内外装・価格・メニュー構成で変化する）----
+//  これらが「来る客層」を左右する。今は既定値だが pickPersona() が参照済み。
+const store = {
+  priceLevel: 1.0,      // 価格帯（1.0=標準／>1 高級／<1 安い）← メニュー価格の平均で算出予定
+  vibe: 'cozy',         // 内装の雰囲気（cozy / chic / pop）← 内装で変化
+  location: 'downtown', // 立地（downtown / college / residential / tourist）← 出店で選ぶ
+};
+
+// ---- ペルソナ：見た目・注文傾向・行動・来店時間帯・店の好みが異なる ----
 const PERSONAS = [
-  { name:'学生', say:['課題やらなきゃ…','Wi-Fiありがたい','長居しちゃう'] },
-  { name:'サラリーマン', say:['ふぅ、一服','打合せ前に一杯','深煎り好き'] },
-  { name:'家族連れ', say:['子どもと休憩','パンケーキある？','落ち着くね'] },
-  { name:'常連さん', say:['いつもの！','このブレンド最高','また来たよ'] },
+  { key:'worker', name:'会社員', color:0x8a93a6, acc:'case',
+    menu:['☕','🥛'], stay:[40,80], patience:[55,90], tip:1.4, spend:1.1,
+    peak:[7,11], loc:'downtown', vibe:'chic', priceTol:1.5,
+    say:['ふぅ、一服','打合せ前に一杯','深煎りで','テイクアウトで'] },
+  { key:'student', name:'学生', color:0x6aa0ff, acc:'bag',
+    menu:['🧋','🥛','🍰'], stay:[120,200], patience:[80,140], tip:0.8, spend:0.85,
+    peak:[14,21], loc:'college', vibe:'pop', priceTol:0.7,
+    say:['課題やらなきゃ…','Wi-Fiありがたい','長居しちゃう','テスト前〜'] },
+  { key:'family', name:'家族連れ', color:0xffb06a, acc:'kid',
+    menu:['🍰','🥐','🍵'], stay:[90,150], patience:[65,105], tip:1.1, spend:1.5,
+    peak:[11,16], loc:'residential', vibe:'cozy', priceTol:1.1,
+    say:['子どもと休憩','パンケーキある？','落ち着くね','ケーキおいしい！'] },
+  { key:'tourist', name:'観光客', color:0x6ad6a0, acc:'cam',
+    menu:['🍵','🧋','🍰'], stay:[60,110], patience:[90,150], tip:1.25, spend:1.2,
+    peak:[10,18], loc:'tourist', vibe:'chic', priceTol:1.3,
+    say:['映え〜！','抹茶飲みたい','記念に一枚','いい雰囲気'] },
 ];
+const PMAP = Object.fromEntries(PERSONAS.map(p=>[p.key,p]));
+
+// ---- 常連（名前つき）。通うほどloyaltyが上がりチップ増。日が経つほど来やすい ----
+const REGULARS = [
+  { name:'ミカ',       key:'student', color:0xff8ec7, fav:'🧋' },
+  { name:'タナカ部長', key:'worker',  color:0x5d6675, fav:'☕' },
+  { name:'サトウ一家', key:'family',  color:0xff9a52, fav:'🍰' },
+  { name:'リサ',       key:'student', color:0xb98cff, fav:'🥛' },
+  { name:'ケンさん',   key:'worker',  color:0x4f8f6a, fav:'🍵' },
+];
+const loyalty = {};
+REGULARS.forEach(r=>loyalty[r.name]=0);
+
+const rrange = ([a,b])=> a + Math.random()*(b-a);
+const curHour = ()=> Math.floor(sim.minutes/60);
+const menuByEmoji = em => MENU.find(m=>m.emoji===em) || MENU[0];
+
+// 来店ペルソナを抽選：時間帯 × 立地 × 内装の雰囲気 × 価格帯 で重み付け
+function pickPersona(){
+  const h = curHour();
+  const weights = PERSONAS.map(p=>{
+    let w = (h>=p.peak[0] && h<p.peak[1]) ? 3 : 1;                          // 時間帯
+    if(store.location===p.loc) w *= 2.2;                                    // 立地の相性
+    if(store.vibe===p.vibe)    w *= 1.6;                                    // 内装の雰囲気
+    w *= Math.max(0.3, Math.min(2, 1 + (p.priceTol - store.priceLevel)));   // 価格帯の合致
+    return w;
+  });
+  let r = Math.random()*weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<PERSONAS.length;i++){ r-=weights[i]; if(r<=0) return PERSONAS[i]; }
+  return PERSONAS[0];
+}
 const MENU = [
   {emoji:'☕', name:'ブレンド'}, {emoji:'🥛', name:'ラテ'}, {emoji:'🍵', name:'抹茶'},
   {emoji:'🧋', name:'タピオカ'}, {emoji:'🍰', name:'ケーキ'}, {emoji:'🥐', name:'クロワッサン'},
@@ -436,23 +557,37 @@ function trySpawnCustomer(dtGameMin){
 }
 
 function spawnCustomer(){
-  const persona = PERSONAS[(Math.random()*PERSONAS.length)|0];
-  const g = makeHuman(CUST_COLORS[(Math.random()*CUST_COLORS.length)|0]);
+  // 常連が来るか？（日が経つほど確率UP、最大45%）
+  const regChance = Math.min(0.45, 0.08 + sim.day*0.04);
+  let regular=null, persona;
+  if(Math.random() < regChance){
+    regular = REGULARS[(Math.random()*REGULARS.length)|0];
+    persona = PMAP[regular.key];
+  } else {
+    persona = pickPersona();           // 店の属性×時間帯で客層が偏る
+  }
+  const color = regular ? regular.color : persona.color;
+  const g = makeHuman(color, persona.acc);
   g.position.set(0,0, STORE.d/2 - 1);   // 入口から
   storeScene.add(g);
-  const order = MENU[(Math.random()*MENU.length)|0];
+  // 注文：常連は"いつもの"、他はペルソナの好みから
+  const order = regular ? menuByEmoji(regular.fav) : menuByEmoji(persona.menu[(Math.random()*persona.menu.length)|0]);
+  const loy = regular ? loyalty[regular.name] : 0;
   const cust = {
-    group:g, seat:null, state:'QUEUE', t:0, persona, order,
-    stay: 60 + Math.random()*70,                 // 着席後の滞在(ゲーム分)
-    patience: 90 + Math.random()*60,             // 列で待てる時間(ゲーム分)
-    pay: Math.round(SEAT_PRICE*(0.7+Math.random()*0.8)),
-    tag:null,
+    group:g, seat:null, state:'QUEUE', t:0, persona, regular, order,
+    stay: rrange(persona.stay),                  // 着席後の滞在(ゲーム分)
+    patience: rrange(persona.patience),          // 列で待てる時間(ゲーム分)
+    pay: Math.round(SEAT_PRICE * persona.spend * (0.8+Math.random()*0.5)),
+    tipFactor: persona.tip + loy*0.05,           // 常連は通うほどチップが厚い
+    tag:null, nameTag:null,
   };
   cust.patienceMax = cust.patience;
   customers.push(cust);
   queue.push(cust);          // 入店＝注文の列に並ぶ
   sim.custToday++;
+  dayStats.visits[persona.key] = (dayStats.visits[persona.key]||0) + 1;  // 客層を記録
   makeOrderTag(cust);        // 注文（頭上に表示）
+  if(regular) makeNameTag(cust);
 }
 
 function updateCustomers(dtReal, dtGameMin){
@@ -469,7 +604,7 @@ function updateCustomers(dtReal, dtGameMin){
       c.patience -= dtGameMin;
       if(c.patience<=0){              // 我慢の限界→怒って退店（支払いなし）
         const qi = queue.indexOf(c); if(qi>=0) queue.splice(qi,1);
-        c.state='LEAVE'; c.angry=true; sim.lostToday++;
+        c.state='LEAVE'; c.angry=true; sim.lostToday++; dayStats.lost++;
         removeOrderTag(c);
         floatText(c.group, '💢 帰っちゃった…');
       }
@@ -483,7 +618,7 @@ function updateCustomers(dtReal, dtGameMin){
       if(stepToward(c.group.position, exit, speed)){
         if(c.seat) c.seat.occupied=false;
         storeScene.remove(c.group);
-        removeOrderTag(c);
+        removeOrderTag(c); removeNameTag(c);
         if(c._bubble) c._bubble.remove();
         customers.splice(i,1);
       }
@@ -499,6 +634,24 @@ function makeOrderTag(c){
   c.tag = el; c.patBar = el.querySelector('i');
 }
 function removeOrderTag(c){ if(c.tag){ c.tag.remove(); c.tag=null; } }
+
+// ---- 常連の名前タグ（来店中ずっと頭上に表示）----
+function makeNameTag(c){
+  const el = document.createElement('div'); el.className='nametag';
+  el.textContent = '💖 '+c.regular.name;
+  document.body.appendChild(el); c.nameTag = el;
+}
+function removeNameTag(c){ if(c.nameTag){ c.nameTag.remove(); c.nameTag=null; } }
+function updateNameTags(){
+  for(const c of customers){
+    if(!c.nameTag) continue;
+    const p = c.group.position.clone(); p.y += 2.7; p.project(camera);
+    if(sim.mode!=='store' || p.z>1){ c.nameTag.style.display='none'; continue; }
+    c.nameTag.style.display='block';
+    c.nameTag.style.left = (p.x*0.5+0.5)*innerWidth + 'px';
+    c.nameTag.style.top  = (-p.y*0.5+0.5)*innerHeight + 'px';
+  }
+}
 function updateOrderTags(){
   for(const c of customers){
     if(!c.tag) continue;
@@ -529,10 +682,20 @@ function stepToward(pos, target, step){
 let bubbleEl=null, bubbleTarget=null, bubbleTimer=0;
 function talkTo(cust){
   clearBubble();
-  const line = cust.persona.say[(Math.random()*cust.persona.say.length)|0];
+  let nameLabel, line;
+  if(cust.regular){
+    const loy = loyalty[cust.regular.name];
+    nameLabel = `${cust.regular.name}（常連 ♥${loy}）`;
+    const regLines = [`いつもの${cust.order.emoji}で！`, 'また来ちゃった', 'ここのが一番だね',
+                      loy>=3?'すっかり常連だよ〜':'最近ハマってる'];
+    line = regLines[(Math.random()*regLines.length)|0];
+  } else {
+    nameLabel = cust.persona.name;
+    line = cust.persona.say[(Math.random()*cust.persona.say.length)|0];
+  }
   bubbleEl = document.createElement('div');
   bubbleEl.className='bubble';
-  bubbleEl.innerHTML = `<span style="color:#c9602e">${cust.persona.name}</span><br>${line}`;
+  bubbleEl.innerHTML = `<span style="color:#c9602e">${nameLabel}</span><br>${line}`;
   document.body.appendChild(bubbleEl);
   bubbleTarget = cust.group; bubbleTimer = 3.0;
 }
@@ -648,13 +811,23 @@ document.getElementById('btn-close').onclick = ()=>{
   document.getElementById('m-cust').textContent = `${sim.custToday}組（提供${sim.servedToday}・離脱${sim.lostToday}）`;
   document.getElementById('m-rev').textContent = '¥'+sim.revToday.toLocaleString('ja-JP');
   document.getElementById('m-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
+  document.getElementById('m-breakdown').innerHTML = miniBreakdown();
   modal.classList.add('show');
 };
+function miniBreakdown(){
+  const s = dayStats;
+  const topP = PERSONAS.map(p=>({n:p.name, v:s.visits[p.key]||0})).sort((a,b)=>b.v-a.v)[0];
+  const topM = MENU.map(m=>({n:m.emoji+m.name, v:s.sold[m.emoji]||0})).sort((a,b)=>b.v-a.v)[0];
+  return `<div class="row"><span>一番多い客層</span><span>${topP&&topP.v? topP.n+`（${topP.v}組）`:'—'}</span></div>
+          <div class="row"><span>売れ筋商品</span><span>${topM&&topM.v? topM.n+`（${topM.v}杯）`:'—'}</span></div>`;
+}
 document.getElementById('m-next').onclick = ()=>{
+  // 本日分を累計へ移す
+  mergeInto(totalStats, dayStats); dayStats = blankStats();
   // 翌日リセット
   sim.day++; sim.custToday=0; sim.revToday=0; sim.servedToday=0; sim.lostToday=0; sim.minutes=OPEN_MIN;
   // 居残り客を片付け
-  for(const c of customers){ if(c.seat) c.seat.occupied=false; storeScene.remove(c.group); removeOrderTag(c); if(c._bubble)c._bubble.remove(); }
+  for(const c of customers){ if(c.seat) c.seat.occupied=false; storeScene.remove(c.group); removeOrderTag(c); removeNameTag(c); if(c._bubble)c._bubble.remove(); }
   customers.length=0; queue.length=0; spawnAccum=0;
   // 店長の状態リセット
   player.userData.task=null; player.userData.moveTarget=null;
@@ -664,6 +837,51 @@ document.getElementById('m-next').onclick = ()=>{
 function syncSpeedUI(){
   document.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', +x.dataset.speed===sim.speed));
 }
+
+// =====================================================================
+//  ダッシュボード（客層・商品別の集計表示）
+// =====================================================================
+let dashRange = 'today';
+function statsForRange(range){
+  if(range==='today') return dayStats;
+  const t = blankStats(); mergeInto(t, totalStats); mergeInto(t, dayStats); return t; // 累計＝前日まで＋本日
+}
+function dashBars(rows){
+  const max = Math.max(1, ...rows.map(r=>r.value));
+  const body = rows.map(r=>
+    `<div class="barrow"><span class="nm">${r.label}</span><span class="bar"><i style="width:${r.value/max*100}%"></i></span><span class="vv">${r.vv}</span></div>`
+  ).join('');
+  return body || '<div style="color:var(--sub);font-size:12px;padding:4px 2px">まだデータがありません</div>';
+}
+function renderDash(){
+  const s = statsForRange(dashRange);
+  const vt = Object.values(s.visits).reduce((a,b)=>a+b,0);
+  const personaRows = PERSONAS.map(p=>{
+    const v = s.visits[p.key]||0;
+    return { label:p.name, value:v, vv: v + (vt?` (${Math.round(v/vt*100)}%)`:'') };
+  });
+  const menuRows = MENU.map(m=>({ label:m.emoji+' '+m.name, value:s.sold[m.emoji]||0, vv:(s.sold[m.emoji]||0)+'杯' }))
+    .filter(r=>r.value>0).sort((a,b)=>b.value-a.value);
+  document.getElementById('dash-body').innerHTML =
+    `<div class="dash-kpis">
+       <div class="kpi"><div class="v gold">¥${s.revenue.toLocaleString('ja-JP')}</div><div class="l">売上</div></div>
+       <div class="kpi"><div class="v green">${s.served}組</div><div class="l">提供</div></div>
+       <div class="kpi"><div class="v" style="color:var(--red)">${s.lost}組</div><div class="l">離脱（行列）</div></div>
+       <div class="kpi"><div class="v gold">¥${s.tips.toLocaleString('ja-JP')}</div><div class="l">チップ</div></div>
+     </div>
+     <div class="dash-h">👥 客層（来店ペルソナ）</div>${dashBars(personaRows)}
+     <div class="dash-h">🍰 売れた商品ランキング</div>${dashBars(menuRows)}`;
+}
+const dashModal = document.getElementById('modal-dash');
+document.getElementById('btn-dash').onclick = ()=>{ renderDash(); dashModal.classList.add('show'); };
+document.getElementById('dash-close').onclick = ()=> dashModal.classList.remove('show');
+document.querySelectorAll('.dash-tab').forEach(t=>{
+  t.onclick = ()=>{
+    dashRange = t.dataset.range;
+    document.querySelectorAll('.dash-tab').forEach(x=>x.classList.toggle('active', x===t));
+    renderDash();
+  };
+});
 
 // =====================================================================
 //  HUD更新
@@ -702,6 +920,7 @@ function animate(){
   updateBubble(dt);
   updateFloats(dt);
   updateOrderTags();
+  updateNameTags();
 
   // 俯瞰のカップを回す（ちょい演出）
   if(myCafeMesh.userData.cup) myCafeMesh.userData.cup.rotation.y += dt;
