@@ -179,6 +179,7 @@
       <button class="m-tab" data-mtab="equip">設備</button>
       <button class="m-tab" data-mtab="store">店舗</button>
       <button class="m-tab" data-mtab="staff">人材</button>
+      <button class="m-tab" data-mtab="expand">展開</button>
       <button class="m-tab" data-mtab="finance">資金</button>
     </div>
     <div id="manage-body"></div>
@@ -291,6 +292,56 @@ function updateStaff(dtGameMin){
       s.cool = serveOne() ? 24 / s.skill : 4;   // スキルが高いほど速い
     }
   }
+}
+
+// ---- 複数店舗 & 競合（シェア争い）----
+const CITY_DEMAND = 60000;     // 街全体の1日のカフェ需要（円指標）
+const RIVALS = [
+  { name:'グリーン珈琲', comp:13, color:0x2f9e63, pos:[-30,18] },
+  { name:'ブルーカフェ', comp:10, color:0x4a78c9, pos:[26,-28] },
+  { name:'まちの喫茶店', comp:7,  color:0x9a5b3a, pos:[-24,-24] },
+];
+const BRANCH_SPOTS = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12} ];
+const branches = [ { name:'本店', loc:'downtown', level:1, mesh:null } ]; // [0]=プレイ可能な本店
+const openCost   = () => 15000 + (branches.length-1)*10000;
+const branchUpCost = b => 6000 + (b.level-1)*4000;
+function mainComp(){
+  let c = 8;
+  c += (equip.machine.lv-1)*1.5;        // 設備品質
+  c += staff.length;                     // 人員
+  c += (1.1 - store.priceLevel)*4;       // 安いほど集客力（粗利とトレードオフ）
+  c += extraUsed*0.4;                     // 席数
+  return Math.max(2, c);
+}
+const branchComp = b => (b===branches[0] ? mainComp() : 6 + (b.level-1)*3);
+const playerComp = () => branches.reduce((a,b)=>a+branchComp(b), 0);
+const totalComp  = () => playerComp() + RIVALS.reduce((a,r)=>a+r.comp, 0);
+const playerShare= () => playerComp()/totalComp();
+// 支店の1日の純益（本店は実プレイで稼ぐので0）
+function branchDailyNet(b){
+  if(b===branches[0]) return 0;
+  const rev = Math.round(CITY_DEMAND * (branchComp(b)/totalComp()));
+  return rev - (RENT[b.loc]||2500);     // 売上シェア − 支店家賃
+}
+const branchesDailyNet = () => branches.reduce((a,b)=>a+branchDailyNet(b), 0);
+// 俯瞰マップにカフェの建物を置く
+function makeCafeBuilding(color, x, z, emissive){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(5,3.5,5), new THREE.MeshStandardMaterial({ color, emissive:emissive||0x000000 }));
+  m.position.set(x, 1.75, z); m.castShadow=m.receiveShadow=true; overScene.add(m);
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.32,0.55,12), new THREE.MeshStandardMaterial({ color:0xfff0d0 }));
+  cup.position.set(x, 5.0, z); overScene.add(cup);
+  return m;
+}
+function openBranch(loc){
+  if(branches.length-1 >= BRANCH_SPOTS.length) return false;
+  const c = openCost(); if(sim.money < c) return false;
+  sim.money -= c; dayStats.capex += c;
+  const sp = BRANCH_SPOTS[branches.length-1];
+  const b = { name:(branches.length+1)+'号店', loc, level:1, mesh:null };
+  b.mesh = makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0x2a1600);
+  b.mesh.userData.isCafe = true;
+  branches.push(b);
+  return true;
 }
 
 // ---- Three.js 基本セット ----
@@ -445,7 +496,7 @@ let myCafeMesh;
 function buildOverviewScene(){
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fc6e8);
-  scene.fog = new THREE.Fog(0x9fc6e8, 60, 140);
+  scene.fog = new THREE.Fog(0x9fc6e8, 130, 300);
   addLights(scene, 1.1);
 
   // 地面
@@ -497,8 +548,11 @@ function onClick(e){
   raycaster.setFromCamera(pointer, camera);
 
   if(sim.mode==='overview'){
-    const hit = raycaster.intersectObject(myCafeMesh, false)[0];
-    if(hit) enterStore();
+    const myMeshes = branches.map(b=>b.mesh).filter(Boolean);
+    if(raycaster.intersectObjects(myMeshes, false)[0]){ enterStore(); return; }
+    const rivalMeshes = RIVALS.map(r=>r.mesh).filter(Boolean);
+    const rh = raycaster.intersectObjects(rivalMeshes, false)[0];
+    if(rh){ const r = RIVALS.find(x=>x.mesh===rh.object); flashHint(`🏪 ${r?r.name:'ライバル店'}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`); }
   } else {
     // 客タップ：並んでる客=レジで接客 / くつろぎ客=会話
     const meshes = customers.map(c=>c.group.userData.body);
@@ -577,7 +631,13 @@ btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
     ? 'レジ／並んでる客をタップ→先頭から注文を提供 ／ くつろぐ客をタップ→会話 ／ 床タップで移動'
-    : '自分のカフェ（オレンジの建物）をタップして中に入る';
+    : '自分のカフェ（オレンジの建物）をタップして中に入る ／ 緑・青の建物は競合店';
+}
+let hintTimer = null;
+function flashHint(msg){
+  hint.textContent = msg;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(updateHint, 2600);
 }
 
 // =====================================================================
@@ -958,11 +1018,10 @@ function updateCamera(dt){
     camera.position.lerp(desired, 1-Math.pow(0.001,dt));
     camera.lookAt(target.x, 1.0, target.z);
   } else {
-    // 俯瞰：街を斜め見下ろし、カフェ中心
-    const c = myCafeMesh.position;
-    const desired = new THREE.Vector3(c.x-2, 38, c.z+34);
+    // 俯瞰：街全体を見渡す（競合・支店も視界に）
+    const desired = new THREE.Vector3(2, 76, 64);
     camera.position.lerp(desired, 1-Math.pow(0.0005,dt));
-    camera.lookAt(c.x, 0, c.z);
+    camera.lookAt(0, 0, 2);
   }
 }
 
@@ -1012,8 +1071,15 @@ function plBreakdown(){
   if(wages>0) h += row('人件費', wages, true);
   h += row(`家賃（${LOC_JP[store.location]}）`, rent, true);
   if(interest>0) h += row('借入利息', interest, true);
-  h += `<div class="row" style="border-bottom:0"><span><b>営業損益</b></span><b style="color:${op>=0?'var(--gold)':'var(--red)'}">${op<0?'−':''}¥${Math.abs(op).toLocaleString('ja-JP')}</b></div>`;
-  if(dayStats.capex>0) h += `<div class="note">※ 別途 設備投資 −¥${dayStats.capex.toLocaleString('ja-JP')}（現金から支出済み）</div>`;
+  const bnet = branchesDailyNet();
+  const showBranch = branches.length>1;
+  h += `<div class="row" ${showBranch?'':'style="border-bottom:0"'}><span>${showBranch?'本店 営業損益':'<b>営業損益</b>'}</span><b style="color:${op>=0?'var(--gold)':'var(--red)'}">${op<0?'−':''}¥${Math.abs(op).toLocaleString('ja-JP')}</b></div>`;
+  if(showBranch){
+    h += row('支店損益（自動運営）', bnet, bnet<0);
+    const tot = op + bnet;
+    h += `<div class="row" style="border-bottom:0"><span><b>総損益</b></span><b style="color:${tot>=0?'var(--gold)':'var(--red)'}">${tot<0?'−':''}¥${Math.abs(tot).toLocaleString('ja-JP')}</b></div>`;
+  }
+  if(dayStats.capex>0) h += `<div class="note">※ 別途 設備投資・出店 −¥${dayStats.capex.toLocaleString('ja-JP')}（現金から支出済み）</div>`;
   return h;
 }
 function miniBreakdown(){
@@ -1024,8 +1090,9 @@ function miniBreakdown(){
           <div class="row"><span>売れ筋商品</span><span>${topM&&topM.v? topM.n+`（${topM.v}杯）`:'—'}</span></div>`;
 }
 document.getElementById('m-next').onclick = ()=>{
-  // 家賃・利息・人件費を清算し、運用を増やす
+  // 家賃・利息・人件費を清算、支店純益を加算、運用を増やす
   sim.money -= plRent() + plInterest() + staffWage();
+  sim.money += branchesDailyNet();
   finance.invest = Math.round(finance.invest * (1 + INVEST_RATE));
   // 本日分を累計へ移す
   mergeInto(totalStats, dayStats); dayStats = blankStats();
@@ -1190,6 +1257,34 @@ function renderManage(){
       h += `<div class="mrow"><div class="nm">別の候補を探す</div><button class="mbtn" data-reroll="1">🔄 更新</button></div>`;
     }
     h += `<div class="note">日給は毎日の閉店時に人件費としてPLから引かれます。スキルが高いほど提供が速い。</div>`;
+  } else if(mtab==='expand'){
+    // 市場シェア
+    const tot = totalComp();
+    const rows = [{label:'🟠 自社', value:playerComp(), me:true}, ...RIVALS.map(r=>({label:'🏪 '+r.name, value:r.comp}))];
+    const max = Math.max(...rows.map(r=>r.value));
+    h += `<div class="dash-h">🥧 市場シェア（競争力）</div>`;
+    h += rows.map(r=>`<div class="barrow"><span class="nm" style="${r.me?'color:var(--gold)':''}">${r.label}</span><span class="bar"><i style="width:${r.value/max*100}%;${r.me?'background:linear-gradient(90deg,var(--gold),#ff9d4d)':''}"></i></span><span class="vv">${Math.round(r.value/tot*100)}%</span></div>`).join('');
+    h += `<div class="dash-h">🏬 あなたの店舗</div>`;
+    branches.forEach((b,i)=>{
+      const main = i===0;
+      const net = branchDailyNet(b);
+      const meta = main ? `本店（実プレイで営業）・競争力 ${branchComp(b).toFixed(0)}`
+                        : `${LOC_JP[b.loc]}・Lv.${b.level}・日次純益 <b style="color:${net>=0?'var(--green)':'var(--red)'}">${net<0?'−':''}¥${Math.abs(net).toLocaleString('ja-JP')}</b>`;
+      const act = main ? '' : `<button class="mbtn" data-upbranch="${i}" ${sim.money<branchUpCost(b)?'disabled':''}>強化<br>¥${branchUpCost(b).toLocaleString('ja-JP')}</button>`;
+      h += mcard(ART.downtown, b.name, meta, act || '<span class="sub2">操作可</span>');
+    });
+    // 新規出店
+    const full = branches.length-1 >= BRANCH_SPOTS.length;
+    h += `<div class="dash-h">📍 新規出店 ${full?'（上限）':`（¥${openCost().toLocaleString('ja-JP')}）`}</div>`;
+    if(full){
+      h += `<div class="note" style="margin-top:0">出店上限に達しました（最大${BRANCH_SPOTS.length}支店）。</div>`;
+    } else {
+      for(const k in LOC_JP){
+        h += mcard(ART[k], LOC_JP[k], `家賃¥${(RENT[k]||0).toLocaleString('ja-JP')}/日・自動運営`,
+          `<button class="mbtn" data-openbranch="${k}" ${sim.money<openCost()?'disabled':''}>出店</button>`);
+      }
+    }
+    h += `<div class="note">支店は自動運営。競争力（設備・人員・価格・支店Lv）でシェアが決まり、支店の純益が毎日のPLに加わります。</div>`;
   } else if(mtab==='finance'){
     const rent = RENT[store.location]||0;
     h += `<div class="dash-kpis">
@@ -1249,6 +1344,11 @@ document.getElementById('manage-body').addEventListener('click', e=>{
     fireStaff(+t.dataset.fire);
   } else if(t.dataset.reroll){
     candidates = [makeCandidate(), makeCandidate(), makeCandidate()];
+  } else if(t.dataset.openbranch){
+    openBranch(t.dataset.openbranch);
+  } else if(t.dataset.upbranch!==undefined){
+    const b = branches[+t.dataset.upbranch];
+    if(b && b!==branches[0] && sim.money>=branchUpCost(b)){ sim.money-=branchUpCost(b); dayStats.capex+=branchUpCost(b); b.level++; }
   }
   renderManage();
 });
@@ -1279,6 +1379,9 @@ function updateHUD(){
 // =====================================================================
 storeScene = buildStoreScene();
 overScene  = buildOverviewScene();
+// 俯瞰に競合（ライバル店）を配置・本店を紐付け
+branches[0].mesh = myCafeMesh;
+RIVALS.forEach(r=>{ r.mesh = makeCafeBuilding(r.color, r.pos[0], r.pos[1]); });
 
 // =====================================================================
 //  メインループ
