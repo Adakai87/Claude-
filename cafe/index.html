@@ -39,6 +39,15 @@
   .hint{position:fixed; left:50%; transform:translateX(-50%); bottom:70px; background:var(--panel); border:1px solid var(--line);
     border-radius:20px; padding:6px 14px; font-size:12px; color:var(--sub); pointer-events:none; white-space:nowrap;}
 
+  .carrybadge{position:fixed; left:50%; transform:translateX(-50%); bottom:108px; background:var(--panel); border:1px solid var(--gold);
+    color:var(--gold); border-radius:20px; padding:5px 14px; font-size:13px; font-weight:800; pointer-events:none;}
+
+  /* 注文タグ（客の頭上） */
+  .ordertag{position:fixed; transform:translate(-50%,-100%); pointer-events:none; text-align:center; z-index:40;}
+  .ordertag .em{font-size:24px; line-height:1; filter:drop-shadow(0 2px 3px rgba(0,0,0,.6));}
+  .ordertag .pat{width:42px; height:5px; background:rgba(0,0,0,.55); border-radius:3px; margin:3px auto 0; overflow:hidden;}
+  .ordertag .pat > i{display:block; height:100%; width:100%; background:#7fc77f; transition:width .2s linear;}
+
   /* ---- speech / dialog ---- */
   .bubble{position:fixed; background:#fff; color:#1a140e; border-radius:14px; padding:8px 12px; font-size:13px; font-weight:700;
     transform:translate(-50%,-100%); pointer-events:none; box-shadow:0 6px 18px rgba(0,0,0,.4); max-width:220px; line-height:1.4;}
@@ -77,7 +86,7 @@
   <div class="panel stats">
     <div class="stat"><div class="v gold" id="s-money">¥0</div><div class="l">所持金</div></div>
     <div class="stat"><div class="v" id="s-day">1日目</div><div class="l">経営日数</div></div>
-    <div class="stat"><div class="v acc" id="s-cust">0</div><div class="l">本日の来客</div></div>
+    <div class="stat"><div class="v acc" id="s-cust">0/0</div><div class="l">提供/来客</div></div>
   </div>
   <div class="spacer"></div>
   <div class="panel timectrl">
@@ -88,6 +97,7 @@
   </div>
 </div>
 
+<div class="carrybadge" id="carry" style="display:none"></div>
 <div class="hint" id="hint"></div>
 
 <div class="bottom">
@@ -124,6 +134,8 @@ const sim = {
   day: 1,
   custToday: 0,
   revToday: 0,
+  servedToday: 0,    // 提供できた組
+  lostToday: 0,      // 我慢の限界で帰った組
   // 時間：分単位で保持。リアル1秒=ゲーム1分（=リアル1分でゲーム1時間）
   minutes: 8 * 60,   // 08:00 開店
   speed: 1,          // 0=停止, 1=等速, 3=倍速
@@ -131,6 +143,7 @@ const sim = {
 };
 const OPEN_MIN = 8 * 60;
 const SEAT_PRICE = 600; // 1組あたりの平均客単価（仮）
+const TRAY_MAX = 3;     // 一度に運べるドリンク数
 
 // ---- Three.js 基本セット ----
 const app = document.getElementById('app');
@@ -166,6 +179,7 @@ const seats = [];                 // 座席 {pos, occupied}
 let player;                       // プレイヤー（店長）
 let storeFloor;                   // 床（タップ移動のレイキャスト対象）
 let moveMarker;                   // タップ先マーカー
+let counterMesh;                  // カウンター（タップでドリンク用意）
 const customers = [];             // 客リスト
 
 function buildStoreScene(){
@@ -203,6 +217,10 @@ function buildStoreScene(){
   const counter = new THREE.Mesh(new THREE.BoxGeometry(6,1.1,1.2), new THREE.MeshStandardMaterial({ color:0x4a3b2a }));
   counter.position.set(-3, 0.55, -STORE.d/2 + 1.4); counter.castShadow=counter.receiveShadow=true;
   scene.add(counter);
+  counterMesh = counter;
+  // カウンター上のドリンクマシン（目印）
+  const machine = new THREE.Mesh(new THREE.BoxGeometry(1,0.7,0.7), new THREE.MeshStandardMaterial({ color:0x9aa0a6, metalness:0.3 }));
+  machine.position.set(-4.4, 1.45, -STORE.d/2 + 1.4); machine.castShadow=true; scene.add(machine);
 
   // 入口マット（手前中央）
   const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.6), new THREE.MeshStandardMaterial({ color:0xcaa24a }));
@@ -224,6 +242,12 @@ function buildStoreScene(){
   // プレイヤー（店長＝箱人間）
   player = makeHuman(0xffd27f);
   player.position.set(0,0, STORE.d/2 - 3);
+  // 手に持つドリンク（運搬中だけ表示）
+  const carryCup = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.13,0.26,10), new THREE.MeshStandardMaterial({ color:0xfff0d0 }));
+  carryCup.position.set(0.32,1.0,0.28); carryCup.visible=false; player.add(carryCup);
+  player.userData.carryCup = carryCup;
+  player.userData.carrying = 0;   // 運んでいるドリンク数
+  player.userData.task = null;    // {type:'brew'} | {type:'serve', cust}
   scene.add(player);
 
   scene._isStore = true;
@@ -303,12 +327,21 @@ function onClick(e){
     const hit = raycaster.intersectObject(myCafeMesh, false)[0];
     if(hit) enterStore();
   } else {
-    // 客タップ＝会話を優先
+    // 客タップ：待ち客=提供へ向かう / くつろぎ客=会話
     const meshes = customers.map(c=>c.group.userData.body);
     const chit = raycaster.intersectObjects(meshes, false)[0];
     if(chit){
       const cust = customers.find(c=>c.group.userData.body===chit.object);
-      if(cust){ talkTo(cust); return; }
+      if(cust){
+        if(cust.state==='WAIT') setServeTask(cust);
+        else talkTo(cust);
+        return;
+      }
+    }
+    // カウンタータップ：ドリンクを用意しに行く
+    if(counterMesh){
+      const khit = raycaster.intersectObject(counterMesh, false)[0];
+      if(khit){ setBrewTask(); return; }
     }
     // それ以外は床タップ＝その地点へ移動
     const fhit = raycaster.intersectObject(storeFloor, false)[0];
@@ -316,13 +349,66 @@ function onClick(e){
   }
 }
 
-// タップした床地点へ歩く目的地をセット
+// カウンター前の作業位置
+const COUNTER_SPOT = new THREE.Vector3(-3, 0, -STORE.d/2 + 3.0);
+
+// タップした床地点へ歩く（タスク無し）
 function setMoveTarget(point){
   const x = THREE.MathUtils.clamp(point.x, -STORE.w/2+0.6, STORE.w/2-0.6);
   const z = THREE.MathUtils.clamp(point.z, -STORE.d/2+0.6, STORE.d/2-0.6);
+  player.userData.task = null;
   player.userData.moveTarget = new THREE.Vector3(x, 0, z);
   moveMarker.position.set(x, 0.03, z);
   moveMarker.material.opacity = 0.95;
+}
+// カウンターでドリンクを用意（trayを満タンに）
+function setBrewTask(){
+  player.userData.task = { type:'brew' };
+  player.userData.moveTarget = COUNTER_SPOT.clone();
+  moveMarker.position.set(COUNTER_SPOT.x, 0.03, COUNTER_SPOT.z);
+  moveMarker.material.opacity = 0.95;
+}
+// 待ち客に提供しに行く
+function setServeTask(cust){
+  const sp = cust.seat.pos.clone(); sp.z += 1.0;   // 席の少し手前
+  player.userData.task = { type:'serve', cust };
+  player.userData.moveTarget = sp;
+  moveMarker.position.set(sp.x, 0.03, sp.z);
+  moveMarker.material.opacity = 0.95;
+}
+// 目的地に着いたときタスクを実行
+function arriveTask(){
+  const task = player.userData.task;
+  player.userData.task = null;
+  if(!task) return;
+  if(task.type==='brew'){
+    player.userData.carrying = TRAY_MAX;
+    updateCarryUI();
+    floatText(player, '☕ 用意完了 ×'+TRAY_MAX);
+  } else if(task.type==='serve'){
+    const c = task.cust;
+    if(!c || c.state!=='WAIT') return;          // もう帰った等
+    if(player.userData.carrying>0){
+      player.userData.carrying--; updateCarryUI();
+      c.state='SERVED'; c.t=0;
+      removeOrderTag(c);
+      const ratio = Math.max(0, c.patience/c.patienceMax);
+      const tip = Math.round(c.pay*ratio*0.3);   // 早いほどチップ
+      const total = c.pay + tip;
+      sim.money += total; sim.revToday += total; sim.servedToday++;
+      floatText(c.group, '+¥'+total + (tip>0?' ⭐':''));
+    } else {
+      floatText(player, 'カウンターで用意して！');
+    }
+  }
+}
+// 運搬中UI（頭上カップ＋バッジ）
+function updateCarryUI(){
+  const n = player.userData.carrying;
+  if(player.userData.carryCup) player.userData.carryCup.visible = n>0;
+  const badge = document.getElementById('carry');
+  badge.textContent = n>0 ? ('🫖 ドリンク ×'+n) : '';
+  badge.style.display = n>0 ? 'block' : 'none';
 }
 
 // =====================================================================
@@ -335,7 +421,7 @@ function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTa
 btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
-    ? '床をタップした場所へ移動 ・ 客をタップで会話 ・ 時間は常に進行中（PCはWASDも可）'
+    ? 'カウンターをタップ→ドリンク用意 ／ 待ち客をタップ→提供 ／ 床タップで移動'
     : '自分のカフェ（オレンジの建物）をタップして中に入る';
 }
 
@@ -350,6 +436,10 @@ const PERSONAS = [
   { name:'サラリーマン', say:['ふぅ、一服','打合せ前に一杯','深煎り好き'] },
   { name:'家族連れ', say:['子どもと休憩','パンケーキある？','落ち着くね'] },
   { name:'常連さん', say:['いつもの！','このブレンド最高','また来たよ'] },
+];
+const MENU = [
+  {emoji:'☕', name:'ブレンド'}, {emoji:'🥛', name:'ラテ'}, {emoji:'🍵', name:'抹茶'},
+  {emoji:'🧋', name:'タピオカ'}, {emoji:'🍰', name:'ケーキ'}, {emoji:'🥐', name:'クロワッサン'},
 ];
 
 function trySpawnCustomer(dtGameMin){
@@ -370,13 +460,17 @@ function spawnCustomer(seat){
   const g = makeHuman(CUST_COLORS[(Math.random()*CUST_COLORS.length)|0]);
   g.position.set(0,0, STORE.d/2 - 1);   // 入口から
   storeScene.add(g);
-  const cust = { group:g, seat, state:'ENTER', t:0, persona,
-                 stay: 90 + Math.random()*120 }; // 着席滞在(ゲーム分)
+  const order = MENU[(Math.random()*MENU.length)|0];
+  const cust = {
+    group:g, seat, state:'ENTER', t:0, persona, order,
+    stay: 60 + Math.random()*70,                 // 提供後の滞在(ゲーム分)
+    patience: 80 + Math.random()*50,             // 待てる時間(ゲーム分)
+    pay: Math.round(SEAT_PRICE*(0.7+Math.random()*0.8)),
+    tag:null,
+  };
+  cust.patienceMax = cust.patience;
   customers.push(cust);
   sim.custToday++;
-  // 着席＝注文確定で売上（簡易）
-  const pay = Math.round(SEAT_PRICE*(0.7+Math.random()*0.8));
-  cust.pay = pay;
 }
 
 function updateCustomers(dtReal, dtGameMin){
@@ -384,13 +478,18 @@ function updateCustomers(dtReal, dtGameMin){
   for(let i=customers.length-1;i>=0;i--){
     const c = customers[i];
     if(c.state==='ENTER'){
-      const target = c.seat.pos;
-      if(stepToward(c.group.position, target, speed)){
-        c.state='SEATED'; c.t=0;
-        sim.money += c.pay; sim.revToday += c.pay;
-        floatText(c.group, '+¥'+c.pay);
+      if(stepToward(c.group.position, c.seat.pos, speed)){
+        c.state='WAIT';            // 着席→注文して待つ
+        makeOrderTag(c);
       }
-    } else if(c.state==='SEATED'){
+    } else if(c.state==='WAIT'){
+      c.patience -= dtGameMin;
+      if(c.patience<=0){           // 我慢の限界→怒って退店（支払いなし）
+        c.state='LEAVE'; c.angry=true; sim.lostToday++;
+        removeOrderTag(c);
+        floatText(c.group, '💢 帰っちゃった…');
+      }
+    } else if(c.state==='SERVED'){
       c.t += dtGameMin;
       if(c.t >= c.stay){ c.state='LEAVE'; }
     } else if(c.state==='LEAVE'){
@@ -398,10 +497,33 @@ function updateCustomers(dtReal, dtGameMin){
       if(stepToward(c.group.position, exit, speed)){
         c.seat.occupied=false;
         storeScene.remove(c.group);
+        removeOrderTag(c);
         if(c._bubble) c._bubble.remove();
         customers.splice(i,1);
       }
     }
+  }
+}
+
+// ---- 注文タグ（頭上の注文＆我慢メーター） ----
+function makeOrderTag(c){
+  const el = document.createElement('div'); el.className='ordertag';
+  el.innerHTML = `<div class="em">${c.order.emoji}</div><div class="pat"><i></i></div>`;
+  document.body.appendChild(el);
+  c.tag = el; c.patBar = el.querySelector('i');
+}
+function removeOrderTag(c){ if(c.tag){ c.tag.remove(); c.tag=null; } }
+function updateOrderTags(){
+  for(const c of customers){
+    if(!c.tag) continue;
+    const p = c.group.position.clone(); p.y += 2.1; p.project(camera);
+    if(sim.mode!=='store' || p.z>1){ c.tag.style.display='none'; continue; }
+    c.tag.style.display='block';
+    c.tag.style.left = (p.x*0.5+0.5)*innerWidth + 'px';
+    c.tag.style.top  = (-p.y*0.5+0.5)*innerHeight + 'px';
+    const ratio = Math.max(0, c.patience/c.patienceMax);
+    c.patBar.style.width = (ratio*100)+'%';
+    c.patBar.style.background = ratio>0.5?'#7fc77f':ratio>0.25?'#ffce4d':'#e0685e';
   }
 }
 
@@ -470,8 +592,8 @@ function updatePlayer(dt){
   if(keys.KeyD||keys.ArrowRight) vx+=1;
 
   if(vx||vz){
-    // キーボード操作（タップ移動は中断）
-    player.userData.moveTarget = null;
+    // キーボード操作（タップ移動・タスクは中断）
+    player.userData.moveTarget = null; player.userData.task = null;
     const l=Math.hypot(vx,vz); vx/=l; vz/=l;
     player.position.x = THREE.MathUtils.clamp(player.position.x+vx*sp, -STORE.w/2+0.6, STORE.w/2-0.6);
     player.position.z = THREE.MathUtils.clamp(player.position.z+vz*sp, -STORE.d/2+0.6, STORE.d/2-0.6);
@@ -481,7 +603,7 @@ function updatePlayer(dt){
     const t = player.userData.moveTarget;
     const dx=t.x-player.position.x, dz=t.z-player.position.z;
     const dist=Math.hypot(dx,dz);
-    if(dist<0.15){ player.userData.moveTarget=null; }
+    if(dist<0.2){ player.userData.moveTarget=null; arriveTask(); }
     else{
       player.position.x += dx/dist*Math.min(sp,dist);
       player.position.z += dz/dist*Math.min(sp,dist);
@@ -537,17 +659,19 @@ const modal = document.getElementById('modal');
 document.getElementById('btn-close').onclick = ()=>{
   sim.speed = 0; syncSpeedUI();
   document.getElementById('m-title').textContent = sim.day+'日目 閉店';
-  document.getElementById('m-cust').textContent = sim.custToday+'人';
+  document.getElementById('m-cust').textContent = `${sim.custToday}組（提供${sim.servedToday}・離脱${sim.lostToday}）`;
   document.getElementById('m-rev').textContent = '¥'+sim.revToday.toLocaleString('ja-JP');
   document.getElementById('m-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
   modal.classList.add('show');
 };
 document.getElementById('m-next').onclick = ()=>{
   // 翌日リセット
-  sim.day++; sim.custToday=0; sim.revToday=0; sim.minutes=OPEN_MIN;
+  sim.day++; sim.custToday=0; sim.revToday=0; sim.servedToday=0; sim.lostToday=0; sim.minutes=OPEN_MIN;
   // 居残り客を片付け
-  for(const c of customers){ c.seat.occupied=false; storeScene.remove(c.group); if(c._bubble)c._bubble.remove(); }
+  for(const c of customers){ c.seat.occupied=false; storeScene.remove(c.group); removeOrderTag(c); if(c._bubble)c._bubble.remove(); }
   customers.length=0; spawnAccum=0;
+  // 店長の状態リセット
+  player.userData.carrying=0; player.userData.task=null; updateCarryUI();
   modal.classList.remove('show');
   sim.speed=1; syncSpeedUI();
 };
@@ -561,7 +685,7 @@ function syncSpeedUI(){
 function updateHUD(){
   document.getElementById('s-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
   document.getElementById('s-day').textContent = sim.day+'日目';
-  document.getElementById('s-cust').textContent = sim.custToday;
+  document.getElementById('s-cust').textContent = sim.servedToday+'/'+sim.custToday;
   document.getElementById('s-clock').textContent = fmtClock(sim.minutes);
 }
 
@@ -591,6 +715,7 @@ function animate(){
   updateCamera(dt);
   updateBubble(dt);
   updateFloats(dt);
+  updateOrderTags();
 
   // 俯瞰のカップを回す（ちょい演出）
   if(myCafeMesh.userData.cup) myCafeMesh.userData.cup.rotation.y += dt;
