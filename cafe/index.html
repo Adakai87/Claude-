@@ -143,7 +143,6 @@ const sim = {
 };
 const OPEN_MIN = 8 * 60;
 const SEAT_PRICE = 600; // 1組あたりの平均客単価（仮）
-const TRAY_MAX = 3;     // 一度に運べるドリンク数
 
 // ---- Three.js 基本セット ----
 const app = document.getElementById('app');
@@ -179,8 +178,15 @@ const seats = [];                 // 座席 {pos, occupied}
 let player;                       // プレイヤー（店長）
 let storeFloor;                   // 床（タップ移動のレイキャスト対象）
 let moveMarker;                   // タップ先マーカー
-let counterMesh;                  // カウンター（タップでドリンク用意）
+let counterMesh;                  // 注文カウンター（レジ）
 const customers = [];             // 客リスト
+
+// ---- 注文カウンターの行列 ----
+const QUEUE_MAX = 5;
+const queue = [];                 // 並んでいる客（先頭=queue[0]）
+const queueSpots = [];            // 行列の立ち位置（先頭→後ろ）
+for(let i=0;i<QUEUE_MAX;i++) queueSpots.push(new THREE.Vector3(-0.5, 0, -3.2 + i*1.25));
+const BARISTA_SPOT = new THREE.Vector3(-2.3, 0, -3.0); // 店長がレジで接客する位置
 
 function buildStoreScene(){
   const scene = new THREE.Scene();
@@ -218,9 +224,14 @@ function buildStoreScene(){
   counter.position.set(-3, 0.55, -STORE.d/2 + 1.4); counter.castShadow=counter.receiveShadow=true;
   scene.add(counter);
   counterMesh = counter;
-  // カウンター上のドリンクマシン（目印）
+  // カウンター上のドリンクマシン（左）
   const machine = new THREE.Mesh(new THREE.BoxGeometry(1,0.7,0.7), new THREE.MeshStandardMaterial({ color:0x9aa0a6, metalness:0.3 }));
   machine.position.set(-4.4, 1.45, -STORE.d/2 + 1.4); machine.castShadow=true; scene.add(machine);
+  // レジ（注文位置の目印・右寄り）
+  const register = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.45,0.5), new THREE.MeshStandardMaterial({ color:0x2e2e38 }));
+  register.position.set(-0.5, 1.32, -STORE.d/2 + 1.4); register.castShadow=true; scene.add(register);
+  const regScreen = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.35,0.05), new THREE.MeshStandardMaterial({ color:0x3ddc97, emissive:0x0a3a28 }));
+  regScreen.position.set(-0.5, 1.5, -STORE.d/2 + 1.16); scene.add(regScreen);
 
   // 入口マット（手前中央）
   const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.6), new THREE.MeshStandardMaterial({ color:0xcaa24a }));
@@ -242,12 +253,7 @@ function buildStoreScene(){
   // プレイヤー（店長＝箱人間）
   player = makeHuman(0xffd27f);
   player.position.set(0,0, STORE.d/2 - 3);
-  // 手に持つドリンク（運搬中だけ表示）
-  const carryCup = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.13,0.26,10), new THREE.MeshStandardMaterial({ color:0xfff0d0 }));
-  carryCup.position.set(0.32,1.0,0.28); carryCup.visible=false; player.add(carryCup);
-  player.userData.carryCup = carryCup;
-  player.userData.carrying = 0;   // 運んでいるドリンク数
-  player.userData.task = null;    // {type:'brew'} | {type:'serve', cust}
+  player.userData.task = null;    // {type:'serve'}
   scene.add(player);
 
   scene._isStore = true;
@@ -327,30 +333,27 @@ function onClick(e){
     const hit = raycaster.intersectObject(myCafeMesh, false)[0];
     if(hit) enterStore();
   } else {
-    // 客タップ：待ち客=提供へ向かう / くつろぎ客=会話
+    // 客タップ：並んでる客=レジで接客 / くつろぎ客=会話
     const meshes = customers.map(c=>c.group.userData.body);
     const chit = raycaster.intersectObjects(meshes, false)[0];
     if(chit){
       const cust = customers.find(c=>c.group.userData.body===chit.object);
       if(cust){
-        if(cust.state==='WAIT') setServeTask(cust);
-        else talkTo(cust);
+        if(cust.state==='QUEUE') goServeFront();
+        else if(cust.state==='SEATED') talkTo(cust);
         return;
       }
     }
-    // カウンタータップ：ドリンクを用意しに行く
+    // レジ（カウンター）タップ：先頭客を接客しに行く
     if(counterMesh){
       const khit = raycaster.intersectObject(counterMesh, false)[0];
-      if(khit){ setBrewTask(); return; }
+      if(khit){ goServeFront(); return; }
     }
     // それ以外は床タップ＝その地点へ移動
     const fhit = raycaster.intersectObject(storeFloor, false)[0];
     if(fhit) setMoveTarget(fhit.point);
   }
 }
-
-// カウンター前の作業位置
-const COUNTER_SPOT = new THREE.Vector3(-3, 0, -STORE.d/2 + 3.0);
 
 // タップした床地点へ歩く（タスク無し）
 function setMoveTarget(point){
@@ -361,54 +364,33 @@ function setMoveTarget(point){
   moveMarker.position.set(x, 0.03, z);
   moveMarker.material.opacity = 0.95;
 }
-// カウンターでドリンクを用意（trayを満タンに）
-function setBrewTask(){
-  player.userData.task = { type:'brew' };
-  player.userData.moveTarget = COUNTER_SPOT.clone();
-  moveMarker.position.set(COUNTER_SPOT.x, 0.03, COUNTER_SPOT.z);
+// レジへ向かい、行列の先頭客を接客する
+function goServeFront(){
+  if(queue.length===0) return;
+  player.userData.task = { type:'serve' };
+  player.userData.moveTarget = BARISTA_SPOT.clone();
+  moveMarker.position.set(BARISTA_SPOT.x, 0.03, BARISTA_SPOT.z);
   moveMarker.material.opacity = 0.95;
 }
-// 待ち客に提供しに行く
-function setServeTask(cust){
-  const sp = cust.seat.pos.clone(); sp.z += 1.0;   // 席の少し手前
-  player.userData.task = { type:'serve', cust };
-  player.userData.moveTarget = sp;
-  moveMarker.position.set(sp.x, 0.03, sp.z);
-  moveMarker.material.opacity = 0.95;
-}
-// 目的地に着いたときタスクを実行
+// 目的地（レジ）に着いたときタスクを実行：先頭客に提供
 function arriveTask(){
   const task = player.userData.task;
   player.userData.task = null;
-  if(!task) return;
-  if(task.type==='brew'){
-    player.userData.carrying = TRAY_MAX;
-    updateCarryUI();
-    floatText(player, '☕ 用意完了 ×'+TRAY_MAX);
-  } else if(task.type==='serve'){
-    const c = task.cust;
-    if(!c || c.state!=='WAIT') return;          // もう帰った等
-    if(player.userData.carrying>0){
-      player.userData.carrying--; updateCarryUI();
-      c.state='SERVED'; c.t=0;
-      removeOrderTag(c);
-      const ratio = Math.max(0, c.patience/c.patienceMax);
-      const tip = Math.round(c.pay*ratio*0.3);   // 早いほどチップ
-      const total = c.pay + tip;
-      sim.money += total; sim.revToday += total; sim.servedToday++;
-      floatText(c.group, '+¥'+total + (tip>0?' ⭐':''));
-    } else {
-      floatText(player, 'カウンターで用意して！');
-    }
-  }
-}
-// 運搬中UI（頭上カップ＋バッジ）
-function updateCarryUI(){
-  const n = player.userData.carrying;
-  if(player.userData.carryCup) player.userData.carryCup.visible = n>0;
-  const badge = document.getElementById('carry');
-  badge.textContent = n>0 ? ('🫖 ドリンク ×'+n) : '';
-  badge.style.display = n>0 ? 'block' : 'none';
+  if(!task || task.type!=='serve') return;
+  const c = queue[0];
+  if(!c || c.state!=='QUEUE') return;           // 先頭がいない/もう帰った
+  queue.shift();                                 // 列から外す（後続が前進）
+  removeOrderTag(c);
+  const ratio = Math.max(0, c.patience/c.patienceMax);
+  const tip = Math.round(c.pay*ratio*0.3);       // 待たせないほどチップ
+  const total = c.pay + tip;
+  sim.money += total; sim.revToday += total; sim.servedToday++;
+  // 受け取ったドリンクを頭上に（演出）
+  floatText(c.group, '☕ +¥'+total + (tip>0?' ⭐':''));
+  // 空席があれば席へ、満席ならテイクアウトで退店（支払い済み）
+  const seat = seats.find(s=>!s.occupied);
+  if(seat){ seat.occupied=true; c.seat=seat; c.state='GO_SEAT'; }
+  else { c.state='LEAVE'; }
 }
 
 // =====================================================================
@@ -421,7 +403,7 @@ function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTa
 btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
-    ? 'カウンターをタップ→ドリンク用意 ／ 待ち客をタップ→提供 ／ 床タップで移動'
+    ? 'レジ／並んでる客をタップ→先頭から注文を提供 ／ くつろぐ客をタップ→会話 ／ 床タップで移動'
     : '自分のカフェ（オレンジの建物）をタップして中に入る';
 }
 
@@ -445,57 +427,61 @@ const MENU = [
 function trySpawnCustomer(dtGameMin){
   // 営業時間内のみ。時間あたりの来店ペース（仮）
   spawnAccum += dtGameMin;
-  const interval = 6; // ゲーム内6分ごとに来店判定
+  const interval = 7; // ゲーム内7分ごとに来店判定
   while(spawnAccum >= interval){
     spawnAccum -= interval;
-    const free = seats.find(s=>!s.occupied);
-    if(!free) continue;                 // 満席なら来ない
-    if(Math.random() < 0.7) spawnCustomer(free);
+    if(queue.length >= QUEUE_MAX) continue;   // 行列が一杯なら入店しない
+    if(Math.random() < 0.6) spawnCustomer();
   }
 }
 
-function spawnCustomer(seat){
-  seat.occupied = true;
+function spawnCustomer(){
   const persona = PERSONAS[(Math.random()*PERSONAS.length)|0];
   const g = makeHuman(CUST_COLORS[(Math.random()*CUST_COLORS.length)|0]);
   g.position.set(0,0, STORE.d/2 - 1);   // 入口から
   storeScene.add(g);
   const order = MENU[(Math.random()*MENU.length)|0];
   const cust = {
-    group:g, seat, state:'ENTER', t:0, persona, order,
-    stay: 60 + Math.random()*70,                 // 提供後の滞在(ゲーム分)
-    patience: 80 + Math.random()*50,             // 待てる時間(ゲーム分)
+    group:g, seat:null, state:'QUEUE', t:0, persona, order,
+    stay: 60 + Math.random()*70,                 // 着席後の滞在(ゲーム分)
+    patience: 90 + Math.random()*60,             // 列で待てる時間(ゲーム分)
     pay: Math.round(SEAT_PRICE*(0.7+Math.random()*0.8)),
     tag:null,
   };
   cust.patienceMax = cust.patience;
   customers.push(cust);
+  queue.push(cust);          // 入店＝注文の列に並ぶ
   sim.custToday++;
+  makeOrderTag(cust);        // 注文（頭上に表示）
 }
 
 function updateCustomers(dtReal, dtGameMin){
   const speed = 2.2 * dtReal; // 歩行速度
   for(let i=customers.length-1;i>=0;i--){
     const c = customers[i];
-    if(c.state==='ENTER'){
-      if(stepToward(c.group.position, c.seat.pos, speed)){
-        c.state='WAIT';            // 着席→注文して待つ
-        makeOrderTag(c);
-      }
-    } else if(c.state==='WAIT'){
+    if(c.state==='QUEUE'){
+      // 自分の並び位置へ歩く（先頭が抜けると前に詰める）
+      const idx = queue.indexOf(c);
+      const spot = queueSpots[Math.min(idx, queueSpots.length-1)];
+      stepToward(c.group.position, spot, speed);
+      c.group.rotation.y = Math.PI;   // カウンターを向く
+      // 列で待つ間、我慢が減る
       c.patience -= dtGameMin;
-      if(c.patience<=0){           // 我慢の限界→怒って退店（支払いなし）
+      if(c.patience<=0){              // 我慢の限界→怒って退店（支払いなし）
+        const qi = queue.indexOf(c); if(qi>=0) queue.splice(qi,1);
         c.state='LEAVE'; c.angry=true; sim.lostToday++;
         removeOrderTag(c);
         floatText(c.group, '💢 帰っちゃった…');
       }
-    } else if(c.state==='SERVED'){
+    } else if(c.state==='GO_SEAT'){
+      if(stepToward(c.group.position, c.seat.pos, speed)){ c.state='SEATED'; c.t=0; }
+    } else if(c.state==='SEATED'){
       c.t += dtGameMin;
       if(c.t >= c.stay){ c.state='LEAVE'; }
     } else if(c.state==='LEAVE'){
       const exit = new THREE.Vector3(0,0, STORE.d/2 - 0.5);
       if(stepToward(c.group.position, exit, speed)){
-        c.seat.occupied=false;
+        if(c.seat) c.seat.occupied=false;
         storeScene.remove(c.group);
         removeOrderTag(c);
         if(c._bubble) c._bubble.remove();
@@ -668,10 +654,10 @@ document.getElementById('m-next').onclick = ()=>{
   // 翌日リセット
   sim.day++; sim.custToday=0; sim.revToday=0; sim.servedToday=0; sim.lostToday=0; sim.minutes=OPEN_MIN;
   // 居残り客を片付け
-  for(const c of customers){ c.seat.occupied=false; storeScene.remove(c.group); removeOrderTag(c); if(c._bubble)c._bubble.remove(); }
-  customers.length=0; spawnAccum=0;
+  for(const c of customers){ if(c.seat) c.seat.occupied=false; storeScene.remove(c.group); removeOrderTag(c); if(c._bubble)c._bubble.remove(); }
+  customers.length=0; queue.length=0; spawnAccum=0;
   // 店長の状態リセット
-  player.userData.carrying=0; player.userData.task=null; updateCarryUI();
+  player.userData.task=null; player.userData.moveTarget=null;
   modal.classList.remove('show');
   sim.speed=1; syncSpeedUI();
 };
