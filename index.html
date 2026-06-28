@@ -11,14 +11,15 @@
   html,body{margin:0; height:100%; overflow:hidden; background:#10141a;
     font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; color:var(--txt);}
   #app{position:fixed; inset:0;}
-  canvas{display:block;}
+  canvas{display:block; touch-action:none;}
 
   /* ---- HUD ---- */
   .hud{position:fixed; left:0; right:0; top:0; padding:12px; display:flex; gap:10px; align-items:flex-start; pointer-events:none;}
   .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 12px; backdrop-filter:blur(6px); pointer-events:auto;}
   .stats{display:flex; gap:16px;}
-  .stat .v{font-size:18px; font-weight:800; line-height:1;}
-  .stat .l{font-size:10px; color:var(--sub); margin-top:3px;}
+  .stat{flex-shrink:0;}
+  .stat .v{font-size:18px; font-weight:800; line-height:1; white-space:nowrap;}
+  .stat .l{font-size:10px; color:var(--sub); margin-top:3px; white-space:nowrap;}
   .gold{color:var(--gold);} .green{color:var(--green);} .acc{color:var(--accent);}
   .clock{font-variant-numeric:tabular-nums;}
   .spacer{flex:1;}
@@ -53,6 +54,19 @@
 
   /* ---- loading ---- */
   #load{position:fixed; inset:0; display:grid; place-items:center; background:#10141a; z-index:100; font-size:14px; color:var(--sub);}
+
+  /* ---- スマホ縦画面の調整 ---- */
+  @media (max-width:480px){
+    .hud{padding:8px; gap:6px; flex-wrap:wrap;}
+    .stats{gap:12px;}
+    .panel{padding:6px 9px;}
+    .stat .v{font-size:15px;}
+    .timectrl{gap:5px;}
+    .tbtn{padding:6px 9px;}
+    .hint{font-size:11px; max-width:92vw; white-space:normal; text-align:center; line-height:1.4; bottom:66px;}
+    .bottom{padding:10px;}
+    .btn{padding:12px 14px; font-size:13px;}
+  }
 </style>
 </head>
 <body>
@@ -150,6 +164,8 @@ function addLights(scene, intensity=1){
 const STORE = { w: 16, d: 12 };   // 店の床サイズ
 const seats = [];                 // 座席 {pos, occupied}
 let player;                       // プレイヤー（店長）
+let storeFloor;                   // 床（タップ移動のレイキャスト対象）
+let moveMarker;                   // タップ先マーカー
 const customers = [];             // 客リスト
 
 function buildStoreScene(){
@@ -165,6 +181,15 @@ function buildStoreScene(){
   );
   floor.rotation.x = -Math.PI/2; floor.receiveShadow = true;
   scene.add(floor);
+  storeFloor = floor;
+
+  // タップ移動の目的地マーカー（リング）
+  moveMarker = new THREE.Mesh(
+    new THREE.RingGeometry(0.3, 0.46, 22),
+    new THREE.MeshBasicMaterial({ color:0xffce4d, transparent:true, opacity:0, side:THREE.DoubleSide })
+  );
+  moveMarker.rotation.x = -Math.PI/2; moveMarker.position.y = 0.03;
+  scene.add(moveMarker);
 
   // 壁（3面・正面は開口＝入口側）
   const wallMat = new THREE.MeshStandardMaterial({ color:0x8a6c4a });
@@ -278,14 +303,26 @@ function onClick(e){
     const hit = raycaster.intersectObject(myCafeMesh, false)[0];
     if(hit) enterStore();
   } else {
-    // 客クリックで会話
+    // 客タップ＝会話を優先
     const meshes = customers.map(c=>c.group.userData.body);
-    const hit = raycaster.intersectObjects(meshes, false)[0];
-    if(hit){
-      const cust = customers.find(c=>c.group.userData.body===hit.object);
-      if(cust) talkTo(cust);
+    const chit = raycaster.intersectObjects(meshes, false)[0];
+    if(chit){
+      const cust = customers.find(c=>c.group.userData.body===chit.object);
+      if(cust){ talkTo(cust); return; }
     }
+    // それ以外は床タップ＝その地点へ移動
+    const fhit = raycaster.intersectObject(storeFloor, false)[0];
+    if(fhit) setMoveTarget(fhit.point);
   }
+}
+
+// タップした床地点へ歩く目的地をセット
+function setMoveTarget(point){
+  const x = THREE.MathUtils.clamp(point.x, -STORE.w/2+0.6, STORE.w/2-0.6);
+  const z = THREE.MathUtils.clamp(point.z, -STORE.d/2+0.6, STORE.d/2-0.6);
+  player.userData.moveTarget = new THREE.Vector3(x, 0, z);
+  moveMarker.position.set(x, 0.03, z);
+  moveMarker.material.opacity = 0.95;
 }
 
 // =====================================================================
@@ -293,13 +330,13 @@ function onClick(e){
 // =====================================================================
 const btnMode = document.getElementById('btn-mode');
 const hint = document.getElementById('hint');
-function enterStore(){ sim.mode='store'; btnMode.textContent='街に出る（俯瞰）'; updateHint(); }
-function enterOverview(){ sim.mode='overview'; btnMode.textContent='店に入る'; clearBubble(); updateHint(); }
+function enterStore(){ sim.mode='store'; if(player) player.userData.moveTarget=null; btnMode.textContent='街に出る（俯瞰）'; updateHint(); }
+function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTarget=null; btnMode.textContent='店に入る'; clearBubble(); updateHint(); }
 btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
-    ? 'WASD / 矢印キーで店長を移動 ・ 客をクリックで会話 ・ 時間は常に進行中'
-    : '自分のカフェ（オレンジの建物）をクリックして中に入る';
+    ? '床をタップした場所へ移動 ・ 客をタップで会話 ・ 時間は常に進行中（PCはWASDも可）'
+    : '自分のカフェ（オレンジの建物）をタップして中に入る';
 }
 
 // =====================================================================
@@ -431,11 +468,30 @@ function updatePlayer(dt){
   if(keys.KeyS||keys.ArrowDown) vz+=1;
   if(keys.KeyA||keys.ArrowLeft) vx-=1;
   if(keys.KeyD||keys.ArrowRight) vx+=1;
+
   if(vx||vz){
+    // キーボード操作（タップ移動は中断）
+    player.userData.moveTarget = null;
     const l=Math.hypot(vx,vz); vx/=l; vz/=l;
     player.position.x = THREE.MathUtils.clamp(player.position.x+vx*sp, -STORE.w/2+0.6, STORE.w/2-0.6);
     player.position.z = THREE.MathUtils.clamp(player.position.z+vz*sp, -STORE.d/2+0.6, STORE.d/2-0.6);
     player.rotation.y = Math.atan2(vx,vz);
+  } else if(player.userData.moveTarget){
+    // タップ移動：目的地へ歩く
+    const t = player.userData.moveTarget;
+    const dx=t.x-player.position.x, dz=t.z-player.position.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist<0.15){ player.userData.moveTarget=null; }
+    else{
+      player.position.x += dx/dist*Math.min(sp,dist);
+      player.position.z += dz/dist*Math.min(sp,dist);
+      player.rotation.y = Math.atan2(dx,dz);
+    }
+  }
+
+  // マーカーをゆっくりフェードアウト
+  if(moveMarker && moveMarker.material.opacity>0){
+    moveMarker.material.opacity = Math.max(0, moveMarker.material.opacity - dt*0.5);
   }
 }
 
