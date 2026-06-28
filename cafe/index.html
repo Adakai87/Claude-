@@ -480,31 +480,49 @@ function buildStoreScene(){
   return scene;
 }
 
-// 箱人間（体＋頭）。Group を返す
+// 人型キャラ（頭・髪・胴・腕・脚）。Group を返す
+const SKIN_TONES = [0xf3d6b0, 0xe8c49a, 0xd9a877, 0xc8915f];
+const HAIR_TONES = [0x2a1d12, 0x171717, 0x4a3018, 0x6b4a2a, 0x8a6a3a];
 function makeHuman(color, accessory){
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.7, 4, 10), new THREE.MeshStandardMaterial({ color }));
-  body.position.y = 0.75; body.castShadow=true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color:0xf3d6b0 }));
+  const skin = SKIN_TONES[(Math.random()*SKIN_TONES.length)|0];
+  const hairCol = HAIR_TONES[(Math.random()*HAIR_TONES.length)|0];
+  const shirtMat = new THREE.MeshStandardMaterial({ color });
+  // 脚（ズボン）
+  const pantMat = new THREE.MeshStandardMaterial({ color:0x39414f });
+  const legGeo = new THREE.CapsuleGeometry(0.1, 0.42, 4, 8);
+  const lL = new THREE.Mesh(legGeo, pantMat); lL.position.set(-0.12, 0.33, 0); lL.castShadow=true; g.add(lL);
+  const lR = lL.clone(); lR.position.x = 0.12; g.add(lR);
+  // 胴（シャツ＝ペルソナ色）
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.46, 6, 12), shirtMat);
+  torso.position.y = 0.95; torso.castShadow=true; g.add(torso);
+  // 腕
+  const armGeo = new THREE.CapsuleGeometry(0.075, 0.4, 4, 8);
+  const aL = new THREE.Mesh(armGeo, shirtMat); aL.position.set(-0.31, 0.98, 0); aL.rotation.z = 0.18; aL.castShadow=true; g.add(aL);
+  const aR = aL.clone(); aR.position.x = 0.31; aR.rotation.z = -0.18; g.add(aR);
+  // 首・頭
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.1,8), new THREE.MeshStandardMaterial({ color:skin }));
+  neck.position.y = 1.27; g.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 16), new THREE.MeshStandardMaterial({ color:skin }));
   head.position.y = 1.45; head.castShadow=true; g.add(head);
-  g.userData.body = body;
-  // ペルソナ別アクセサリ（見分け用）
+  // 髪（上半分のキャップ）
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 18, 12, 0, Math.PI*2, 0, Math.PI*0.62), new THREE.MeshStandardMaterial({ color:hairCol }));
+  hair.position.y = 1.475; g.add(hair);
+  g.userData.body = torso;   // クリック判定用
+  // ペルソナ別アクセサリ
   if(accessory==='bag'){            // 学生：リュック
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.52,0.24), new THREE.MeshStandardMaterial({color:0x2f9e63}));
-    m.position.set(0,0.95,-0.33); m.castShadow=true; g.add(m);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.5,0.22), new THREE.MeshStandardMaterial({color:0x2f9e63}));
+    m.position.set(0,0.98,-0.3); m.castShadow=true; g.add(m);
   } else if(accessory==='case'){    // 会社員：ブリーフケース
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.26,0.1), new THREE.MeshStandardMaterial({color:0x20242b}));
-    m.position.set(0.44,0.6,0.12); m.castShadow=true; g.add(m);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.24,0.1), new THREE.MeshStandardMaterial({color:0x20242b}));
+    m.position.set(0.42,0.62,0.1); m.castShadow=true; g.add(m);
   } else if(accessory==='kid'){     // 家族連れ：子ども（横）
-    const k=new THREE.Group();
-    const kb=new THREE.Mesh(new THREE.CapsuleGeometry(0.18,0.34,4,8), new THREE.MeshStandardMaterial({color:0xffd27f}));
-    kb.position.y=0.42; kb.castShadow=true; k.add(kb);
-    const kh=new THREE.Mesh(new THREE.SphereGeometry(0.16,12,10), new THREE.MeshStandardMaterial({color:0xf3d6b0}));
-    kh.position.y=0.8; k.add(kh);
-    k.position.set(0.52,0,0.1); g.add(k);
-  } else if(accessory==='cam'){     // 観光客：カメラ
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.16,0.12), new THREE.MeshStandardMaterial({color:0x111418}));
-    m.position.set(0,1.02,0.3); m.castShadow=true; g.add(m);
+    const k=makeHuman(0xffb37f, null); k.scale.setScalar(0.6); k.position.set(0.56,0,0.1); g.add(k);
+  } else if(accessory==='cam'){     // 観光客：首かけカメラ
+    const strap=new THREE.Mesh(new THREE.TorusGeometry(0.18,0.02,6,16), new THREE.MeshStandardMaterial({color:0x111418}));
+    strap.position.set(0,1.18,0.02); strap.rotation.x=1.2; g.add(strap);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.14,0.1), new THREE.MeshStandardMaterial({color:0x111418}));
+    m.position.set(0,1.0,0.26); m.castShadow=true; g.add(m);
   }
   return g;
 }
