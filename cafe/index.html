@@ -104,7 +104,7 @@
   .thumb{width:58px; height:58px; border-radius:11px; overflow:hidden; flex-shrink:0; background:#11131c;}
   .thumb svg, .thumb .ethumb{width:100%; height:100%; display:block;}
   .ethumb{display:flex; align-items:center; justify-content:center;}
-  .ethumb svg{width:74%; height:74%;}
+  .ethumb svg{width:80%; height:80%;}
   .mcard .info{flex:1; min-width:0;}
   .mcard .ttl{font-weight:800; font-size:14.5px; line-height:1.3;}
   .mcard .meta{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.55;}
@@ -130,6 +130,24 @@
   /* ---- loading ---- */
   #load{position:fixed; inset:0; display:grid; place-items:center; background:#10141a; z-index:100; font-size:14px; color:var(--sub);}
 
+  /* タイトル / 設定 */
+  .overlay{position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(1000px 620px at 50% 18%, #2c1e12, #0c0a07);}
+  .overlay.hidden{display:none;}
+  .title-card{text-align:center; padding:24px; max-width:340px;}
+  .title-emblem{width:96px; height:96px; margin:0 auto 14px;}
+  .title-logo{font-size:38px; font-weight:900; letter-spacing:2px; color:var(--cream); line-height:1.1; text-shadow:0 4px 24px rgba(224,137,74,.45);}
+  .title-logo span{color:var(--accent);}
+  .title-sub{color:var(--sub); margin:12px 0 26px; font-size:14px; line-height:1.6;}
+  .title-card .btn{display:block; width:250px; margin:11px auto; padding:14px; font-size:15px;}
+  .title-card .btn:disabled{filter:grayscale(.7) brightness(.55); cursor:not-allowed;}
+  #btn-settings{position:fixed; top:166px; right:12px; z-index:30; pointer-events:auto;
+    background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:8px 12px; cursor:pointer;}
+  .toast-mini{position:fixed; left:50%; top:18px; transform:translateX(-50%); z-index:210; background:var(--panel);
+    border:1px solid var(--accent); color:var(--cream); border-radius:20px; padding:8px 18px; font-weight:800; font-size:13px;
+    opacity:0; transition:opacity .25s;}
+  .toast-mini.show{opacity:1;}
+
   /* ---- スマホ縦画面の調整 ---- */
   @media (max-width:480px){
     .hud{padding:8px; gap:6px; flex-wrap:wrap;}
@@ -147,6 +165,36 @@
 <body>
 <div id="app"></div>
 <div id="load">読み込み中…</div>
+<div id="toast-mini" class="toast-mini"></div>
+
+<!-- タイトル画面 -->
+<div id="title" class="overlay">
+  <div class="title-card">
+    <svg class="title-emblem" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="48" cy="48" r="46" fill="#1a140e" stroke="#e0894a" stroke-width="3"/>
+      <path d="M30 44 h30 v8 a15 15 0 0 1 -30 0 Z" fill="#f4efe9"/>
+      <path d="M34 47 h22 v4 a11 11 0 0 1 -22 0 Z" fill="#7a4a28"/>
+      <path d="M60 46 a8 8 0 0 1 0 14" fill="none" stroke="#f4efe9" stroke-width="4"/>
+      <path d="M40 36 c3 -3 -2 -6 1 -10 M48 36 c3 -3 -2 -6 1 -10 M56 36 c3 -3 -2 -6 1 -10" stroke="#caa24a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div class="title-logo">CAFE <span>TYCOON</span></div>
+    <div class="title-sub">街でいちばんのカフェ帝国をつくろう。<br>接客から経営、出店、上場まで。</div>
+    <button class="btn" id="t-new">新しく始める</button>
+    <button class="btn ghost" id="t-continue">つづきから</button>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="modal" id="modal-settings">
+  <div class="sheet" style="max-width:360px">
+    <h2>設定</h2>
+    <button class="btn" style="width:100%; margin:6px 0" id="set-save">今すぐセーブ</button>
+    <button class="btn ghost" style="width:100%; margin:6px 0" id="set-title">タイトルに戻る</button>
+    <button class="btn ghost" style="width:100%; margin:6px 0; border-color:var(--red); color:var(--red)" id="set-reset">最初からやり直す</button>
+    <button class="btn ghost" style="width:100%; margin:12px 0 0" id="set-close">閉じる</button>
+    <div class="note" style="text-align:left">進行は「翌日へ」進むたび自動セーブされます。同じURLを開けば続きから遊べます。</div>
+  </div>
+</div>
 
 <div class="hud">
   <div class="panel stats">
@@ -166,6 +214,7 @@
 <div class="carrybadge" id="carry" style="display:none"></div>
 <button id="btn-dash" title="ダッシュボード"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="2" y="10" width="3.6" height="7" rx="1"/><rect x="8.2" y="5" width="3.6" height="12" rx="1"/><rect x="14.4" y="2" width="3.6" height="15" rx="1"/></svg></button>
 <button id="btn-manage" title="経営（事務所）"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="3" y="3" width="9" height="14" rx="1"/><rect x="12" y="7" width="5" height="10" rx="1"/><g fill="#1a140e"><rect x="5" y="5.5" width="1.8" height="1.8"/><rect x="8" y="5.5" width="1.8" height="1.8"/><rect x="5" y="9" width="1.8" height="1.8"/><rect x="8" y="9" width="1.8" height="1.8"/><rect x="13.4" y="9.5" width="1.5" height="1.5"/></g></svg></button>
+<button id="btn-settings" title="設定"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path d="M10 6.5 a3.5 3.5 0 1 0 0 7 a3.5 3.5 0 0 0 0 -7 Z M10 8.5 a1.5 1.5 0 1 1 0 3 a1.5 1.5 0 0 1 0 -3 Z"/><path d="M10 1.6 l1.2 2.2 2.5 -.5 .3 2.5 2.2 1.2 -1.1 2.3 1.1 2.3 -2.2 1.2 -.3 2.5 -2.5 -.5 -1.2 2.2 -1.2 -2.2 -2.5 .5 -.3 -2.5 -2.2 -1.2 1.1 -2.3 -1.1 -2.3 2.2 -1.2 .3 -2.5 2.5 .5 Z" opacity=".55"/></svg></button>
 <div class="hint" id="hint"></div>
 
 <div class="bottom">
@@ -182,8 +231,11 @@
       <button class="m-tab" data-mtab="equip">設備</button>
       <button class="m-tab" data-mtab="store">店舗</button>
       <button class="m-tab" data-mtab="staff">人材</button>
+      <button class="m-tab" data-mtab="marketing">マーケ</button>
       <button class="m-tab" data-mtab="expand">展開</button>
+      <button class="m-tab" data-mtab="exec">幹部</button>
       <button class="m-tab" data-mtab="finance">資金</button>
+      <button class="m-tab" data-mtab="company">会社</button>
     </div>
     <div id="manage-body"></div>
     <button class="btn ghost" style="width:100%; margin-top:14px" id="manage-close">閉じる</button>
@@ -314,19 +366,77 @@ function mainComp(){
   c += staff.length;                     // 人員
   c += (1.1 - store.priceLevel)*4;       // 安いほど集客力（粗利とトレードオフ）
   c += extraUsed*0.4;                     // 席数
+  c += brand*0.09;                        // ブランド力
+  c += (qualityLevel()-1)*12;             // コーヒー品質
   return Math.max(2, c);
 }
 const branchComp = b => (b===branches[0] ? mainComp() : 6 + (b.level-1)*3);
 const playerComp = () => branches.reduce((a,b)=>a+branchComp(b), 0);
 const totalComp  = () => playerComp() + RIVALS.reduce((a,r)=>a+r.comp, 0);
 const playerShare= () => playerComp()/totalComp();
-// 支店の1日の純益（本店は実プレイで稼ぐので0）
+// 支店の1日の純益（本店は実プレイで稼ぐので0）。COOで効率UP
 function branchDailyNet(b){
   if(b===branches[0]) return 0;
-  const rev = Math.round(CITY_DEMAND * (branchComp(b)/totalComp()));
+  const rev = Math.round(CITY_DEMAND * (branchComp(b)/totalComp()) * (hasExec('coo')?1.2:1));
   return rev - (RENT[b.loc]||2500);     // 売上シェア − 支店家賃
 }
 const branchesDailyNet = () => branches.reduce((a,b)=>a+branchDailyNet(b), 0);
+
+// ==== Coffee Inc 寄せ：ブランド/マーケ・品質/豆・役員・企業/IPO ====
+// ブランド力（0-100）。マーケで上げ、毎日少し減衰
+let brand = 20;
+const MARKETING = [
+  {id:'sns',        name:'SNSキャンペーン',     cost:2000,  brand:6,  desc:'手軽に話題化（バズ狙い）'},
+  {id:'influencer', name:'インフルエンサー起用', cost:6000,  brand:14, desc:'映えで一気に拡散'},
+  {id:'outdoor',    name:'屋外広告',            cost:9000,  brand:18, desc:'街の認知度を底上げ'},
+  {id:'tvcm',       name:'テレビCM',            cost:20000, brand:32, desc:'全国区の知名度'},
+];
+const marketingMult = () => 1 + (hasExec('cmo')?0.4:0);
+function runCampaign(id){
+  const c = MARKETING.find(m=>m.id===id); if(!c || sim.money<c.cost) return;
+  sim.money -= c.cost; dayStats.capex += c.cost;
+  brand = Math.min(100, brand + c.brand*marketingMult());
+}
+// コーヒー豆のグレード＝品質
+const beans = { grade:1, max:5 };
+const BEAN_NAMES = ['ハウスブレンド','セレクト','スペシャルティ','シングルオリジン','マイクロロット'];
+const beanUpCost = () => 4000 + (beans.grade-1)*4500;
+function upgradeBeans(){ if(beans.grade>=beans.max) return; const c=beanUpCost(); if(sim.money<c) return; sim.money-=c; dayStats.capex+=c; beans.grade++; }
+const qualityLevel = () => 1 + (beans.grade-1)*0.18 + (equip.machine.lv-1)*0.06 + (hasExec('cto')?0.15:0);
+// 役員（C-level）。雇うと日次の役員報酬が固定費に乗り、能力ボーナス
+const execRoles = {
+  coo:{ name:'COO 最高執行責任者', salary:8000, desc:'支店の運営効率＝純益+20%', hired:false },
+  cfo:{ name:'CFO 最高財務責任者', salary:8000, desc:'運用益+1%/日・借入金利を軽減', hired:false },
+  cmo:{ name:'CMO 最高マーケ責任者', salary:8000, desc:'ブランド維持・マーケ効果+40%', hired:false },
+  cto:{ name:'CTO 最高技術責任者', salary:8000, desc:'品質+・新メニュー開発費-30%', hired:false },
+};
+const hasExec = k => execRoles[k].hired;
+const execSalaries = () => Object.values(execRoles).reduce((a,e)=>a+(e.hired?e.salary:0), 0);
+function toggleExec(k){ execRoles[k].hired = !execRoles[k].hired; }
+const investRateEff = () => INVEST_RATE + (hasExec('cfo')?0.01:0);
+const loanRateEff   = () => Math.max(0.006, LOAN_RATE - (hasExec('cfo')?0.008:0));
+const devDiscount   = () => hasExec('cto')?0.7:1;
+const brandDecay    = () => hasExec('cmo')?1:3;
+// 会社（企業価値・IPO・配当）
+const company = { public:false, dividendsPaid:0, ipoRaised:0 };
+let lastProfit = 0;   // 直近の総損益（企業価値の素）
+function storeAssets(){ return branches.length*15000 + extraUsed*1200 + Object.values(equip).reduce((a,e)=>a+(e.lv-1)*2500,0); }
+function valuation(){
+  return Math.max(0, Math.round(brand*2200 + playerShare()*150000 + Math.max(0,lastProfit)*200 + storeAssets() + finance.invest));
+}
+function netWorth(){ return sim.money + Math.round(finance.invest) + storeAssets() - finance.debt; }
+function doIPO(){
+  if(company.public) return;
+  if(valuation() < 120000) return;          // 上場には企業価値12万以上
+  const raised = Math.round(valuation()*0.3);
+  company.public = true; company.ipoRaised = raised;
+  sim.money += raised; brand = Math.min(100, brand+10);
+}
+function payDividend(){
+  if(sim.money < 10000) return;
+  sim.money -= 10000; company.dividendsPaid += 10000;
+  brand = Math.min(100, brand + 4);          // 株主・市場の評価UP
+}
 // 俯瞰マップにデザイン性のあるカフェ建物（屋根・ストライプ日除け・ドア・窓・看板・カップ看板）
 const cafeCups = [];
 function makeCafeBuilding(color, x, z, accent){
@@ -638,7 +748,7 @@ function serveOne(){
   queue.shift();                                 // 列から外す（後続が前進）
   removeOrderTag(c);
   const ratio = Math.max(0, c.patience/c.patienceMax);
-  const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1)*qualityMult());   // 待たせない×ペルソナ×常連×設備品質
+  const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1)*qualityLevel());   // 待たせない×ペルソナ×常連×品質
   const total = c.pay + tip;
   sim.money += total; sim.revToday += total; sim.servedToday++;
   dayStats.sold[c.order.id] = (dayStats.sold[c.order.id]||0) + 1;  // 商品別の販売を記録
@@ -822,13 +932,13 @@ function trySpawnCustomer(dtGameMin){
   while(spawnAccum >= interval){
     spawnAccum -= interval;
     if(queue.length >= queueCap()) continue;   // 行列が一杯なら入店しない（設備で拡張）
-    if(Math.random() < 0.6) spawnCustomer();
+    if(Math.random() < 0.4 + brand/200) spawnCustomer();   // ブランド力で集客UP
   }
 }
 
 function spawnCustomer(){
   // 常連が来るか？（日が経つほど確率UP、最大45%）
-  const regChance = Math.min(0.5, 0.08 + sim.day*0.04 + (equip.decor.lv-1)*0.02);
+  const regChance = Math.min(0.55, 0.08 + sim.day*0.04 + (equip.decor.lv-1)*0.02 + (beans.grade-1)*0.02 + brand/800);
   let regular=null, persona;
   if(Math.random() < regChance){
     regular = REGULARS[(Math.random()*REGULARS.length)|0];
@@ -1088,18 +1198,19 @@ document.getElementById('btn-close').onclick = ()=>{
 };
 // 日次PL（営業損益）
 function plRent(){ return RENT[store.location]||0; }
-function plInterest(){ return Math.round(finance.debt*LOAN_RATE); }
+function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
 function plBreakdown(){
   const tips = dayStats.tips;
   const sales = dayStats.revenue - tips;
-  const rent = plRent(), interest = plInterest(), wages = staffWage();
-  const op = sales + tips - dayStats.cogs - wages - rent - interest;
+  const rent = plRent(), interest = plInterest(), wages = staffWage(), execSal = execSalaries();
+  const op = sales + tips - dayStats.cogs - wages - execSal - rent - interest;
   const row = (l,v,neg)=>`<div class="row"><span>${l}</span><span style="${neg?'color:var(--red)':''}">${neg?'−':''}¥${Math.abs(v).toLocaleString('ja-JP')}</span></div>`;
   let h = `<div class="dash-h">日次損益（PL）</div>`;
   h += row('売上（商品）', sales);
   h += row('チップ', tips);
   h += row('仕入（原価）', dayStats.cogs, true);
   if(wages>0) h += row('人件費', wages, true);
+  if(execSal>0) h += row('役員報酬', execSal, true);
   h += row(`家賃（${LOC_JP[store.location]}）`, rent, true);
   if(interest>0) h += row('借入利息', interest, true);
   const bnet = branchesDailyNet();
@@ -1110,7 +1221,8 @@ function plBreakdown(){
     const tot = op + bnet;
     h += `<div class="row" style="border-bottom:0"><span><b>総損益</b></span><b style="color:${tot>=0?'var(--gold)':'var(--red)'}">${tot<0?'−':''}¥${Math.abs(tot).toLocaleString('ja-JP')}</b></div>`;
   }
-  if(dayStats.capex>0) h += `<div class="note">※ 別途 設備投資・出店 −¥${dayStats.capex.toLocaleString('ja-JP')}（現金から支出済み）</div>`;
+  lastProfit = op + branchesDailyNet();      // 企業価値の素として記録
+  if(dayStats.capex>0) h += `<div class="note">※ 別途 設備投資・出店・販促 −¥${dayStats.capex.toLocaleString('ja-JP')}（現金から支出済み）</div>`;
   return h;
 }
 function miniBreakdown(){
@@ -1121,10 +1233,11 @@ function miniBreakdown(){
           <div class="row"><span>売れ筋商品</span><span>${topM&&topM.v? topM.n+`（${topM.v}杯）`:'—'}</span></div>`;
 }
 document.getElementById('m-next').onclick = ()=>{
-  // 家賃・利息・人件費を清算、支店純益を加算、運用を増やす
-  sim.money -= plRent() + plInterest() + staffWage();
+  // 家賃・利息・人件費・役員報酬を清算、支店純益を加算、運用を増やす、ブランド減衰
+  sim.money -= plRent() + plInterest() + staffWage() + execSalaries();
   sim.money += branchesDailyNet();
-  finance.invest = Math.round(finance.invest * (1 + INVEST_RATE));
+  finance.invest = Math.round(finance.invest * (1 + investRateEff()));
+  brand = Math.max(0, brand - brandDecay());
   // 本日分を累計へ移す
   mergeInto(totalStats, dayStats); dayStats = blankStats();
   // 翌日リセット
@@ -1136,6 +1249,7 @@ document.getElementById('m-next').onclick = ()=>{
   player.userData.task=null; player.userData.moveTarget=null;
   modal.classList.remove('show');
   sim.speed=1; syncSpeedUI();
+  saveGame();   // 翌日へ進むたび自動セーブ
 };
 function syncSpeedUI(){
   document.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', +x.dataset.speed===sim.speed));
@@ -1212,15 +1326,15 @@ const ART = {
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
-  coffee: di(`<ellipse cx="18" cy="31" rx="12" ry="2.2" fill="#000" opacity=".12"/><path d="M8 16 h20 v6 a10 10 0 0 1 -20 0 Z" fill="#f4efe9"/><path d="M10 18 h16 v3.5 a8 8 0 0 1 -16 0 Z" fill="#7a4a28"/><path d="M28 17 a5 5 0 0 1 0 9" fill="none" stroke="#f4efe9" stroke-width="2.6"/><path d="M14 13 c2 -2 -1 -4 1 -6 M19 13 c2 -2 -1 -4 1 -6" stroke="#cdd3da" stroke-width="1.5" fill="none" stroke-linecap="round"/>`),
+  coffee: di(`<ellipse cx="20" cy="32" rx="11" ry="2" fill="#000" opacity=".12"/><path d="M9 16 h18 v6 a9 9 0 0 1 -18 0 Z" fill="#f4efe9"/><path d="M11 18 h14 v3.4 a7 7 0 0 1 -14 0 Z" fill="#7a4a28"/><path d="M27 17 a4.6 4.6 0 0 1 0 8.4" fill="none" stroke="#f4efe9" stroke-width="2.4"/><path d="M16 13 c2 -2 -1 -4 1 -6 M22 13 c2 -2 -1 -4 1 -6" stroke="#cdd3da" stroke-width="1.5" fill="none" stroke-linecap="round"/>`),
   latte: di(`<path d="M13 9 h14 l-1.5 25 a3 3 0 0 1 -3 2.6 h-5 a3 3 0 0 1 -3 -2.6 Z" fill="#e9eef3" opacity=".55"/><path d="M13.4 19 h13.2 l-1 15 a3 3 0 0 1 -3 2.4 h-5.2 a3 3 0 0 1 -3 -2.4 Z" fill="#c79a6a"/><path d="M13 9 h14 l-.45 8 h-13.1 Z" fill="#f7f3ee"/>`),
-  matcha: di(`<ellipse cx="20" cy="31" rx="11" ry="2.2" fill="#000" opacity=".12"/><path d="M11 16 h18 v5.5 a9 9 0 0 1 -18 0 Z" fill="#ffffff"/><path d="M13 18 h14 v3 a7 7 0 0 1 -14 0 Z" fill="#86b94a"/><path d="M29 17 a4.5 4.5 0 0 1 0 8" fill="none" stroke="#ffffff" stroke-width="2.4"/>`),
-  boba: di(`<path d="M13 12 h14 l-1.5 22 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#caa07a"/><path d="M13 12 h14 l-.4 6 h-13.2 Z" fill="#ead3bd"/><rect x="22" y="5" width="2.6" height="22" rx="1.3" transform="rotate(12 23 16)" fill="#e0685e"/><g fill="#2a1a10"><circle cx="17" cy="31" r="1.5"/><circle cx="21" cy="32" r="1.5"/><circle cx="24" cy="30" r="1.5"/><circle cx="19" cy="29" r="1.5"/></g>`),
+  matcha: di(`<ellipse cx="20" cy="32" rx="10" ry="2" fill="#000" opacity=".12"/><path d="M9 16 h18 v5.5 a9 9 0 0 1 -18 0 Z" fill="#ffffff"/><path d="M11 18 h14 v3 a7 7 0 0 1 -14 0 Z" fill="#86b94a"/><path d="M27 17 a4.5 4.5 0 0 1 0 8" fill="none" stroke="#ffffff" stroke-width="2.3"/>`),
+  boba: di(`<path d="M13 12 h14 l-1.5 22 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#caa07a"/><path d="M13 12 h14 l-.4 6 h-13.2 Z" fill="#ead3bd"/><rect x="18.7" y="5" width="2.6" height="22" rx="1.3" transform="rotate(10 20 16)" fill="#e0685e"/><g fill="#2a1a10"><circle cx="17" cy="31" r="1.5"/><circle cx="21" cy="32" r="1.5"/><circle cx="24" cy="30.5" r="1.5"/><circle cx="19" cy="29" r="1.5"/></g>`),
   cake: di(`<path d="M6 30 h28" stroke="#caa24a" stroke-width="2" stroke-linecap="round"/><path d="M8 30 l12 -18 l12 18 Z" fill="#f7e2c0"/><path d="M8 30 l12 -18 l3 4.5 l-9 13.5 Z" fill="#e9b07a"/><circle cx="20" cy="12.5" r="2.1" fill="#e0685e"/>`),
   croissant: di(`<path d="M9 28 C9 14 31 14 31 28 C26 21 14 21 9 28 Z" fill="#d79a4e"/><path d="M13 24 l-2 3 M18 22 v3.5 M22 22 l1 3.5 M27 24 l2 3" stroke="#a9692a" stroke-width="1.4" stroke-linecap="round"/>`),
-  pudding: di(`<ellipse cx="20" cy="31" rx="11" ry="2" fill="#000" opacity=".12"/><path d="M11 19 a9 5 0 0 1 18 0 v7 a3 3 0 0 1 -3 3 h-12 a3 3 0 0 1 -3 -3 Z" fill="#f6d77a"/><path d="M11 18 a9 5 0 0 1 18 0 a9 4 0 0 1 -18 0 Z" fill="#9a5a2a"/>`),
+  pudding: di(`<ellipse cx="20" cy="32" rx="11" ry="2" fill="#000" opacity=".12"/><path d="M11 19 a9 5 0 0 1 18 0 v7 a3 3 0 0 1 -3 3 h-12 a3 3 0 0 1 -3 -3 Z" fill="#f6d77a"/><path d="M11 18 a9 5 0 0 1 18 0 a9 4 0 0 1 -18 0 Z" fill="#9a5a2a"/>`),
   sandwich: di(`<path d="M8 28 h24" stroke="#caa24a" stroke-width="2" stroke-linecap="round"/><path d="M8 28 l12 -16 l12 16 Z" fill="#f0cd86"/><path d="M12 23 h16 l-2.5 3.5 h-11 Z" fill="#7fb46a"/><path d="M14 20 h12 l-1.5 2 h-9 Z" fill="#e0685e"/>`),
-  seasonal: di(`<path d="M13 13 h14 l-1.5 21 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#ff9ec4"/><path d="M13 13 h14 l-.4 6 h-13.2 Z" fill="#ffd0e4"/><rect x="22" y="5" width="2.4" height="15" rx="1.2" transform="rotate(12 23 13)" fill="#3ddc97"/><path d="M25 8 q4 -3 5 1 q-4 1 -5 -1 Z" fill="#3ddc97"/>`),
+  seasonal: di(`<path d="M13 13 h14 l-1.5 21 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#ff9ec4"/><path d="M13 13 h14 l-.4 6 h-13.2 Z" fill="#ffd0e4"/><rect x="18.8" y="5" width="2.4" height="15" rx="1.2" transform="rotate(10 20 13)" fill="#3ddc97"/><path d="M21 8 q4 -3 5 1 q-4 1 -5 -1 Z" fill="#3ddc97"/>`),
 };
 const MAT_ART = {
   bean: di(`<ellipse cx="15" cy="20" rx="6" ry="9" transform="rotate(-25 15 20)" fill="#6b4226"/><path d="M15 12 q-2 8 0 16" stroke="#3a2414" stroke-width="1.5" fill="none"/><ellipse cx="25" cy="22" rx="6" ry="9" transform="rotate(20 25 22)" fill="#7a4e2c"/><path d="M25 14 q2 8 0 16" stroke="#3a2414" stroke-width="1.5" fill="none"/>`),
@@ -1250,11 +1364,18 @@ function renderManage(){
     h += `<div class="dash-h">メニュー開発</div>`;
     DEV_CATALOG.forEach((d,i)=>{
       const exists = MENU.some(m=>m.name===d.name);
-      const act = `<button class="mbtn" data-dev="${i}" ${exists||sim.money<d.devCost?'disabled':''}>${exists?'開発済':'開発'}</button>`;
-      h += mcard(menuThumb(d.id), d.name, `想定価格¥${d.basePrice}・開発費¥${d.devCost.toLocaleString('ja-JP')}`, act);
+      const cost = Math.round(d.devCost*devDiscount());
+      const act = `<button class="mbtn" data-dev="${i}" ${exists||sim.money<cost?'disabled':''}>${exists?'開発済':'開発'}</button>`;
+      h += mcard(menuThumb(d.id), d.name, `想定価格¥${d.basePrice}・開発費¥${cost.toLocaleString('ja-JP')}`, act);
     });
     h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
   } else if(mtab==='supply'){
+    h += `<div class="dash-h">コーヒー豆のグレード（品質）</div>`;
+    const bmax = beans.grade>=beans.max;
+    h += mcard(matThumb('bean'), `${BEAN_NAMES[beans.grade-1]} <b>Lv.${beans.grade}</b>`,
+      `品質指数 ${qualityLevel().toFixed(2)}（チップ・常連・シェアに効く）`,
+      `<button class="mbtn" data-bean="1" ${bmax||sim.money<beanUpCost()?'disabled':''}>${bmax?'最高級':'格上げ<br>¥'+beanUpCost().toLocaleString('ja-JP')}</button>`);
+    h += `<div class="dash-h">材料の在庫・仕入れ</div>`;
     for(const [k,mt] of Object.entries(materials)){
       const low = mt.stock < mt.buyAmt*0.5;
       const meta = `原価¥${mt.cost}/${mt.unit}・在庫 <span class="${low?'low':''}">${mt.stock}${mt.unit}</span>`;
@@ -1353,6 +1474,44 @@ function renderManage(){
       <button class="mbtn" data-deposit="10000" ${sim.money<10000?'disabled':''}>¥1万 預入</button>
       <button class="mbtn" data-withdraw="1" ${finance.invest<=0?'disabled':''}>全額引出</button></div>`;
     h += `<div class="note">毎日の閉店時に家賃と借入利息が引かれ、運用は+1.5%増えます。日次の損益は閉店サマリーで確認できます。</div>`;
+  } else if(mtab==='marketing'){
+    h += `<div class="dash-kpis">
+       <div class="kpi"><div class="v gold">${Math.round(brand)}</div><div class="l">ブランド力（0-100）</div></div>
+       <div class="kpi"><div class="v green">${Math.round(playerShare()*100)}%</div><div class="l">市場シェア</div></div></div>`;
+    h += `<div class="dash-h">マーケティング施策（ブランド↑＝集客・常連・シェアUP）</div>`;
+    MARKETING.forEach(m=>{
+      h += mcard(ART.pop, m.name, `${m.desc}・ブランド +${Math.round(m.brand*marketingMult())}`,
+        `<button class="mbtn" data-campaign="${m.id}" ${sim.money<m.cost?'disabled':''}>実施<br>¥${m.cost.toLocaleString('ja-JP')}</button>`);
+    });
+    h += `<div class="note">ブランドは毎日少し下がる（CMOがいると減衰が緩やか）。高ブランドほど客が増えシェアも上がります。</div>`;
+  } else if(mtab==='exec'){
+    h += `<div class="dash-h">役員（C-level）｜雇うと報酬が固定費に</div>`;
+    for(const [k,e] of Object.entries(execRoles)){
+      h += mcard(ART.staff, e.name, `${e.desc}・報酬¥${e.salary.toLocaleString('ja-JP')}/日`,
+        `<button class="mbtn ${e.hired?'on':''}" data-exec="${k}">${e.hired?'契約中':'招へい'}</button>`, e.hired);
+    }
+    h += `<div class="note">役員は会社全体に効く強力なボーナス。報酬は毎日の閉店PLに「役員報酬」として計上されます。</div>`;
+  } else if(mtab==='company'){
+    const val = valuation(), nw = netWorth();
+    const assets = sim.money + Math.round(finance.invest) + storeAssets();
+    h += `<div class="dash-kpis">
+       <div class="kpi"><div class="v gold">¥${val.toLocaleString('ja-JP')}</div><div class="l">企業価値</div></div>
+       <div class="kpi"><div class="v">${company.public?'上場済':'未上場'}</div><div class="l">ステータス</div></div>
+       <div class="kpi"><div class="v" style="${nw<0?'color:var(--red)':'color:var(--green)'}">¥${nw.toLocaleString('ja-JP')}</div><div class="l">純資産</div></div>
+       <div class="kpi"><div class="v">${Math.round(brand)}</div><div class="l">ブランド</div></div></div>`;
+    h += `<div class="dash-h">貸借（B/S）</div>`;
+    h += `<div class="mrow"><div class="nm">資産（現金＋運用＋店舗）</div><span>¥${assets.toLocaleString('ja-JP')}</span></div>`;
+    h += `<div class="mrow"><div class="nm">負債（借入）</div><span class="${finance.debt>0?'low':''}">¥${finance.debt.toLocaleString('ja-JP')}</span></div>`;
+    h += `<div class="mrow"><div class="nm"><b>純資産（資本）</b></div><b>¥${nw.toLocaleString('ja-JP')}</b></div>`;
+    h += `<div class="dash-h">資本政策</div>`;
+    if(!company.public){
+      h += mcard(ART.chic, 'IPO（株式上場）', val>=120000?'投資銀行と上場し企業価値の30%を調達':`企業価値12万以上で実施可（現在 ¥${val.toLocaleString('ja-JP')}）`,
+        `<button class="mbtn" data-ipo="1" ${val<120000?'disabled':''}>上場</button>`);
+    } else {
+      h += mcard(ART.chic, '上場企業', `調達¥${company.ipoRaised.toLocaleString('ja-JP')}・配当累計¥${company.dividendsPaid.toLocaleString('ja-JP')}`, '<span class="sub2">上場済</span>', true);
+    }
+    h += mcard(ART.cozy, '配当を出す', '¥1万を株主還元（ブランド+4）', `<button class="mbtn" data-dividend="1" ${sim.money<10000?'disabled':''}>配当</button>`);
+    h += `<div class="note">企業価値＝ブランド×シェア×利益×資産。上場で大型調達、配当で市場評価UP。</div>`;
   }
   el.innerHTML = h;
 }
@@ -1365,8 +1524,9 @@ document.getElementById('manage-body').addEventListener('click', e=>{
     const m = MENU.find(x=>x.id===t.dataset.toggle); if(m){ m.enabled=!m.enabled; recomputePriceLevel(); }
   } else if(t.dataset.dev!==undefined){
     const d = DEV_CATALOG[+t.dataset.dev];
-    if(d && sim.money>=d.devCost && !MENU.some(m=>m.name===d.name)){
-      sim.money -= d.devCost; dayStats.capex += d.devCost;
+    const cost = Math.round(d.devCost*devDiscount());
+    if(d && sim.money>=cost && !MENU.some(m=>m.name===d.name)){
+      sim.money -= cost; dayStats.capex += cost;
       MENU.push({ id:d.id, name:d.name, basePrice:d.basePrice, price:d.basePrice, enabled:true, recipe:d.recipe });
       recomputePriceLevel();
     }
@@ -1399,6 +1559,16 @@ document.getElementById('manage-body').addEventListener('click', e=>{
   } else if(t.dataset.upbranch!==undefined){
     const b = branches[+t.dataset.upbranch];
     if(b && b!==branches[0] && sim.money>=branchUpCost(b)){ sim.money-=branchUpCost(b); dayStats.capex+=branchUpCost(b); b.level++; }
+  } else if(t.dataset.bean){
+    upgradeBeans();
+  } else if(t.dataset.campaign){
+    runCampaign(t.dataset.campaign);
+  } else if(t.dataset.exec){
+    toggleExec(t.dataset.exec);
+  } else if(t.dataset.ipo){
+    doIPO();
+  } else if(t.dataset.dividend){
+    payDividend();
   }
   renderManage();
 });
@@ -1413,6 +1583,79 @@ document.querySelectorAll('.m-tab').forEach(t=>{
   };
 });
 recomputePriceLevel();   // 起動時に価格帯を算出
+
+// =====================================================================
+//  セーブ / ロード（localStorage）
+// =====================================================================
+const SAVE_KEY = 'cafeTycoon_v1';
+function gameState(){
+  return {
+    money:sim.money, day:sim.day, minutes:sim.minutes,
+    custToday:sim.custToday, revToday:sim.revToday, servedToday:sim.servedToday, lostToday:sim.lostToday,
+    store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location },
+    menu:MENU.map(m=>({id:m.id,name:m.name,basePrice:m.basePrice,price:m.price,enabled:m.enabled,recipe:m.recipe})),
+    materials:Object.fromEntries(Object.entries(materials).map(([k,v])=>[k,v.stock])),
+    equip:Object.fromEntries(Object.entries(equip).map(([k,e])=>[k,e.lv])),
+    extraUsed, beans:beans.grade, brand,
+    execs:Object.fromEntries(Object.entries(execRoles).map(([k,e])=>[k,e.hired])),
+    finance:{ debt:finance.debt, invest:finance.invest },
+    company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised },
+    lastProfit, spawnAccum,
+    branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level})),
+    staff:staff.map(s=>({name:s.name, skill:s.skill, wage:s.wage})),
+    loyalty:{...loyalty}, totalStats, dayStats,
+  };
+}
+function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(gameState())); return true; }catch(e){ return false; } }
+function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
+function loadGame(){
+  let d; try{ d=JSON.parse(localStorage.getItem(SAVE_KEY)); }catch(e){ return false; }
+  if(!d) return false;
+  sim.money=d.money; sim.day=d.day; sim.minutes=d.minutes;
+  sim.custToday=d.custToday||0; sim.revToday=d.revToday||0; sim.servedToday=d.servedToday||0; sim.lostToday=d.lostToday||0;
+  Object.assign(store, d.store||{});
+  if(d.menu){ MENU.length=0; d.menu.forEach(m=>MENU.push(m)); }
+  for(const k in (d.materials||{})) if(materials[k]) materials[k].stock=d.materials[k];
+  for(const k in (d.equip||{}))     if(equip[k]) equip[k].lv=d.equip[k];
+  for(const k in (d.execs||{}))     if(execRoles[k]) execRoles[k].hired=d.execs[k];
+  beans.grade=d.beans||1; brand=(d.brand!=null?d.brand:20);
+  if(d.finance){ finance.debt=d.finance.debt; finance.invest=d.finance.invest; }
+  if(d.company){ company.public=d.company.public; company.dividendsPaid=d.company.dividendsPaid; company.ipoRaised=d.company.ipoRaised; }
+  lastProfit=d.lastProfit||0; spawnAccum=d.spawnAccum||0;
+  Object.assign(loyalty, d.loyalty||{});
+  if(d.totalStats) totalStats=d.totalStats;
+  if(d.dayStats) dayStats=d.dayStats;
+  for(let i=0;i<(d.extraUsed||0);i++){ const sp=EXTRA_SLOTS[i]; if(sp) addTable(sp.x,sp.z); }
+  extraUsed=d.extraUsed||0;
+  if(d.branches&&d.branches[0]){ branches[0].name=d.branches[0].name; branches[0].loc=d.branches[0].loc; branches[0].level=d.branches[0].level; }
+  if(d.branches) for(let i=1;i<d.branches.length;i++){
+    const sb=d.branches[i], sp=BRANCH_SPOTS[i-1]; if(!sp) break;
+    const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null};
+    b.mesh=makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0xc9772e); b.mesh.userData.isCafe=true; branches.push(b);
+  }
+  if(d.staff) d.staff.forEach(s=>hireStaff(s));
+  recomputePriceLevel();
+  return true;
+}
+function miniToast(msg){
+  const el=document.getElementById('toast-mini'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'), 1600);
+}
+
+// =====================================================================
+//  タイトル / 設定
+// =====================================================================
+const titleEl = document.getElementById('title');
+function showTitle(){ sim.speed=0; syncSpeedUI(); titleEl.classList.remove('hidden'); document.getElementById('t-continue').disabled=!hasSave(); }
+function startGame(){ titleEl.classList.add('hidden'); sim.speed=1; syncSpeedUI(); }
+document.getElementById('t-new').onclick = ()=>{ startGame(); };
+document.getElementById('t-continue').onclick = ()=>{ if(loadGame()){ updateHUD(); } startGame(); };
+const setModal = document.getElementById('modal-settings');
+document.getElementById('btn-settings').onclick = ()=> setModal.classList.add('show');
+document.getElementById('set-close').onclick = ()=> setModal.classList.remove('show');
+document.getElementById('set-save').onclick = ()=>{ miniToast(saveGame()?'セーブしました':'セーブ失敗'); setModal.classList.remove('show'); };
+document.getElementById('set-title').onclick = ()=>{ setModal.classList.remove('show'); showTitle(); };
+document.getElementById('set-reset').onclick = ()=>{ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); };
 
 // =====================================================================
 //  HUD更新
@@ -1475,6 +1718,7 @@ addEventListener('resize', ()=>{
 btnMode.textContent = sim.mode==='store' ? '街に出る（俯瞰）' : '店に入る';
 updateHint();
 document.getElementById('load').style.display='none';
+showTitle();   // 起動時はタイトル画面（一時停止）
 animate();
 </script>
 </body>
