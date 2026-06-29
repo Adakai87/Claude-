@@ -320,16 +320,6 @@
   </div>
 </div>
 
-<!-- 不動産（空き物件ブラウザ） -->
-<div class="modal" id="modal-realestate">
-  <div class="sheet" style="max-width:440px">
-    <h2>不動産 — 物件情報</h2>
-    <div class="title-sub" id="re-sub" style="margin-bottom:6px">この街の空き物件。「出店」でそのまま開業できます</div>
-    <div id="re-list" style="max-height:60vh; overflow:auto"></div>
-    <button class="btn ghost" id="re-close" style="width:100%; margin-top:8px">閉じる</button>
-  </div>
-</div>
-
 <!-- 空港（都市移動） -->
 <div class="modal" id="modal-airport">
   <div class="sheet" style="max-width:420px">
@@ -556,13 +546,13 @@ const RIVAL_NAMES  = ['グリーン珈琲','ブルーカフェ','まちの喫茶
 const RIVAL_COLORS = [0x2f9e63,0x4a78c9,0x9a5b3a,0xb5552f,0x7a5cc0,0x2f8f9e];
 // ランドマーク（全都市共通。タップで対応する経営パネルを開く）
 const AIRPORT_POS = {x:24,z:21};
-const LANDMARK_DEFS = [
-  {x:-52,z:-14, kind:'bank',  label:'銀行',  tab:'finance', color:0xe2d9c4, h:9},
-  {x:50,z:-46,  kind:'office',label:'不動産',tab:'store',   color:0xc6b9a2, h:12},
-  {x:-50,z:46,  kind:'hq',    label:'本社',  tab:'company', color:0x9fb0c2, h:19},
-  {x:14,z:54,   kind:'supply',label:'市場',  tab:'supply',  color:0xcf9f6e, h:7},
-];
-const landmarks = [];                   // {mesh,label,tab,x,z,h}
+// プレイヤーが自分で建てる施設（最初は街に存在しない）。建てると機能が解放される
+const FAC_DEFS = {
+  hq:       { label:'本社',     tab:'company', color:0x9fb0c2, h:18, build:40000, desc:'会社（企業価値・IPO・配当）と幹部（C-level）が解放されます' },
+  roastery: { label:'焙煎工房', tab:'supply',  color:0xb9963c, h:8,  build:24000, desc:'コーヒー豆の品質アップグレード（焙煎）が解放されます' },
+};
+const FACILITY = { hq:false, roastery:false };
+const landmarks = [];                   // 建設済み施設 {mesh,group,label,tab,kind,x,z,city,h}
 const lots = [];                        // 空き/建設済みの物件 {city,x,z,tenant,branch,group}
 const RIVALS = [];                      // 全都市のライバル（各 .city を持つ）
 // branches[0]=プレイ可能な本店。built=false の間はマップ上に未出店（空き物件から建てる）
@@ -758,29 +748,27 @@ function makeAirport(){
   airportMesh = body; body.userData.group = g;
   return g;
 }
-// ランドマーク（銀行・不動産・本社・市場）。タップで対応する経営パネルを開く
-function addLandmark(def){
-  const g = new THREE.Group(); g.position.set(def.x,0,def.z); overScene.add(g);
+// プレイヤーが建てた施設（本社・焙煎工房）をマップに生成。タップで対応パネルを開く
+function makeFacility(kind, x, z, cityId){
+  const def = FAC_DEFS[kind];
+  const g = new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
   const h = def.h;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(8,h,7), new THREE.MeshStandardMaterial({ color:def.color }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(7,h,6), new THREE.MeshStandardMaterial({ color:def.color }));
   body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(8.5,0.6,7.5), new THREE.MeshStandardMaterial({ color:0x33343d }));
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(7.4,0.6,6.4), new THREE.MeshStandardMaterial({ color:0x33343d }));
   roof.position.y=h+0.3; roof.castShadow=true; g.add(roof);
-  if(def.kind==='bank'){                       // 石造り＋柱＋切妻
-    const ped=new THREE.Mesh(new THREE.BoxGeometry(8.8,0.7,7.7), new THREE.MeshStandardMaterial({color:0xeae2cf})); ped.position.y=0.35; g.add(ped);
-    for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,h*0.72,10), new THREE.MeshStandardMaterial({color:0xf3ecdb})); c.position.set(-3.2+i*1.6, h*0.36+0.7, 3.6); c.castShadow=true; g.add(c); }
-    const ped2=new THREE.Mesh(new THREE.BoxGeometry(8.4,0.5,1.2), new THREE.MeshStandardMaterial({color:0xf3ecdb})); ped2.position.set(0,h*0.72+0.7,3.6); g.add(ped2);
-  } else if(def.kind==='hq'){                   // ガラス高層
-    const glass=new THREE.Mesh(new THREE.BoxGeometry(8.1,h*0.92,7.1), new THREE.MeshStandardMaterial({color:0x7fb4d8, emissive:0x16303f, emissiveIntensity:0.5})); glass.position.y=h/2; g.add(glass);
-    for(let r=0;r<Math.floor(h/2.4);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.2,0.18,7.2), new THREE.MeshStandardMaterial({color:0x33506a})); band.position.y=1.6+r*2.4; g.add(band); }
-  } else if(def.kind==='supply'){               // 倉庫（かまぼこ屋根）
-    const r=new THREE.Mesh(new THREE.CylinderGeometry(3.8,3.8,8.2,14,1,false,0,Math.PI), new THREE.MeshStandardMaterial({color:0xb9c0c8})); r.rotation.z=Math.PI/2; r.position.y=h; g.add(r);
-  } else {                                       // office：窓帯
-    for(let r=0;r<Math.floor(h/2.4);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.0,7.1), new THREE.MeshStandardMaterial({color:0xbfe3ff, emissive:0x22425a, emissiveIntensity:0.4})); band.position.y=1.5+r*2.4; if(band.position.y<h-0.6) g.add(band); }
+  if(kind==='hq'){                              // ガラス高層
+    const glass=new THREE.Mesh(new THREE.BoxGeometry(7.1,h*0.92,6.1), new THREE.MeshStandardMaterial({color:0x7fb4d8, emissive:0x16303f, emissiveIntensity:0.5})); glass.position.y=h/2; g.add(glass);
+    for(let r=0;r<Math.floor(h/2.4);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(7.2,0.18,6.2), new THREE.MeshStandardMaterial({color:0x33506a})); band.position.y=1.6+r*2.4; g.add(band); }
+  } else if(kind==='roastery'){                 // 倉庫（かまぼこ屋根＋煙突）
+    const r=new THREE.Mesh(new THREE.CylinderGeometry(3.0,3.0,7.2,14,1,false,0,Math.PI), new THREE.MeshStandardMaterial({color:0xcaa24a})); r.rotation.z=Math.PI/2; r.position.y=h; g.add(r);
+    const ch=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.55,3,8), new THREE.MeshStandardMaterial({color:0x6b5638})); ch.position.set(2.2,h+1.2,2.2); ch.castShadow=true; g.add(ch);
   }
   body.userData.group = g;
-  landmarks.push({ mesh:body, label:def.label, tab:def.tab, kind:def.kind, x:def.x, z:def.z, h });
-  return g;
+  const entry = { mesh:body, group:g, label:def.label, tab:def.tab, kind, x, z, city:cityId, h };
+  landmarks.push(entry);
+  g.visible = (cityId===viewCity);
+  return entry;
 }
 
 // 都市を初期化（ライバルと空き物件を一度だけ生成）
@@ -810,6 +798,7 @@ function applyCityView(){
   for(const b of branches){ if(b.built && b.mesh) b.mesh.userData.group.visible = (b.city===viewCity); }
   for(const r of RIVALS){ if(r.mesh) r.mesh.userData.group.visible = (r.city===viewCity); }
   for(const l of lots){ if(l.group) l.group.visible = (l.city===viewCity && !l.branch); }
+  for(const f of landmarks){ if(f.group) f.group.visible = (f.city===viewCity); }
   const banner = document.getElementById('city-banner');
   if(banner){ const c=CITIES.find(c=>c.id===viewCity); banner.textContent = c?c.name:''; }
 }
@@ -839,7 +828,7 @@ function updateMapMarkers(){
     return el;
   };
   // ランドマーク（全都市共通）＋空港のラベル
-  landmarks.forEach((lm,i)=> place('lm'+i,'land', lm.label, lm.x, lm.h+2.4, lm.z));
+  landmarks.filter(l=>l.city===viewCity).forEach(lm=> place('lm'+lm.kind,'land', lm.label, lm.x, lm.h+2.4, lm.z));
   place('air','land','空港', AIRPORT_POS.x, 8.5, AIRPORT_POS.z);
   lots.forEach((l,i)=>{ if(l.city===viewCity && !l.branch) place('lot'+i,'lease','FOR LEASE', l.x,3.4,l.z); });
   RIVALS.forEach((r,i)=>{ if(r.city===viewCity){ const el=place('riv'+i,'rival',RIVAL_CUP, r.pos[0],5.2,r.pos[1]); if(el) el.style.background='#'+r.color.toString(16).padStart(6,'0'); } });
@@ -1058,7 +1047,7 @@ function buildOverviewScene(){
   }
 
   // 予約地点（カフェ/空き物件/ライバル/空港/ランドマーク）の近くにはビルを置かない
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...LANDMARK_DEFS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ビルのパレット（壁色 / 屋根色）
@@ -1200,7 +1189,7 @@ function overviewPick(e){
   const targets = [];
   lots.filter(l=>l.city===viewCity && !l.branch).forEach(l=>targets.push({o:l.group.userData.lotPad, type:'lot', ref:l}));
   if(airportMesh) targets.push({o:airportMesh, type:'air'});
-  landmarks.forEach(l=>targets.push({o:l.mesh, type:'lm', ref:l}));
+  landmarks.filter(l=>l.city===viewCity).forEach(l=>targets.push({o:l.mesh, type:'lm', ref:l}));
   branches.filter(b=>b.built && b.mesh && b.city===viewCity).forEach(b=>targets.push({o:b.mesh, type:'cafe', ref:b}));
   RIVALS.filter(r=>r.mesh && r.city===viewCity).forEach(r=>targets.push({o:r.mesh, type:'rival', ref:r}));
   const hit = raycaster.intersectObjects(targets.map(t=>t.o), false)[0];
@@ -1208,7 +1197,7 @@ function overviewPick(e){
   const t = targets.find(x=>x.o===hit.object); if(!t) return;
   if(t.type==='lot') openBuildSheet(t.ref);
   else if(t.type==='air') openAirport();
-  else if(t.type==='lm'){ if(t.ref.kind==='office') openRealEstate(); else openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
+  else if(t.type==='lm'){ openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
   else if(t.type==='cafe'){ if(t.ref===branches[0]) enterStore(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
   else if(t.type==='rival') flashHint(`${t.ref.name}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`);
 }
@@ -1967,10 +1956,14 @@ function renderManage(){
     h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
   } else if(mtab==='supply'){
     h += `<div class="dash-h">コーヒー豆のグレード（品質）</div>`;
-    const bmax = beans.grade>=beans.max;
-    h += mcard(matThumb('bean'), `${BEAN_NAMES[beans.grade-1]} <b>Lv.${beans.grade}</b>`,
-      `品質指数 ${qualityLevel().toFixed(2)}（チップ・常連・シェアに効く）`,
-      `<button class="mbtn" data-bean="1" ${bmax||sim.money<beanUpCost()?'disabled':''}>${bmax?'最高級':'格上げ<br>¥'+beanUpCost().toLocaleString('ja-JP')}</button>`);
+    if(!FACILITY.roastery){
+      h += `<div class="note" style="margin-top:0">🔒 豆の品質アップグレードは <b>焙煎工房</b> を建てると解放されます。俯瞰マップの空きテナントをタップ→「焙煎工房」を建設してください。</div>`;
+    } else {
+      const bmax = beans.grade>=beans.max;
+      h += mcard(matThumb('bean'), `${BEAN_NAMES[beans.grade-1]} <b>Lv.${beans.grade}</b>`,
+        `品質指数 ${qualityLevel().toFixed(2)}（チップ・常連・シェアに効く）`,
+        `<button class="mbtn" data-bean="1" ${bmax||sim.money<beanUpCost()?'disabled':''}>${bmax?'最高級':'格上げ<br>¥'+beanUpCost().toLocaleString('ja-JP')}</button>`);
+    }
     h += `<div class="dash-h">材料の在庫・仕入れ</div>`;
     for(const [k,mt] of Object.entries(materials)){
       const low = mt.stock < mt.buyAmt*0.5;
@@ -2101,13 +2094,21 @@ function renderManage(){
     });
     h += `<div class="note">ブランドは毎日少し下がる（CMOがいると減衰が緩やか）。高ブランドほど客が増えシェアも上がります。</div>`;
   } else if(mtab==='exec'){
-    h += `<div class="dash-h">役員（C-level）｜雇うと報酬が固定費に</div>`;
-    for(const [k,e] of Object.entries(execRoles)){
-      h += mcard(ART.staff, e.name, `${e.desc}・報酬¥${e.salary.toLocaleString('ja-JP')}/日`,
-        `<button class="mbtn ${e.hired?'on':''}" data-exec="${k}">${e.hired?'契約中':'招へい'}</button>`, e.hired);
+    if(!FACILITY.hq){
+      h += `<div class="note" style="margin-top:0">🔒 幹部（C-level）の招へいは <b>本社</b> を建てると解放されます。俯瞰マップの空きテナントをタップ→「本社」を建設してください。</div>`;
+    } else {
+      h += `<div class="dash-h">役員（C-level）｜雇うと報酬が固定費に</div>`;
+      for(const [k,e] of Object.entries(execRoles)){
+        h += mcard(ART.staff, e.name, `${e.desc}・報酬¥${e.salary.toLocaleString('ja-JP')}/日`,
+          `<button class="mbtn ${e.hired?'on':''}" data-exec="${k}">${e.hired?'契約中':'招へい'}</button>`, e.hired);
+      }
+      h += `<div class="note">役員は会社全体に効く強力なボーナス。報酬は毎日の閉店PLに「役員報酬」として計上されます。</div>`;
     }
-    h += `<div class="note">役員は会社全体に効く強力なボーナス。報酬は毎日の閉店PLに「役員報酬」として計上されます。</div>`;
   } else if(mtab==='company'){
+    if(!FACILITY.hq){
+      h += `<div class="note" style="margin-top:0">🔒 会社（企業価値・IPO・配当）は <b>本社</b> を建てると解放されます。俯瞰マップの空きテナントをタップ→「本社」を建設してください。</div>`;
+      el.innerHTML = h; return;
+    }
     const val = valuation(), nw = netWorth();
     const assets = sim.money + Math.round(finance.invest) + storeAssets();
     h += mcard(logoBadge(profile.logo,58), profile.brandName, 'オーナー：'+profile.owner+'｜'+sim.day+'日目', '<span class="sub2">あなたの会社</span>');
@@ -2216,29 +2217,49 @@ recomputePriceLevel();   // 起動時に価格帯を算出
 // =====================================================================
 //  出店シート（空き物件タップ）＆ 空港（都市移動）
 // =====================================================================
-let buildLot=null, buildInt=0, buildEq=0, buildExt=0;
-function buildCost(){ return (buildLot?buildLot.tenant.cost:0) + EXTERIORS[buildExt].cost + INTERIORS[buildInt].cost + EQUIP_SETS[buildEq].cost; }
-function openBuildSheet(lot){ buildLot=lot; buildInt=0; buildEq=0; buildExt=0; renderBuild(); document.getElementById('modal-build').classList.add('show'); }
+let buildLot=null, buildInt=0, buildEq=0, buildExt=0, buildType='cafe';
+function buildCost(){
+  if(!buildLot) return 0;
+  const plot=buildLot.tenant.cost;
+  if(buildType==='cafe') return plot + EXTERIORS[buildExt].cost + INTERIORS[buildInt].cost + EQUIP_SETS[buildEq].cost;
+  return plot + (FAC_DEFS[buildType]?FAC_DEFS[buildType].build:0);
+}
+function openBuildSheet(lot){ buildLot=lot; buildInt=0; buildEq=0; buildExt=0; buildType='cafe'; renderBuild(); document.getElementById('modal-build').classList.add('show'); }
 function renderBuild(){
   const t=buildLot.tenant, cityN=(CITIES.find(c=>c.id===buildLot.city)||{}).name||'';
   const first=!branches[0].built;
-  document.getElementById('build-title').textContent = first?'1号店を出店する':'新しいカフェを出店する';
+  if(first) buildType='cafe';
+  // 建てるものを選ぶ（最初の1棟は必ずカフェ。本社・焙煎工房は各1棟）
+  const types=[
+    {k:'cafe',     n:'カフェ',   ok:true},
+    {k:'hq',       n:'本社',     ok:!first && !FACILITY.hq},
+    {k:'roastery', n:'焙煎工房', ok:!first && !FACILITY.roastery},
+  ];
+  const typeRow = `<div class="dash-h" style="border:0;padding-left:0">建てるもの</div>`+
+    types.map(ty=>`<button class="mbtn ${buildType===ty.k?'sel':''}" data-btype="${ty.k}" ${ty.ok?'':'disabled'} style="margin:3px 4px 3px 0">${ty.n}${(!ty.ok&&ty.k!=='cafe')?(FACILITY[ty.k]?'（建設済）':'（要カフェ）'):''}</button>`).join('');
+  document.getElementById('build-title').textContent = buildType==='cafe' ? (first?'1号店を出店する':'カフェを出店する') : `${FAC_DEFS[buildType].label}を建設する`;
   const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
   const row=(label,arr,sel,key)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
     arr.map((o,i)=>`<button class="mbtn ${i===sel?'sel':''}" data-${key}="${i}" style="margin:3px 4px 3px 0">${o.name}${o.cost?` +¥${o.cost.toLocaleString('ja-JP')}`:'（無料）'}</button>`).join('');
-  document.getElementById('build-body').innerHTML =
-    `<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
+  const plotCard=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
     `<div class="meta">${cityN}・交通量 ${t.traffic.toLocaleString('ja-JP')}人/日</div>`+
-    `<div class="meta">賃料 ¥${t.rent.toLocaleString('ja-JP')}/日・物件取得 ¥${t.cost.toLocaleString('ja-JP')}</div></div></div>`+
-    row('外装',EXTERIORS,buildExt,'bext') + row('内装',INTERIORS,buildInt,'bint') + row('設備（マシン）',EQUIP_SETS,buildEq,'beq');
+    `<div class="meta">${buildType==='cafe'?`賃料 ¥${t.rent.toLocaleString('ja-JP')}/日・`:''}物件取得 ¥${t.cost.toLocaleString('ja-JP')}</div></div></div>`;
+  let detail;
+  if(buildType==='cafe'){
+    detail = row('外装',EXTERIORS,buildExt,'bext') + row('内装',INTERIORS,buildInt,'bint') + row('設備（マシン）',EQUIP_SETS,buildEq,'beq');
+  } else {
+    detail = `<div class="note" style="margin-top:8px">${FAC_DEFS[buildType].desc}<br>建設費 ¥${FAC_DEFS[buildType].build.toLocaleString('ja-JP')}（＋物件取得）</div>`;
+  }
+  document.getElementById('build-body').innerHTML = plotCard + typeRow + detail;
   const cost=buildCost(), left=sim.money-cost;
   document.getElementById('build-cost').innerHTML =
-    `初期費用 <span class="gold">¥${cost.toLocaleString('ja-JP')}</span> ／ 開業後の手元資金 <span class="${left>=0?'green':''}" style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
-  document.getElementById('build-go').disabled = left<0;
+    `初期費用 <span class="gold">¥${cost.toLocaleString('ja-JP')}</span> ／ 建設後の手元資金 <span class="${left>=0?'green':''}" style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
+  const go=document.getElementById('build-go'); go.disabled = left<0; go.textContent = buildType==='cafe'?'この内容で開店する':`${FAC_DEFS[buildType].label}を建設する`;
 }
 document.getElementById('build-body').addEventListener('click', e=>{
-  const t=e.target.closest('button'); if(!t) return;
-  if(t.dataset.bext!==undefined) buildExt=+t.dataset.bext;
+  const t=e.target.closest('button'); if(!t || t.disabled) return;
+  if(t.dataset.btype!==undefined) buildType=t.dataset.btype;
+  else if(t.dataset.bext!==undefined) buildExt=+t.dataset.bext;
   else if(t.dataset.bint!==undefined) buildInt=+t.dataset.bint;
   else if(t.dataset.beq!==undefined) buildEq=+t.dataset.beq;
   renderBuild();
@@ -2247,12 +2268,23 @@ document.getElementById('build-cancel').onclick = ()=> document.getElementById('
 document.getElementById('build-go').onclick = ()=>{
   const lot=buildLot; if(!lot || lot.branch) return;
   const cost=buildCost(); if(sim.money<cost) return;
-  sim.money-=cost; dayStats.capex+=cost;
   const city=CITIES.find(c=>c.id===lot.city)||CITIES[0];
+  // --- 施設（本社・焙煎工房）を建設 ---
+  if(buildType!=='cafe'){
+    if(!branches[0].built || FACILITY[buildType]) return;
+    sim.money-=cost; dayStats.capex+=cost;
+    const f=makeFacility(buildType, lot.x, lot.z, lot.city); FACILITY[buildType]=true; lot.branch=f;
+    applyCityView();
+    document.getElementById('modal-build').classList.remove('show');
+    saveGame(); updateHUD();
+    flashHint(`${FAC_DEFS[buildType].label}を建設！ ${buildType==='hq'?'会社・幹部が解放されました':'豆の品質アップグレードが解放されました'}`);
+    return;
+  }
+  // --- カフェを出店 ---
+  sim.money-=cost; dayStats.capex+=cost;
   const vibe=INTERIORS[buildInt].vibe, mlv=EQUIP_SETS[buildEq].mlv, extB=EXTERIORS[buildExt].brand;
   let built;
   if(!branches[0].built){
-    // 1号店＝プレイ可能な本店をこの物件に建てる
     const b=branches[0];
     b.built=true; b.loc=lot.tenant.loc; b.city=lot.city; b.x=lot.x; b.z=lot.z; b.level=1; b.name='本店';
     b.mesh=makeCafeBuilding(0xe0894a, lot.x, lot.z, 0xc9602e); b.mesh.userData.isCafe=true;
@@ -2270,37 +2302,8 @@ document.getElementById('build-go').onclick = ()=>{
   applyCityView();
   document.getElementById('modal-build').classList.remove('show');
   saveGame(); updateHUD(); updateHint();
-  flashHint(built===branches[0] ? '1号店をオープン！ オレンジの建物をタップして店内に入ろう' : `${built.name}を出店！ 委任運営で純益が積み上がります`);
+  flashHint(built===branches[0] ? '1号店をオープン！ オレンジの建物をタップして店内に入ろう／本社・焙煎工房も空きテナントに建てられます' : `${built.name}を出店！ 委任運営で純益が積み上がります`);
 };
-// 不動産：この街の空き物件を一覧 → そのまま出店
-function openRealEstate(){ renderRealEstate(); document.getElementById('modal-realestate').classList.add('show'); }
-function renderRealEstate(){
-  const cityN=(CITIES.find(c=>c.id===viewCity)||{}).name||'';
-  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
-  const free=lots.filter(l=>l.city===viewCity && !l.branch);
-  const mine=branches.filter(b=>b.built && b.city===viewCity);
-  document.getElementById('re-sub').textContent = `${cityN}：空き ${free.length}件・自店舗 ${mine.length}件`;
-  let h='';
-  if(!free.length) h+=`<div class="note" style="margin-top:0">この街に空き物件はありません。空港から別の都市へ。</div>`;
-  free.forEach((l,i)=>{
-    const t=l.tenant;
-    h+=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
-       `<div class="meta">交通量 ${t.traffic.toLocaleString('ja-JP')}人/日・賃料¥${t.rent.toLocaleString('ja-JP')}/日</div>`+
-       `<div class="meta">物件取得 ¥${t.cost.toLocaleString('ja-JP')}・${t.risk}</div></div>`+
-       `<div class="act"><button class="mbtn" data-relot="${lots.indexOf(l)}">出店</button></div></div>`;
-  });
-  if(mine.length){ h+=`<div class="dash-h">営業中</div>`;
-    mine.forEach(b=>{ h+=`<div class="mcard"><div class="thumb">${locArt[b.loc]||ART.downtown}</div><div class="info"><div class="ttl">${b.name}</div><div class="meta">${LOC_JP[b.loc]||b.loc}・${b===branches[0]?'本店（実プレイ）':'委任運営'}</div></div></div>`; });
-  }
-  document.getElementById('re-list').innerHTML=h;
-}
-document.getElementById('re-list').addEventListener('click', e=>{
-  const t=e.target.closest('[data-relot]'); if(!t) return;
-  const lot=lots[+t.dataset.relot]; if(!lot || lot.branch) return;
-  document.getElementById('modal-realestate').classList.remove('show');
-  openBuildSheet(lot);
-});
-document.getElementById('re-close').onclick = ()=> document.getElementById('modal-realestate').classList.remove('show');
 // 空港：都市移動
 function openAirport(){ renderAirport(); document.getElementById('modal-airport').classList.add('show'); }
 function renderAirport(){
@@ -2351,6 +2354,8 @@ function gameState(){
     lastProfit, spawnAccum, mgrCandidates,
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
+    FACILITY:{...FACILITY},
+    facilities:landmarks.map(l=>({kind:l.kind, x:l.x, z:l.z, city:l.city})),
     rivals:RIVALS.map(r=>({name:r.name, comp:r.comp, color:r.color, pos:r.pos, city:r.city})),
     lots:lots.map(l=>({city:l.city, x:l.x, z:l.z, tenant:l.tenant, built:!!l.branch})),
     branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level, manager:b.manager||null, built:!!b.built, city:b.city, x:b.x, z:b.z})),
@@ -2416,11 +2421,16 @@ function loadGame(slot){
     const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null, manager:sb.manager||null, built:true, city:sb.city||viewCity, x, z};
     b.mesh=makeCafeBuilding(0xe0a85a, x, z, 0xc9772e); b.mesh.userData.isCafe=true; branches.push(b);
   }
-  // 空き物件（建設済みは対応する店舗に紐付け）
+  // 施設（本社・焙煎工房）の復元
+  if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
+  const facList=[];
+  if(d.facilities) d.facilities.forEach(f=>{ const e=makeFacility(f.kind, f.x, f.z, f.city||viewCity); FACILITY[f.kind]=true; facList.push(e); });
+  // 空き物件（建設済みは対応する店舗/施設に紐付け）
   if(d.lots){
     d.lots.forEach(ld=>{
       const lot={ city:ld.city, x:ld.x, z:ld.z, tenant:ld.tenant, branch:null, group:makeLotMarker(ld.x,ld.z) };
-      if(ld.built) lot.branch = branches.find(b=>b.built && b.city===ld.city && b.x===ld.x && b.z===ld.z) || true;
+      if(ld.built) lot.branch = branches.find(b=>b.built && b.city===ld.city && b.x===ld.x && b.z===ld.z)
+                              || facList.find(f=>f.city===ld.city && f.x===ld.x && f.z===ld.z) || true;
       lots.push(lot); cityInited[ld.city]=true;
     });
   }
@@ -2546,9 +2556,8 @@ function updateHUD(){
 // =====================================================================
 storeScene = buildStoreScene();
 overScene  = buildOverviewScene();
-// 俯瞰マップの旅行ハブ（空港）＋ランドマーク（銀行・不動産・本社・市場）。本店・支店・ライバル・空き物件は都市ごとに配置する
+// 俯瞰マップの旅行ハブ（空港）のみ初期配置。カフェ・本社・焙煎工房はプレイヤーが空きテナントに建てる
 makeAirport();
-LANDMARK_DEFS.forEach(addLandmark);
 
 // =====================================================================
 //  メインループ
