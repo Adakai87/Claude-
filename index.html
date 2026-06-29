@@ -279,6 +279,7 @@
       <button class="m-tab" data-mtab="equip">設備</button>
       <button class="m-tab" data-mtab="store">店舗</button>
       <button class="m-tab" data-mtab="staff">人材</button>
+      <button class="m-tab" data-mtab="manager">店長</button>
       <button class="m-tab" data-mtab="marketing">マーケ</button>
       <button class="m-tab" data-mtab="expand">展開</button>
       <button class="m-tab" data-mtab="exec">幹部</button>
@@ -416,9 +417,14 @@ function mainComp(){
   c += extraUsed*0.4;                     // 席数
   c += brand*0.09;                        // ブランド力
   c += (qualityLevel()-1)*12;             // コーヒー品質
+  if(branches[0].manager) c += mgrRating(branches[0].manager)*0.5;   // 本店の店長
   return Math.max(2, c);
 }
-const branchComp = b => (b===branches[0] ? mainComp() : 6 + (b.level-1)*3);
+const branchComp = b => {
+  if(b===branches[0]) return mainComp();
+  const base = 6 + (b.level-1)*3;
+  return b.manager ? base + mgrRating(b.manager)*0.9 : base*0.5;     // 店長不在は半減
+};
 const playerComp = () => branches.reduce((a,b)=>a+branchComp(b), 0);
 const totalComp  = () => playerComp() + RIVALS.reduce((a,r)=>a+r.comp, 0);
 const playerShare= () => playerComp()/totalComp();
@@ -429,6 +435,55 @@ function branchDailyNet(b){
   return rev - (RENT[b.loc]||2500);     // 売上シェア − 支店家賃
 }
 const branchesDailyNet = () => branches.reduce((a,b)=>a+branchDailyNet(b), 0);
+
+// ---- 店長（委任）システム：各店に1名。4ステ＋給与+30%で承認率↑、放置で不満→辞職 ----
+const MGR_NAMES = ['佐藤','鈴木','高橋','田中','渡辺','伊藤','山本','中村','小林','加藤','清水','森'];
+const STAT_DEF = [['jinzai','人材'],['senren','洗練'],['shohin','商品'],['rinri','倫理']];
+function makeMgrCandidate(){
+  const r=()=>1+(Math.random()*5|0);
+  const j=r(),s=r(),p=r(),e=r();
+  return { name:MGR_NAMES[(Math.random()*MGR_NAMES.length)|0], jinzai:j, senren:s, shohin:p, rinri:e,
+           salary:5000+(j+s+p+e)*900, bonus:false, fuman:0 };
+}
+let mgrCandidates = [makeMgrCandidate(), makeMgrCandidate(), makeMgrCandidate()];
+const mgrRating   = m => m ? (m.jinzai+m.senren+m.shohin+m.rinri) : 0;
+const mgrApproval = m => m ? Math.min(0.95, 0.40 + (m.senren+m.rinri)*0.05 + (m.bonus?0.15:0)) : 0;
+const mgrSalary   = m => m ? Math.round(m.salary*(m.bonus?1.3:1)) : 0;
+const managerSalaries = () => branches.reduce((a,b)=>a+mgrSalary(b.manager), 0);
+let mainMgrMesh = null;
+function assignManager(storeIdx, cand){
+  const b = branches[storeIdx]; if(!b || b.manager || !cand) return false;
+  b.manager = {...cand};
+  if(storeIdx===0){ mainMgrMesh = makeHuman(0x2a2e3a); mainMgrMesh.position.set(-3.4,0,-3.7); storeScene.add(mainMgrMesh); }
+  const i = mgrCandidates.indexOf(cand); if(i>=0) mgrCandidates[i] = makeMgrCandidate();
+  return true;
+}
+function dismissManager(storeIdx){
+  const b = branches[storeIdx]; if(!b || !b.manager) return;
+  b.manager = null;
+  if(storeIdx===0 && mainMgrMesh){ storeScene.remove(mainMgrMesh); mainMgrMesh=null; }
+}
+// 本店の店長が自動でレジを捌く（委任＝あなたは離れてOK）
+let mgrCool = 0;
+function updateManagers(dtGameMin){
+  const m = branches[0].manager; if(!m) return;
+  mgrCool -= dtGameMin;
+  if(mgrCool<=0 && queue.length){ mgrCool = serveOne() ? 22/Math.max(1,m.jinzai) : 4; }
+}
+// 1日処理：不満の増減・インシデント・辞職。通知文を返す
+function managersDailyTick(){
+  const notes=[];
+  branches.forEach((b,idx)=>{
+    const m=b.manager; if(!m) return;
+    m.fuman = Math.max(0, Math.min(100, m.fuman + (m.bonus? -4 : 3)));
+    if(Math.random() < 0.25){           // トラブル発生
+      if(Math.random() < mgrApproval(m)) notes.push(`${b.name}：${m.name}がトラブルを無事処理`);
+      else { const loss=2000+(Math.random()*3000|0); sim.money-=loss; m.fuman=Math.min(100,m.fuman+8); notes.push(`${b.name}：対応失敗 −¥${loss.toLocaleString('ja-JP')}`); }
+    }
+    if(m.fuman>=100){ notes.push(`${b.name}：店長 ${m.name} が不満で辞職…`); dismissManager(idx); }
+  });
+  return notes;
+}
 
 // ==== Coffee Inc 寄せ：ブランド/マーケ・品質/豆・役員・企業/IPO ====
 // ブランド力（0-100）。マーケで上げ、毎日少し減衰
@@ -787,7 +842,9 @@ function arriveTask(){
   const task = player.userData.task;
   player.userData.task = null;
   if(!task || task.type!=='serve') return;
-  serveOne();
+  if(serveOne() && branches[0].manager){    // 店長がいるのに自分で捌くと不満↑
+    branches[0].manager.fuman = Math.min(100, branches[0].manager.fuman + 3);
+  }
 }
 // 行列の先頭客に提供（プレイヤー・スタッフ共通）
 function serveOne(){
@@ -1250,14 +1307,15 @@ function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
 function plBreakdown(){
   const tips = dayStats.tips;
   const sales = dayStats.revenue - tips;
-  const rent = plRent(), interest = plInterest(), wages = staffWage(), execSal = execSalaries();
-  const op = sales + tips - dayStats.cogs - wages - execSal - rent - interest;
+  const rent = plRent(), interest = plInterest(), wages = staffWage(), execSal = execSalaries(), mgrSal = managerSalaries();
+  const op = sales + tips - dayStats.cogs - wages - mgrSal - execSal - rent - interest;
   const row = (l,v,neg)=>`<div class="row"><span>${l}</span><span style="${neg?'color:var(--red)':''}">${neg?'−':''}¥${Math.abs(v).toLocaleString('ja-JP')}</span></div>`;
   let h = `<div class="dash-h">日次損益（PL）</div>`;
   h += row('売上（商品）', sales);
   h += row('チップ', tips);
   h += row('仕入（原価）', dayStats.cogs, true);
   if(wages>0) h += row('人件費', wages, true);
+  if(mgrSal>0) h += row('店長給与', mgrSal, true);
   if(execSal>0) h += row('役員報酬', execSal, true);
   h += row(`家賃（${LOC_JP[store.location]}）`, rent, true);
   if(interest>0) h += row('借入利息', interest, true);
@@ -1281,11 +1339,13 @@ function miniBreakdown(){
           <div class="row"><span>売れ筋商品</span><span>${topM&&topM.v? topM.n+`（${topM.v}杯）`:'—'}</span></div>`;
 }
 document.getElementById('m-next').onclick = ()=>{
-  // 家賃・利息・人件費・役員報酬を清算、支店純益を加算、運用を増やす、ブランド減衰
-  sim.money -= plRent() + plInterest() + staffWage() + execSalaries();
+  // 家賃・利息・人件費・店長給与・役員報酬を清算、支店純益を加算、運用を増やす、ブランド減衰
+  sim.money -= plRent() + plInterest() + staffWage() + managerSalaries() + execSalaries();
   sim.money += branchesDailyNet();
   finance.invest = Math.round(finance.invest * (1 + investRateEff()));
   brand = Math.max(0, brand - brandDecay());
+  const mgrNotes = managersDailyTick();   // 店長の不満・トラブル・辞職
+  if(mgrNotes.length) miniToast(mgrNotes[0]);
   // 本日分を累計へ移す
   mergeInto(totalStats, dayStats); dayStats = blankStats();
   // 翌日リセット
@@ -1476,6 +1536,32 @@ function renderManage(){
       h += `<div class="mrow"><div class="nm">別の候補を探す</div><button class="mbtn" data-reroll="1">更新</button></div>`;
     }
     h += `<div class="note">日給は毎日の閉店時に人件費としてPLから引かれます。スキルが高いほど提供が速い。</div>`;
+  } else if(mtab==='manager'){
+    h += `<div class="dash-h">店長の配置（各店1名・本店は委任で自動運営）</div>`;
+    branches.forEach((b,idx)=>{
+      const m=b.manager;
+      if(m){
+        const stats=STAT_DEF.map(([k,jp])=>`${jp}${m[k]}`).join('・');
+        const fc = m.fuman>66?'var(--red)':m.fuman>33?'var(--gold)':'var(--green)';
+        h += `<div class="mcard"><div class="thumb">${ART.staff}</div><div class="info">
+          <div class="ttl">${b.name}：${m.name}</div>
+          <div class="meta">${stats}｜給与¥${mgrSalary(m).toLocaleString('ja-JP')}/日</div>
+          <div class="meta">不満 <b style="color:${fc}">${Math.round(m.fuman)}%</b>・承認率 ${Math.round(mgrApproval(m)*100)}%</div></div>
+          <div class="act"><button class="mbtn ${m.bonus?'on':''}" data-mbonus="${idx}">${m.bonus?'給与+30%':'+30%提示'}</button>
+          <button class="mbtn" data-mfire="${idx}">解任</button></div></div>`;
+      } else {
+        h += `<div class="mcard"><div class="thumb">${ART.staff}</div><div class="info"><div class="ttl">${b.name}</div><div class="meta">店長 未配置${idx>0?'（不在は支店効率が半減）':''}</div></div><span class="sub2">空き</span></div>`;
+      }
+    });
+    h += `<div class="dash-h">店長候補</div>`;
+    const openStores = branches.map((b,i)=>({b,i})).filter(x=>!x.b.manager);
+    mgrCandidates.forEach((c,ci)=>{
+      const stats=STAT_DEF.map(([k,jp])=>`${jp}${c[k]}`).join('・');
+      const btns = openStores.length ? openStores.map(o=>`<button class="mbtn" data-massign="${ci}|${o.i}" ${sim.money<0?'disabled':''}>${o.b.name}へ</button>`).join('') : '<span class="sub2">配置先なし</span>';
+      h += `<div class="mcard"><div class="thumb">${ART.staff}</div><div class="info"><div class="ttl">${c.name} <b>★${mgrRating(c)}</b></div><div class="meta">${stats}｜給与¥${c.salary.toLocaleString('ja-JP')}/日</div></div><div class="act">${btns}</div></div>`;
+    });
+    h += `<div class="mrow"><div class="nm">別の候補を探す</div><button class="mbtn" data-mreroll="1">更新</button></div>`;
+    h += `<div class="note">本店に店長を置くと自動接客（委任）。自分で接客し続けると不満↑、放置で辞職。給与+30%で承認率↑＆不満↓。支店は店長不在だと効率半減。</div>`;
   } else if(mtab==='expand'){
     // 市場シェア
     const tot = totalComp();
@@ -1618,6 +1704,14 @@ document.getElementById('manage-body').addEventListener('click', e=>{
     doIPO();
   } else if(t.dataset.dividend){
     payDividend();
+  } else if(t.dataset.massign){
+    const [ci,si]=t.dataset.massign.split('|').map(Number); assignManager(si, mgrCandidates[ci]);
+  } else if(t.dataset.mfire!==undefined){
+    dismissManager(+t.dataset.mfire);
+  } else if(t.dataset.mbonus!==undefined){
+    const m=branches[+t.dataset.mbonus].manager; if(m) m.bonus=!m.bonus;
+  } else if(t.dataset.mreroll){
+    mgrCandidates=[makeMgrCandidate(),makeMgrCandidate(),makeMgrCandidate()];
   }
   renderManage();
 });
@@ -1663,8 +1757,8 @@ function gameState(){
     execs:Object.fromEntries(Object.entries(execRoles).map(([k,e])=>[k,e.hired])),
     finance:{ debt:finance.debt, invest:finance.invest },
     company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised },
-    lastProfit, spawnAccum,
-    branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level})),
+    lastProfit, spawnAccum, mgrCandidates,
+    branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level, manager:b.manager||null})),
     staff:staff.map(s=>({name:s.name, skill:s.skill, wage:s.wage})),
     loyalty:{...loyalty}, totalStats, dayStats,
   };
@@ -1694,10 +1788,15 @@ function loadGame(slot){
   if(d.dayStats) dayStats=d.dayStats;
   for(let i=0;i<(d.extraUsed||0);i++){ const sp=EXTRA_SLOTS[i]; if(sp) addTable(sp.x,sp.z); }
   extraUsed=d.extraUsed||0;
-  if(d.branches&&d.branches[0]){ branches[0].name=d.branches[0].name; branches[0].loc=d.branches[0].loc; branches[0].level=d.branches[0].level; }
+  if(d.mgrCandidates) mgrCandidates = d.mgrCandidates;
+  if(d.branches&&d.branches[0]){
+    branches[0].name=d.branches[0].name; branches[0].loc=d.branches[0].loc; branches[0].level=d.branches[0].level;
+    branches[0].manager=d.branches[0].manager||null;
+    if(branches[0].manager){ mainMgrMesh=makeHuman(0x2a2e3a); mainMgrMesh.position.set(-3.4,0,-3.7); storeScene.add(mainMgrMesh); }
+  }
   if(d.branches) for(let i=1;i<d.branches.length;i++){
     const sb=d.branches[i], sp=BRANCH_SPOTS[i-1]; if(!sp) break;
-    const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null};
+    const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null, manager:sb.manager||null};
     b.mesh=makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0xc9772e); b.mesh.userData.isCafe=true; branches.push(b);
   }
   if(d.staff) d.staff.forEach(s=>hireStaff(s));
@@ -1817,7 +1916,7 @@ function animate(){
   }
 
   updatePlayer(dt);
-  if(sim.speed>0){ updateCustomers(dt, dt*sim.speed); updateStaff(dt*sim.speed); }
+  if(sim.speed>0){ updateCustomers(dt, dt*sim.speed); updateStaff(dt*sim.speed); updateManagers(dt*sim.speed); }
   updateCamera(dt);
   updateBubble(dt);
   updateFloats(dt);
