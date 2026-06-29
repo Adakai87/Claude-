@@ -119,6 +119,8 @@
   .dash-tabs{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; scrollbar-width:none;}
   .dash-tabs::-webkit-scrollbar{display:none;}
   .m-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+  .m-tab.locked{opacity:.42;}
+  .m-tab.locked::after{content:" 🔒"; font-size:10px;}
   .mrow{display:flex; align-items:center; gap:7px; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13px;}
   .mrow .nm{flex:1; min-width:0;}
   .mrow .sub2{font-size:11px; color:var(--sub); margin-top:3px; line-height:1.5;}
@@ -409,7 +411,7 @@
 <div class="modal" id="modal-manage">
   <div class="sheet dash-sheet">
     <button class="sheet-x" data-close="modal-manage" aria-label="閉じる">×</button>
-    <h2>経営（事務所）</h2>
+    <h2>経営</h2>
     <div class="dash-tabs">
       <button class="m-tab active" data-mtab="menu">メニュー</button>
       <button class="m-tab" data-mtab="supply">仕入れ</button>
@@ -2072,9 +2074,18 @@ const mcard = (thumb, ttl, meta, act, sel=false)=>
   `<div class="mcard${sel?' sel':''}"><div class="thumb">${thumb}</div><div class="info"><div class="ttl">${ttl}</div><div class="meta">${meta}</div></div><div class="act">${act}</div></div>`;
 
 let mtab = 'menu';
+// オフィス（本社）を契約しないと使えない会社系タブ
+const OFFICE_TABS = ['marketing','finance','expand','manager','exec','company'];
 function renderManage(){
   const el = document.getElementById('manage-body');
   let h = '';
+  // タブのロック表示（オフィス未契約なら会社系をグレーに）
+  document.querySelectorAll('.m-tab').forEach(t=> t.classList.toggle('locked', OFFICE_TABS.includes(t.dataset.mtab) && !FACILITY.hq));
+  // オフィス未契約で会社系タブを開いた場合は契約を促す
+  if(OFFICE_TABS.includes(mtab) && !FACILITY.hq){
+    el.innerHTML = `<div class="note" style="margin-top:0">🔒 <b>${ {marketing:'マーケティング',finance:'資金（融資・運用）',expand:'多店舗展開',manager:'店長への委任',exec:'幹部（C-level）',company:'会社・IPO'}[mtab] }</b> は、<b>オフィス（本社）</b>を契約すると使えるようになります。<br><br>俯瞰マップの空きテナント（FOR LEASE）をタップ → 「本社」を建設してください。まずは店舗運営（メニュー・仕入れ・設備・店舗・人材）で利益を貯めましょう。</div>`;
+    return;
+  }
   if(mtab==='menu'){
     for(const m of MENU){
       const cost = materialCost(m), margin = m.price-cost, rate = Math.round(margin/m.price*100);
