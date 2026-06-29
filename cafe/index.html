@@ -1067,154 +1067,161 @@ function buildOverviewScene(){
   scene.fog = new THREE.Fog(0xbfe3f5, 200, 480);
   addLights(scene, 1.15);
 
-  // 水面（島の外周に見える）→ その上に陸地（芝）
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(520,520), new THREE.MeshStandardMaterial({ color:0x2fb6c4, roughness:0.4, metalness:0.1 }));
-  water.rotation.x=-Math.PI/2; water.position.y=-0.4; scene.add(water);
-  const land = new THREE.Mesh(new THREE.PlaneGeometry(210,210), new THREE.MeshStandardMaterial({ color:0x7fa86a }));
-  land.rotation.x=-Math.PI/2; land.receiveShadow=true; scene.add(land);
-  // 砂浜のフチ
-  const beach = new THREE.Mesh(new THREE.PlaneGeometry(224,224), new THREE.MeshStandardMaterial({ color:0xe6d6a8 }));
-  beach.rotation.x=-Math.PI/2; beach.position.y=-0.05; scene.add(beach);
+  // 水面 → 海岸の芝 → グレーの舗装（街全体の地面＝道路/歩道）
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(560,560), new THREE.MeshStandardMaterial({ color:0x1fa8c6, roughness:0.35 }));
+  water.rotation.x=-Math.PI/2; water.position.y=-0.5; scene.add(water);
+  const coast = new THREE.Mesh(new THREE.PlaneGeometry(244,244), new THREE.MeshStandardMaterial({ color:0x86a35f }));
+  coast.rotation.x=-Math.PI/2; coast.position.y=-0.12; scene.add(coast);
+  const pave = new THREE.Mesh(new THREE.PlaneGeometry(220,220), new THREE.MeshStandardMaterial({ color:0x8f9398 }));
+  pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);
 
-  // 道路グリッド（格子）＋センターライン
-  const roadMat = new THREE.MeshStandardMaterial({ color:0x474a52 });
-  const lineMat = new THREE.MeshStandardMaterial({ color:0xe7dcb8 });
-  const ROADS = [-90,-72,-54,-36,-18,0,18,36,54,72,90];
-  const RLEN = 200;
-  for(const p of ROADS){
-    const h = new THREE.Mesh(new THREE.PlaneGeometry(RLEN,6), roadMat); h.rotation.x=-Math.PI/2; h.position.set(0,0.02,p); scene.add(h);
-    const v = new THREE.Mesh(new THREE.PlaneGeometry(6,RLEN), roadMat); v.rotation.x=-Math.PI/2; v.position.set(p,0.02,0); scene.add(v);
-    const hl= new THREE.Mesh(new THREE.PlaneGeometry(RLEN,0.4), lineMat); hl.rotation.x=-Math.PI/2; hl.position.set(0,0.03,p); scene.add(hl);
-    const vl= new THREE.Mesh(new THREE.PlaneGeometry(0.4,RLEN), lineMat); vl.rotation.x=-Math.PI/2; vl.position.set(p,0.03,0); scene.add(vl);
+  // 街路樹（先に定義：公園・街区で使う）
+  function tree(x,z,s=1){
+    const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(0.14*s,0.18*s,0.9*s,6), new THREE.MeshStandardMaterial({color:0x6e4b2c})); t.position.y=0.45*s; g.add(t);
+    const f=new THREE.Mesh(new THREE.ConeGeometry(0.9*s,2.0*s,7), new THREE.MeshStandardMaterial({color:pick0(0x3f8a45,0x4f9a50,0x5a7a3a,0x6a8a40)})); f.position.y=1.7*s; f.castShadow=true; g.add(f);
   }
+  function pick0(...a){ return a[(Math.random()*a.length)|0]; }
 
-  // 予約地点（カフェ/空き物件/ライバル/空港/ランドマーク）の近くにはビルを置かない
+  // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
   const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
-  // ---- 建物パーツ（種類ごとにデザインを変える）----
-  const WALL_APT=[0xe7ddc9,0xd8c4a6,0xcdb89a,0xe0cdb0,0xdac7b4];
-  const WALL_OFFICE=[0xc2ccd6,0xaeb9c6,0xc9d2da,0xb6c2cf];
-  const SHOP_COL=[0xd98a5a,0x6fae8a,0xc96f6f,0x6f8fc9,0xd9b85a,0x8a6fc0];
-  const ROOFCOL=[0x8a4a36,0x556070,0x6b5638,0x3f4654,0x7a5a3a,0x46505c];
+  // ---- パレット（実在の街っぽい落ち着いた色）----
+  const WALL_OFFICE=[0xc2c9d1,0xb3bcc6,0xccd2d9,0xc6c0b2,0xb6ae9f];
+  const GLASS_DARK=[0x3a4a57,0x2f3a45,0x44525e,0x3f4d4a];
+  const WALL_APT=[0xe2d8c4,0xd6c4a6,0xcdbca0,0xdac7b0,0xc8bda9,0xe6dccb];
+  const ROOFCOL=[0x97593a,0x7a4636,0x556070,0x4a4f57,0x6b5638,0x8a5a3a];
+  const SHOP_COL=[0xcf7a4a,0x5f9e7a,0xb96060,0x5f7fb9,0xc9a84a,0x7a5fb0];
   const pick=a=>a[(Math.random()*a.length)|0];
+
+  // 窓：各階に横帯（リボンウィンドウ）をカメラ向きの2面(+x/+z)だけに。メッシュ数を抑える
   function winGrid(g,w,h,d,glass,em){
-    const mat=new THREE.MeshStandardMaterial({color:glass,emissive:em,emissiveIntensity:0.45});
-    const rows=Math.max(1,Math.floor((h-1.4)/2.2)), cols=Math.max(1,Math.round(w/1.6));
-    const cw=w/cols*0.56;
-    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-      const wy=1.6+r*2.2; if(wy>h-0.7) continue;
-      const f=new THREE.Mesh(new THREE.BoxGeometry(cw,1.1,0.06),mat); f.position.set(-w/2+(c+0.5)*(w/cols),wy,d/2+0.03); g.add(f);
-      const b=f.clone(); b.position.z=-d/2-0.03; g.add(b);
+    const mat=new THREE.MeshStandardMaterial({color:glass,emissive:em,emissiveIntensity:0.4});
+    const rows=Math.max(1,Math.floor((h-1.2)/2.3));
+    for(let r=0;r<rows;r++){ const wy=1.5+r*2.3; if(wy>h-0.6) continue;
+      const f=new THREE.Mesh(new THREE.BoxGeometry(w*0.82,1.2,0.05),mat); f.position.set(0,wy,d/2+0.02); g.add(f);
+      const l=new THREE.Mesh(new THREE.BoxGeometry(0.05,1.2,d*0.82),mat); l.position.set(w/2+0.02,wy,0); g.add(l);
     }
   }
+  // 屋上ディテール（ソーラー/ヘリポート/屋上庭園/AC/貯水タンク）
   function rooftop(g,w,h,d){
-    if(h>7){ const t=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.0,8),new THREE.MeshStandardMaterial({color:0x9aa0a8})); t.position.set(w*0.22,h+0.6,d*0.1); g.add(t); }
-    const ac=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.4,0.9),new THREE.MeshStandardMaterial({color:0x8b9098})); ac.position.set(-w*0.2,h+0.45,-d*0.12); g.add(ac);
+    const top=h, r=Math.random();
+    if(r<0.28){ const cols=Math.max(2,Math.floor(w/1.3)), rows=Math.max(2,Math.floor(d/1.3));
+      for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){ const sp=new THREE.Mesh(new THREE.BoxGeometry(w/cols*0.8,0.06,d/rows*0.8),new THREE.MeshStandardMaterial({color:0x29386a,emissive:0x12224e,emissiveIntensity:0.25})); sp.position.set(-w/2+(i+0.5)*(w/cols),top+0.12,-d/2+(j+0.5)*(d/rows)); sp.rotation.x=-0.25; g.add(sp);} }
+    else if(r<0.45 && Math.min(w,d)>5){ const pad=new THREE.Mesh(new THREE.CylinderGeometry(Math.min(w,d)*0.3,Math.min(w,d)*0.3,0.1,16),new THREE.MeshStandardMaterial({color:0x3a3f46})); pad.position.set(0,top+0.08,0); g.add(pad);
+      const h1=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.12,1.1),new THREE.MeshStandardMaterial({color:0xf0ece0})); h1.position.set(0,top+0.15,0); g.add(h1);
+      const h2=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.12,0.28),new THREE.MeshStandardMaterial({color:0xf0ece0})); h2.position.set(0,top+0.15,0); g.add(h2); }
+    else if(r<0.6){ const gd=new THREE.Mesh(new THREE.BoxGeometry(w*0.7,0.12,d*0.7),new THREE.MeshStandardMaterial({color:0x4f8a44})); gd.position.set(0,top+0.1,0); g.add(gd); }
+    if(h>6){ const ac=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.5,0.9),new THREE.MeshStandardMaterial({color:0x8b9098})); ac.position.set(w*0.28,top+0.3,d*0.28); g.add(ac); }
+    if(h>11){ const t=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,1.1,8),new THREE.MeshStandardMaterial({color:0x9aa0a8})); t.position.set(-w*0.26,top+0.65,-d*0.2); g.add(t); }
   }
-  // type: 'office' | 'apartment' | 'shop' | 'house' | 'bank'
-  function townBuilding(x,z,type){
-    const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=(Math.random()*4|0)*Math.PI/2; scene.add(g);
+  // type別に建物を生成（footprint w,d を指定して街区を埋める）
+  function townBuilding(x,z,type,w,d){
+    const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);   // 回転なし（窓を確実にカメラ向きに）
     if(type==='office'){
-      const w=4+Math.random()*2.5, d=4+Math.random()*2.5, h=12+Math.random()*16;
-      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_OFFICE)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      const glass=new THREE.Mesh(new THREE.BoxGeometry(w*1.005,h*0.9,d*1.005),new THREE.MeshStandardMaterial({color:0x9cc4e0,emissive:0x1b333f,emissiveIntensity:0.4})); glass.position.y=h/2; g.add(glass);
-      winGrid(g,w,h,d,0xcfe7f5,0x24414f); rooftop(g,w,h,d);
+      const h=10+Math.random()*18, dark=Math.random()<0.45;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:dark?pick(GLASS_DARK):pick(WALL_OFFICE)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      winGrid(g,w,h,d, dark?0x6f8ba0:0xcfe2ef, dark?0x1a2730:0x24414f);
+      const cap=new THREE.Mesh(new THREE.BoxGeometry(w*1.02,0.4,d*1.02),new THREE.MeshStandardMaterial({color:0x40464e})); cap.position.y=h+0.1; g.add(cap);
+      rooftop(g,w,h,d);
     } else if(type==='apartment'){
-      const w=4.2+Math.random()*2.4, d=3.6+Math.random()*2, h=6+Math.random()*7;
+      const h=5+Math.random()*7;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.5,d*1.06),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.2; roof.castShadow=true; g.add(roof);
-      winGrid(g,w,h,d,0xbfe3ff,0x22425a);
-      // バルコニー
-      const rows=Math.max(1,Math.floor((h-1.4)/2.2));
-      for(let r=0;r<rows;r++){ const wy=1.6+r*2.2; if(wy>h-0.7)continue; const bal=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.18,0.5),new THREE.MeshStandardMaterial({color:0x6b6157})); bal.position.set(0,wy-0.55,d/2+0.25); g.add(bal); }
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,0.4,d*1.05),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.15; roof.castShadow=true; g.add(roof);
+      winGrid(g,w,h,d,0xbfe0f2,0x22425a);
       rooftop(g,w,h,d);
     } else if(type==='shop'){
-      const w=4+Math.random()*2, d=4+Math.random()*1.6, h=3.2+Math.random()*1.8;
+      const h=3+Math.random()*1.6;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0xefe7d8})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.08,0.5,d*1.08),new THREE.MeshStandardMaterial({color:0x4a4750})); roof.position.y=h+0.15; g.add(roof);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.4,d*1.06),new THREE.MeshStandardMaterial({color:0x4a4750})); roof.position.y=h+0.1; g.add(roof);
       const acc=pick(SHOP_COL);
-      const sign=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.8,0.12),new THREE.MeshStandardMaterial({color:acc})); sign.position.set(0,h-0.5,d/2+0.06); g.add(sign);
-      // ストライプ日除け
-      for(let i=0;i<5;i++){ const s=new THREE.Mesh(new THREE.BoxGeometry(w/5*0.96,0.3,1.0),new THREE.MeshStandardMaterial({color:i%2?0xf3ede2:acc})); s.position.set(-w/2+(i+0.5)*(w/5),1.4,d/2+0.5); s.rotation.x=-0.25; g.add(s); }
-      const disp=new THREE.Mesh(new THREE.BoxGeometry(w*0.8,1.3,0.06),new THREE.MeshStandardMaterial({color:0xbfe3ff,emissive:0x24414f,emissiveIntensity:0.4})); disp.position.set(0,0.9,d/2+0.04); g.add(disp);
+      const sign=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.7,0.1),new THREE.MeshStandardMaterial({color:acc})); sign.position.set(0,h-0.4,d/2+0.05); g.add(sign);
+      for(let i=0;i<Math.max(3,Math.round(w/1.2));i++){ const n=Math.max(3,Math.round(w/1.2)); const s=new THREE.Mesh(new THREE.BoxGeometry(w/n*0.95,0.25,0.9),new THREE.MeshStandardMaterial({color:i%2?0xf3ede2:acc})); s.position.set(-w/2+(i+0.5)*(w/n),1.3,d/2+0.45); s.rotation.x=-0.25; g.add(s); }
     } else if(type==='bank'){
-      const w=5+Math.random()*1.5, d=5+Math.random()*1.5, h=5+Math.random()*2.5;
+      const h=5+Math.random()*2;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0xe6ddc8})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      const ped=new THREE.Mesh(new THREE.BoxGeometry(w*1.12,0.6,d*1.12),new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.3; g.add(ped);
-      for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,h*0.7,10),new THREE.MeshStandardMaterial({color:0xf3ecdb})); c.position.set(-w/2+0.6+i*((w-1.2)/4),h*0.35+0.3,d/2+0.2); g.add(c); }
-      const ped2=new THREE.Mesh(new THREE.BoxGeometry(w*1.0,0.5,1.0),new THREE.MeshStandardMaterial({color:0xf3ecdb})); ped2.position.set(0,h*0.7+0.3,d/2+0.2); g.add(ped2);
-      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.5,d*1.06),new THREE.MeshStandardMaterial({color:0x6c7785})); roof.position.y=h+0.2; g.add(roof);
+      const ped=new THREE.Mesh(new THREE.BoxGeometry(w*1.1,0.5,d*1.1),new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.25; g.add(ped);
+      for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,h*0.7,8),new THREE.MeshStandardMaterial({color:0xf3ecdb})); c.position.set(-w/2+0.6+i*((w-1.2)/4),h*0.35+0.25,d/2+0.18); g.add(c); }
+      const ent=new THREE.Mesh(new THREE.BoxGeometry(w*0.98,0.45,0.9),new THREE.MeshStandardMaterial({color:0xf3ecdb})); ent.position.set(0,h*0.7+0.25,d/2+0.18); g.add(ent);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.04,0.4,d*1.04),new THREE.MeshStandardMaterial({color:0x6c7785})); roof.position.y=h+0.15; g.add(roof);
     } else { // house
-      const w=3+Math.random()*1.6, d=3+Math.random()*1.4, h=2.4+Math.random()*1.6;
+      const h=2.2+Math.random()*1.4;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*0.78,1.6,4),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.8; roof.rotation.y=Math.PI/4; roof.castShadow=true; g.add(roof);
-      const win=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,0.06),new THREE.MeshStandardMaterial({color:0xbfe3ff,emissive:0x22425a,emissiveIntensity:0.4})); win.position.set(0,h*0.55,d/2+0.03); g.add(win);
+      const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*0.74,1.4,4),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.7; roof.rotation.y=Math.PI/4; roof.castShadow=true; g.add(roof);
     }
     return g;
   }
-  // ---- 街区ごとに性格を変えて充填（都心＝高層オフィス / 住宅街 / 商店街）----
-  const PCEN=[-81,-63,-45,-27,-9,9,27,45,63,81];
-  function fillBlock(cx,cz){
-    const r2 = cx*cx+cz*cz;
-    let kind;
-    if(r2<1200) kind = Math.random()<0.7?'downtown':'commercial';
-    else if(r2<4500) kind = pick(['downtown','commercial','residential','residential']);
-    else kind = pick(['residential','residential','suburb']);
-    const place=(ox,oz,type)=>{ const x=cx+ox, z=cz+oz; if(near(x,z,6.5)) return; townBuilding(x,z,type); };
-    if(kind==='downtown'){
-      place((Math.random()-0.5)*3,(Math.random()-0.5)*3, Math.random()<0.7?'office':'bank');
-      if(Math.random()<0.4) place(5.5*(Math.random()<.5?1:-1),5*(Math.random()<.5?1:-1),'apartment');
+
+  // ---- 街区を芝の区画にして建物を密に充填（グレー舗装＝道路がすき間に見える）----
+  const STEP=22, PLOT=16;                 // 区画ピッチ / 区画サイズ（差＝道路幅）
+  const GRID=[]; for(let v=-88; v<=88; v+=STEP) GRID.push(v);
+  function plotLawn(cx,cz){ const l=new THREE.Mesh(new THREE.PlaneGeometry(PLOT,PLOT),new THREE.MeshStandardMaterial({color:pick0(0x8caa6a,0x86a35f,0x93ab72)})); l.rotation.x=-Math.PI/2; l.position.set(cx,0.02,cz); scene.add(l); }
+  function placeB(x,z,type,w,d){ if(near(x,z,5.5)) return; townBuilding(x,z,type,w,d); }
+  function fillPlot(cx,cz){
+    plotLawn(cx,cz);
+    const r2=cx*cx+cz*cz;
+    let kind = r2<2200 ? (Math.random()<0.55?'tower':'mid')
+             : r2<7000 ? pick(['tower','mid','mid','commercial','blockhouse'])
+             : pick(['blockhouse','blockhouse','mid','green']);
+    const H=PLOT/2;
+    if(kind==='tower'){
+      const w=PLOT*0.5+Math.random()*3, d=PLOT*0.5+Math.random()*3;
+      placeB(cx+(Math.random()-0.5)*1.5, cz+(Math.random()-0.5)*1.5, Math.random()<0.78?'office':'bank', w, d);
+      // 余白に低層を一つ
+      if(Math.random()<0.6) placeB(cx+H*0.55, cz-H*0.55, pick(['apartment','shop']), PLOT*0.32, PLOT*0.32);
+    } else if(kind==='mid'){
+      // 2x2 の中低層
+      for(const o of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(Math.random()<0.85) placeB(cx+o[0]*H*0.5, cz+o[1]*H*0.5, pick(['apartment','apartment','office','shop']), PLOT*0.42, PLOT*0.42); }
     } else if(kind==='commercial'){
-      place(-4,0,'shop'); place(4,0,'shop'); if(Math.random()<0.6) place(0,5,'apartment'); if(Math.random()<0.5) place(0,-5,'shop');
-    } else if(kind==='residential'){
-      for(const o of [[-4,-4],[4,-4],[-4,4],[4,4]]) if(Math.random()<0.8) place(o[0]+(Math.random()-0.5)*2,o[1]+(Math.random()-0.5)*2, Math.random()<0.5?'house':'apartment');
-    } else { // suburb：家まばら＋緑
-      for(const o of [[-4,-4],[5,3],[-3,5]]) if(Math.random()<0.7) place(o[0],o[1],'house');
+      placeB(cx, cz-H*0.5, 'shop', PLOT*0.86, PLOT*0.36);
+      placeB(cx, cz+H*0.45, pick(['apartment','office']), PLOT*0.86, PLOT*0.42);
+    } else if(kind==='blockhouse'){
+      // 3x3 の住宅をぎっしり
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.82) placeB(cx+i*H*0.62, cz+j*H*0.62, Math.random()<0.7?'house':'apartment', PLOT*0.27, PLOT*0.27); }
+    } else { // green：小公園
+      for(let i=0;i<6;i++){ const a=Math.random()*Math.PI*2, rr=Math.random()*H*0.7; tree(cx+Math.cos(a)*rr, cz+Math.sin(a)*rr, 0.9+Math.random()*0.4); }
     }
   }
-  for(const cx of PCEN) for(const cz of PCEN){ if(near(cx,cz,9)) continue; fillBlock(cx,cz); }
+  for(const cx of GRID) for(const cz of GRID){ if(near(cx,cz,11)) continue; fillPlot(cx,cz); }
 
-  // 街路樹
-  function tree(x,z){
-    const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
-    const t=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.2,1.0,6), new THREE.MeshStandardMaterial({color:0x7a5230})); t.position.y=0.5; g.add(t);
-    const f=new THREE.Mesh(new THREE.ConeGeometry(1.0,2.2,8), new THREE.MeshStandardMaterial({color:0x3f8a45})); f.position.y=2.0; f.castShadow=true; g.add(f);
-  }
-  for(let i=0;i<90;i++){
-    const x=(Math.random()-0.5)*190, z=(Math.random()-0.5)*190;
-    if(near(x,z,7)) continue;
-    if(ROADS.some(p=>Math.abs(p-x)<3.5)||ROADS.some(p=>Math.abs(p-z)<3.5)) continue; // 道路上は避ける
-    tree(x,z);
+  // 道路の白線（区画のすき間に走るレーン）— 破線。メッシュ数を抑えるため間隔広め
+  const dashMat=new THREE.MeshStandardMaterial({color:0xeae4d4});
+  for(let k=-88-STEP/2; k<=88+STEP/2; k+=STEP){
+    for(let s=-94; s<94; s+=7){
+      const dh=new THREE.Mesh(new THREE.PlaneGeometry(2.4,0.22),dashMat); dh.rotation.x=-Math.PI/2; dh.position.set(s+1.2,0.03,k); scene.add(dh);
+      const dv=new THREE.Mesh(new THREE.PlaneGeometry(0.22,2.4),dashMat); dv.rotation.x=-Math.PI/2; dv.position.set(k,0.03,s+1.2); scene.add(dv);
+    }
   }
 
   // 公園（芝＋池＋木立＋ベンチ）
   (function park(){
-    const px=-9, pz=-27;                                   // 道路の間の一区画を公園に
-    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(15,15), new THREE.MeshStandardMaterial({color:0x6fae5a}));
+    const px=-9, pz=-27;
+    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(16,16), new THREE.MeshStandardMaterial({color:0x6fae5a}));
     lawn.rotation.x=-Math.PI/2; lawn.position.set(px,0.03,pz); scene.add(lawn);
-    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.4,20), new THREE.MeshStandardMaterial({color:0x3aa6c0}));
+    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.6,20), new THREE.MeshStandardMaterial({color:0x2fa6c4}));
     pond.rotation.x=-Math.PI/2; pond.position.set(px+2,0.05,pz+2); scene.add(pond);
-    for(let i=0;i<7;i++){ const a=i/7*Math.PI*2; tree(px+Math.cos(a)*5.5-1, pz+Math.sin(a)*5.5-1); }
-    for(const o of [[-4,-4],[-4,4]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.3,pz+o[1]); scene.add(bn); }
+    for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*6-1, pz+Math.sin(a)*6-1, 1.1); }
+    for(const o of [[-5,-4],[-5,4]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.3,pz+o[1]); scene.add(bn); }
   })();
 
-  // 走る車（道路グリッド上を往復）
+  // 走る車（区画のすき間＝道路を往復）
+  const ROADLINES=[]; for(let k=-88-STEP/2; k<=88+STEP/2; k+=STEP) ROADLINES.push(k);
   const CARCOL=[0xd24b4b,0x4b78d2,0xe0b24a,0x3fae6a,0xdddddd,0x9a5bd0,0x37424f];
   function makeCar(){
     const g=new THREE.Group();
     const col=CARCOL[(Math.random()*CARCOL.length)|0];
-    const body=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.7,3.0), new THREE.MeshStandardMaterial({color:col})); body.position.y=0.45; body.castShadow=true; g.add(body);
-    const cab=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.6,1.5), new THREE.MeshStandardMaterial({color:0x223040})); cab.position.set(0,0.95,-0.1); g.add(cab);
+    const body=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.6,2.6), new THREE.MeshStandardMaterial({color:col})); body.position.y=0.4; body.castShadow=true; g.add(body);
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.5,1.3), new THREE.MeshStandardMaterial({color:0x223040})); cab.position.set(0,0.85,-0.1); g.add(cab);
     scene.add(g);
-    const onX = Math.random()<0.5;                         // x軸沿い or z軸沿い
-    const road = ROADS[(Math.random()*ROADS.length)|0];
+    const onX = Math.random()<0.5;
+    const road = ROADLINES[(Math.random()*ROADLINES.length)|0];
     const dir = Math.random()<0.5?1:-1;
-    const lane = dir>0?1.6:-1.6;
+    const lane = dir>0?1.5:-1.5;
     const car={ g, onX, road, dir, p:(Math.random()-0.5)*180, speed:6+Math.random()*8, lane };
     cityCars.push(car); return car;
   }
-  for(let i=0;i<16;i++) makeCar();
+  for(let i=0;i<18;i++) makeCar();
 
   // カフェ（本店・支店・ライバル）と空き物件・空港は init で配置する
   scene._isStore = false;
