@@ -40,6 +40,14 @@
   .hint{position:fixed; left:50%; transform:translateX(-50%); bottom:70px; background:var(--panel); border:1px solid var(--line);
     border-radius:20px; padding:6px 14px; font-size:12px; color:var(--sub); pointer-events:none; white-space:nowrap;}
 
+  /* 移動パッド（バーチャルスティック） */
+  #joystick{position:fixed; left:18px; bottom:84px; width:118px; height:118px; border-radius:50%;
+    background:rgba(26,20,14,.45); border:1px solid var(--line); z-index:25; display:none; touch-action:none;}
+  #joystick.show{display:block;}
+  #joystick .knob{position:absolute; left:50%; top:50%; width:50px; height:50px; margin:-25px 0 0 -25px; border-radius:50%;
+    background:rgba(224,137,74,.9); border:2px solid rgba(255,255,255,.25); box-shadow:0 3px 10px rgba(0,0,0,.45);}
+  #joystick .ring{position:absolute; inset:8px; border-radius:50%; border:1px dashed rgba(255,255,255,.12);}
+
   .carrybadge{position:fixed; left:50%; transform:translateX(-50%); bottom:108px; background:var(--panel); border:1px solid var(--gold);
     color:var(--gold); border-radius:20px; padding:5px 14px; font-size:13px; font-weight:800; pointer-events:none;}
 
@@ -213,22 +221,39 @@
     <div id="slot-list"></div>
     <span class="back-link" data-go="menu">← 戻る</span>
   </div>
-  <!-- 新規：ブランド設定 -->
+  <!-- 新規①：ブランド設定 -->
   <div class="screen" data-screen="brand">
-    <h2 style="margin:0 0 2px">ブランド設定</h2>
+    <h2 style="margin:0 0 2px">① ブランド設定</h2>
     <div class="title-sub">店名とロゴを決めよう（あとで変更可）</div>
     <input id="brand-name" class="field" placeholder="ブランド名" maxlength="14" value="マイカフェ">
     <div class="logo-grid" id="logo-grid"></div>
-    <button class="btn" id="brand-next" style="width:100%">次へ：出店場所</button>
+    <button class="btn" id="brand-next" style="width:100%">次へ：街を選ぶ</button>
     <span class="back-link" data-go="menu">← 戻る</span>
   </div>
-  <!-- 新規：出店場所 -->
-  <div class="screen" data-screen="loc">
-    <h2 style="margin:0 0 2px">出店場所を選ぶ</h2>
-    <div class="title-sub">立地で来る客層が変わります</div>
-    <div id="loc-grid"></div>
-    <button class="btn" id="loc-start" style="width:100%; margin-top:6px">この場所で開店！</button>
+  <!-- 新規②：街（都市）選び -->
+  <div class="screen" data-screen="city">
+    <h2 style="margin:0 0 2px">② 出店する街を選ぶ</h2>
+    <div class="title-sub">街で需要・競合・交通量が変わります</div>
+    <div id="city-grid"></div>
+    <button class="btn" id="city-next" style="width:100%; margin-top:6px">次へ：物件を探す</button>
     <span class="back-link" data-go="brand">← 戻る</span>
+  </div>
+  <!-- 新規③：テナント（物件）選び -->
+  <div class="screen" data-screen="tenant">
+    <h2 style="margin:0 0 2px">③ 物件（テナント）を選ぶ</h2>
+    <div class="title-sub">賃料・交通量・初期費用を見て決めよう</div>
+    <div id="tenant-grid"></div>
+    <button class="btn" id="tenant-next" style="width:100%; margin-top:6px">次へ：内装・設備</button>
+    <span class="back-link" data-go="city">← 戻る</span>
+  </div>
+  <!-- 新規④：内装・設備＋初期費用 -->
+  <div class="screen" data-screen="setup">
+    <h2 style="margin:0 0 2px">④ 内装・設備を決める</h2>
+    <div class="title-sub">こだわるほど初期費用UP（評価・品質に反映）</div>
+    <div id="setup-body" style="text-align:left"></div>
+    <div id="setup-cost" style="margin:12px 0; font-weight:800"></div>
+    <button class="btn" id="setup-start" style="width:100%">この内容で開店する</button>
+    <span class="back-link" data-go="tenant">← 戻る</span>
   </div>
 </div>
 
@@ -260,6 +285,7 @@
 </div>
 
 <div class="carrybadge" id="carry" style="display:none"></div>
+<div id="joystick"><div class="ring"></div><div class="knob" id="joy-knob"></div></div>
 <button id="btn-dash" title="ダッシュボード"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="2" y="10" width="3.6" height="7" rx="1"/><rect x="8.2" y="5" width="3.6" height="12" rx="1"/><rect x="14.4" y="2" width="3.6" height="15" rx="1"/></svg></button>
 <button id="btn-manage" title="経営（事務所）"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="3" y="3" width="9" height="14" rx="1"/><rect x="12" y="7" width="5" height="10" rx="1"/><g fill="#1a140e"><rect x="5" y="5.5" width="1.8" height="1.8"/><rect x="8" y="5.5" width="1.8" height="1.8"/><rect x="5" y="9" width="1.8" height="1.8"/><rect x="8" y="9" width="1.8" height="1.8"/><rect x="13.4" y="9.5" width="1.5" height="1.5"/></g></svg></button>
 <button id="btn-settings" title="設定"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path d="M10 6.5 a3.5 3.5 0 1 0 0 7 a3.5 3.5 0 0 0 0 -7 Z M10 8.5 a1.5 1.5 0 1 1 0 3 a1.5 1.5 0 0 1 0 -3 Z"/><path d="M10 1.6 l1.2 2.2 2.5 -.5 .3 2.5 2.2 1.2 -1.1 2.3 1.1 2.3 -2.2 1.2 -.3 2.5 -2.5 -.5 -1.2 2.2 -1.2 -2.2 -2.5 .5 -.3 -2.5 -2.2 -1.2 1.1 -2.3 -1.1 -2.3 2.2 -1.2 .3 -2.5 2.5 .5 Z" opacity=".55"/></svg></button>
@@ -354,8 +380,39 @@ function mergeInto(t, s){
   for(const k in s.sold)   t.sold[k]  =(t.sold[k]  ||0)+s.sold[k];
 }
 
+// ---- 出店フロー（街・テナント・内装/設備）----
+const START_CAPITAL = 150000;   // 新規開始時の元手（ここから初期費用を支払う）
+const CITIES = [
+  {id:'tokyo',  name:'東京',   mul:1.35, desc:'需要最大・競合も多い'},
+  {id:'osaka',  name:'大阪',   mul:1.15, desc:'活気ある商業圏'},
+  {id:'nagoya', name:'名古屋', mul:1.00, desc:'バランス型'},
+  {id:'fukuoka',name:'福岡',   mul:0.88, desc:'競合少なめの穴場'},
+];
+const TENANT_DEFS = [
+  {cat:'オフィス街の路面1等地', loc:'downtown',    tr:[10000,15000], rent:[3800,5200], cost:[34000,46000], risk:'収益も損益も大きい'},
+  {cat:'学生街のビル1階',       loc:'college',     tr:[7000,11000],  rent:[2400,3400], cost:[22000,32000], risk:'バランス型'},
+  {cat:'観光地の好立地',         loc:'tourist',     tr:[8000,13000],  rent:[3000,4200], cost:[26000,38000], risk:'人通り多め'},
+  {cat:'住宅街の角地',           loc:'residential', tr:[4000,7000],   rent:[1600,2400], cost:[14000,22000], risk:'低リスク低リターン'},
+];
+function genTenants(city){
+  const pool=[...TENANT_DEFS], out=[];
+  for(let i=0;i<3 && pool.length;i++){
+    const d=pool.splice((Math.random()*pool.length)|0,1)[0];
+    out.push({
+      cat:d.cat, loc:d.loc, risk:d.risk,
+      traffic:Math.round((d.tr[0]+Math.random()*(d.tr[1]-d.tr[0]))*city.mul/100)*100,
+      rent:Math.round((d.rent[0]+Math.random()*(d.rent[1]-d.rent[0]))*city.mul/100)*100,
+      cost:Math.round((d.cost[0]+Math.random()*(d.cost[1]-d.cost[0]))*city.mul/1000)*1000,
+    });
+  }
+  return out;
+}
+const EXTERIORS = [ {name:'スタンダード',cost:0,brand:0}, {name:'レンガ調',cost:8000,brand:4}, {name:'大理石',cost:18000,brand:8} ];
+const INTERIORS = [ {name:'ナチュラル',vibe:'cozy',cost:0}, {name:'シック（高級感）',vibe:'chic',cost:10000}, {name:'ポップ',vibe:'pop',cost:6000} ];
+const EQUIP_SETS = [ {name:'エントリー機',cost:0,mlv:1}, {name:'スタンダード機',cost:9000,mlv:2}, {name:'プロ仕様機',cost:20000,mlv:3} ];
+
 // ---- 資金繰り（家賃・ローン・投資）----
-const RENT = { downtown:4000, college:2500, residential:2000, tourist:3500 }; // 立地別の日次家賃
+const RENT = { downtown:4000, college:2500, residential:2000, tourist:3500 }; // 立地別の日次家賃（テナント未設定時のフォールバック）
 const LOAN_RATE = 0.02;     // 借入の日利
 const INVEST_RATE = 0.015;  // 運用の日利
 const finance = { debt:0, invest:0 };
@@ -431,7 +488,7 @@ const playerShare= () => playerComp()/totalComp();
 // 支店の1日の純益（本店は実プレイで稼ぐので0）。COOで効率UP
 function branchDailyNet(b){
   if(b===branches[0]) return 0;
-  const rev = Math.round(CITY_DEMAND * (branchComp(b)/totalComp()) * (hasExec('coo')?1.2:1));
+  const rev = Math.round(CITY_DEMAND * (store.cityMul||1) * (branchComp(b)/totalComp()) * (hasExec('coo')?1.2:1));
   return rev - (RENT[b.loc]||2500);     // 売上シェア − 支店家賃
 }
 const branchesDailyNet = () => branches.reduce((a,b)=>a+branchDailyNet(b), 0);
@@ -876,8 +933,9 @@ function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTa
 btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
-    ? 'レジ／並んでる客をタップ→先頭から注文を提供 ／ くつろぐ客をタップ→会話 ／ 床タップで移動'
+    ? 'パッドで移動 ／ レジ・並ぶ客をタップ→提供 ／ くつろぐ客をタップ→会話'
     : '自分のカフェ（オレンジの建物）をタップして中に入る ／ 緑・青の建物は競合店';
+  const js=document.getElementById('joystick'); if(js) js.classList.toggle('show', sim.mode==='store');
 }
 let hintTimer = null;
 function flashHint(msg){
@@ -898,6 +956,10 @@ const store = {
   priceLevel: 1.0,      // 価格帯（1.0=標準／>1 高級／<1 安い）← メニュー価格の平均で算出予定
   vibe: 'cozy',         // 内装の雰囲気（cozy / chic / pop）← 内装で変化
   location: 'downtown', // 立地（downtown / college / residential / tourist）← 出店で選ぶ
+  cityName: '東京',     // 出店した街
+  cityMul: 1.0,         // 街の需要倍率（支店売上に影響）
+  rentDaily: 0,         // テナント賃料（日次）。0なら立地デフォルト
+  traffic: 8000,        // 交通量（1日の人通り）← 集客に影響
 };
 
 // ---- ペルソナ：見た目・注文傾向・行動・来店時間帯・店の好みが異なる ----
@@ -1037,7 +1099,7 @@ function trySpawnCustomer(dtGameMin){
   while(spawnAccum >= interval){
     spawnAccum -= interval;
     if(queue.length >= queueCap()) continue;   // 行列が一杯なら入店しない（設備で拡張）
-    if(Math.random() < 0.4 + brand/200) spawnCustomer();   // ブランド力で集客UP
+    if(Math.random() < Math.min(0.95, 0.28 + brand/220 + (store.traffic||6000)/32000)) spawnCustomer();   // 交通量＋ブランドで集客
   }
 }
 
@@ -1221,6 +1283,16 @@ function updateFloats(dt){
 function updatePlayer(dt){
   if(sim.mode!=='store') return;
   const sp = 4.5*dt;
+  // 移動パッド（最優先）
+  if(joyActive && (joyVec.x || joyVec.z)){
+    player.userData.moveTarget=null; player.userData.task=null;
+    const l=Math.hypot(joyVec.x,joyVec.z)||1, nx=joyVec.x/l, nz=joyVec.z/l, mag=Math.min(1,l);
+    player.position.x=THREE.MathUtils.clamp(player.position.x+nx*sp*mag, -STORE.w/2+0.6, STORE.w/2-0.6);
+    player.position.z=THREE.MathUtils.clamp(player.position.z+nz*sp*mag, -STORE.d/2+0.6, STORE.d/2-0.6);
+    player.rotation.y=Math.atan2(nx,nz);
+    if(moveMarker && moveMarker.material.opacity>0) moveMarker.material.opacity=Math.max(0,moveMarker.material.opacity-dt*0.5);
+    return;
+  }
   let vx=0, vz=0;
   if(keys.KeyW||keys.ArrowUp) vz-=1;
   if(keys.KeyS||keys.ArrowDown) vz+=1;
@@ -1302,7 +1374,7 @@ document.getElementById('btn-close').onclick = ()=>{
   modal.classList.add('show');
 };
 // 日次PL（営業損益）
-function plRent(){ return RENT[store.location]||0; }
+function plRent(){ return store.rentDaily || RENT[store.location] || 0; }
 function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
 function plBreakdown(){
   const tips = dayStats.tips;
@@ -1504,6 +1576,8 @@ function renderManage(){
     }
     h += `<div class="note">席＝取りこぼし減／マシン＝チップ／POS＝行列収容／内装＝居心地（我慢・常連化）。</div>`;
   } else if(mtab==='store'){
+    h += `<div class="dash-h">本店の概要</div>`;
+    h += `<div class="mrow"><div class="nm">${store.cityName}｜${LOC_JP[store.location]}<div class="sub2">交通量 ${(store.traffic||0).toLocaleString('ja-JP')}人/日・賃料¥${plRent().toLocaleString('ja-JP')}/日</div></div></div>`;
     h += `<div class="dash-h">立地（移転 ¥${RELOCATE_COST.toLocaleString('ja-JP')}）</div>`;
     const locHint = { downtown:'会社員が多い', college:'学生が多い', residential:'家族が多い', tourist:'観光客が多い' };
     for(const k in LOC_JP){
@@ -1591,7 +1665,7 @@ function renderManage(){
     }
     h += `<div class="note">支店は自動運営。競争力（設備・人員・価格・支店Lv）でシェアが決まり、支店の純益が毎日のPLに加わります。</div>`;
   } else if(mtab==='finance'){
-    const rent = RENT[store.location]||0;
+    const rent = plRent();
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div>
        <div class="kpi"><div class="v" style="color:var(--red)">¥${finance.debt.toLocaleString('ja-JP')}</div><div class="l">借入残（日利2%）</div></div>
@@ -1672,7 +1746,7 @@ document.getElementById('manage-body').addEventListener('click', e=>{
   } else if(t.dataset.equip){
     upgradeEquip(t.dataset.equip);
   } else if(t.dataset.loc){
-    if(store.location!==t.dataset.loc && sim.money>=RELOCATE_COST){ sim.money-=RELOCATE_COST; dayStats.capex+=RELOCATE_COST; store.location=t.dataset.loc; }
+    if(store.location!==t.dataset.loc && sim.money>=RELOCATE_COST){ sim.money-=RELOCATE_COST; dayStats.capex+=RELOCATE_COST; store.location=t.dataset.loc; store.rentDaily=RENT[t.dataset.loc]||0; store.traffic={downtown:11000,college:8000,residential:5000,tourist:10000}[t.dataset.loc]||7000; }
   } else if(t.dataset.vibe){
     if(store.vibe!==t.dataset.vibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; dayStats.capex+=RENOVATE_COST; store.vibe=t.dataset.vibe; }
   } else if(t.dataset.loan){
@@ -1749,7 +1823,7 @@ function gameState(){
     profile,
     money:sim.money, day:sim.day, minutes:sim.minutes,
     custToday:sim.custToday, revToday:sim.revToday, servedToday:sim.servedToday, lostToday:sim.lostToday,
-    store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location },
+    store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location, cityName:store.cityName, cityMul:store.cityMul, rentDaily:store.rentDaily, traffic:store.traffic },
     menu:MENU.map(m=>({id:m.id,name:m.name,basePrice:m.basePrice,price:m.price,enabled:m.enabled,recipe:m.recipe})),
     materials:Object.fromEntries(Object.entries(materials).map(([k,v])=>[k,v.stock])),
     equip:Object.fromEntries(Object.entries(equip).map(([k,e])=>[k,e.lv])),
@@ -1809,6 +1883,27 @@ function miniToast(msg){
 }
 
 // =====================================================================
+//  移動パッド（バーチャルスティック）
+// =====================================================================
+const joyEl = document.getElementById('joystick');
+const joyKnob = document.getElementById('joy-knob');
+const joyVec = { x:0, z:0 };
+let joyActive = false, joyId = null;
+const JOY_R = 44;
+function joyMove(e){
+  const r=joyEl.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+  let dx=e.clientX-cx, dy=e.clientY-cy; const d=Math.hypot(dx,dy)||1, cl=Math.min(d,JOY_R);
+  dx=dx/d*cl; dy=dy/d*cl;
+  joyKnob.style.transform=`translate(${dx}px,${dy}px)`;
+  joyVec.x=dx/JOY_R; joyVec.z=dy/JOY_R;
+}
+function joyEnd(){ joyActive=false; joyId=null; joyVec.x=0; joyVec.z=0; joyKnob.style.transform='translate(0,0)'; }
+joyEl.addEventListener('pointerdown', e=>{ e.preventDefault(); joyActive=true; joyId=e.pointerId; try{joyEl.setPointerCapture(e.pointerId);}catch(_){} joyMove(e); });
+joyEl.addEventListener('pointermove', e=>{ if(joyActive){ e.preventDefault(); joyMove(e); } });
+joyEl.addEventListener('pointerup', joyEnd);
+joyEl.addEventListener('pointercancel', joyEnd);
+
+// =====================================================================
 //  タイトル / オンボーディング / 設定
 // =====================================================================
 const titleEl = document.getElementById('title');
@@ -1836,21 +1931,53 @@ function renderLogoGrid(){
 document.getElementById('logo-grid').addEventListener('click', e=>{
   const o=e.target.closest('[data-logo]'); if(!o) return; selectedLogo=+o.dataset.logo; renderLogoGrid();
 });
-// ブランド→出店場所
-document.getElementById('brand-next').onclick = ()=>{ renderLocGrid(); showScreen('loc'); };
-let setupLoc = 'downtown';
-function renderLocGrid(){
-  const hint = { downtown:'会社員が多い', college:'学生が多い', residential:'家族が多い', tourist:'観光客が多い' };
-  document.getElementById('loc-grid').innerHTML = Object.keys(LOC_JP).map(k=>
-    `<div class="mcard ${k===setupLoc?'sel':''}" data-setloc="${k}"><div class="thumb">${ART[k]}</div><div class="info"><div class="ttl">${LOC_JP[k]}</div><div class="meta">${hint[k]}・家賃¥${(RENT[k]||0).toLocaleString('ja-JP')}/日</div></div></div>`).join('');
+// ② 街選び
+let setupCity = 0, setupTenants = [], setupTenant = 0, setupExt = 0, setupInt = 0, setupEq = 0;
+document.getElementById('brand-next').onclick = ()=>{ renderCityGrid(); showScreen('city'); };
+function renderCityGrid(){
+  document.getElementById('city-grid').innerHTML = CITIES.map((c,i)=>
+    `<div class="mcard ${i===setupCity?'sel':''}" data-setcity="${i}"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">${c.name}</div><div class="meta">${c.desc}・需要×${c.mul.toFixed(2)}</div></div></div>`).join('');
 }
-document.getElementById('loc-grid').addEventListener('click', e=>{
-  const o=e.target.closest('[data-setloc]'); if(!o) return; setupLoc=o.dataset.setloc; renderLocGrid();
+document.getElementById('city-grid').addEventListener('click', e=>{ const o=e.target.closest('[data-setcity]'); if(!o) return; setupCity=+o.dataset.setcity; renderCityGrid(); });
+// ③ テナント選び（街を選ぶたびに物件を生成）
+document.getElementById('city-next').onclick = ()=>{ setupTenants=genTenants(CITIES[setupCity]); setupTenant=0; renderTenantGrid(); showScreen('tenant'); };
+function renderTenantGrid(){
+  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
+  document.getElementById('tenant-grid').innerHTML = setupTenants.map((t,i)=>
+    `<div class="mcard ${i===setupTenant?'sel':''}" data-settenant="${i}"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div><div class="meta">交通量 ${t.traffic.toLocaleString('ja-JP')}人/日・賃料¥${t.rent.toLocaleString('ja-JP')}/日</div><div class="meta">初期費用 ¥${t.cost.toLocaleString('ja-JP')}・${t.risk}</div></div></div>`).join('');
+}
+document.getElementById('tenant-grid').addEventListener('click', e=>{ const o=e.target.closest('[data-settenant]'); if(!o) return; setupTenant=+o.dataset.settenant; renderTenantGrid(); });
+// ④ 内装・設備
+document.getElementById('tenant-next').onclick = ()=>{ renderSetup(); showScreen('setup'); };
+function setupCost(){ return setupTenants[setupTenant].cost + EXTERIORS[setupExt].cost + INTERIORS[setupInt].cost + EQUIP_SETS[setupEq].cost; }
+function renderSetup(){
+  const row=(label,arr,sel,key)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
+    arr.map((o,i)=>`<button class="mbtn ${i===sel?'sel':''}" data-${key}="${i}" style="margin:3px 4px 3px 0">${o.name}${o.cost?` +¥${o.cost.toLocaleString('ja-JP')}`:'（無料）'}</button>`).join('');
+  document.getElementById('setup-body').innerHTML =
+    row('外装',EXTERIORS,setupExt,'setext') + row('内装',INTERIORS,setupInt,'setint') + row('初期設備（マシン）',EQUIP_SETS,setupEq,'seteq');
+  const cost=setupCost(), left=START_CAPITAL-cost;
+  document.getElementById('setup-cost').innerHTML =
+    `初期費用 <span class="gold">¥${cost.toLocaleString('ja-JP')}</span>　/　開業後の手元資金 <span class="${left>=0?'green':''}" style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
+  document.getElementById('setup-start').disabled = left<0;
+}
+document.getElementById('setup-body').addEventListener('click', e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.setext!==undefined) setupExt=+t.dataset.setext;
+  else if(t.dataset.setint!==undefined) setupInt=+t.dataset.setint;
+  else if(t.dataset.seteq!==undefined) setupEq=+t.dataset.seteq;
+  renderSetup();
 });
-// 新規スタート（クリーンな初期状態にするためリロード経由）
-document.getElementById('loc-start').onclick = ()=>{
-  const payload = { slot:firstEmptySlot(), loc:setupLoc,
-    profile:{ owner:profile.owner, brandName:(document.getElementById('brand-name').value.trim()||'マイカフェ'), logo:selectedLogo } };
+// 開店（クリーンな初期状態にするためリロード経由）
+document.getElementById('setup-start').onclick = ()=>{
+  const city=CITIES[setupCity], t=setupTenants[setupTenant];
+  const payload = {
+    slot:firstEmptySlot(),
+    profile:{ owner:profile.owner, brandName:(document.getElementById('brand-name').value.trim()||'マイカフェ'), logo:selectedLogo },
+    city:{ name:city.name, mul:city.mul },
+    tenant:{ loc:t.loc, rent:t.rent, traffic:t.traffic },
+    vibe:INTERIORS[setupInt].vibe, mlv:EQUIP_SETS[setupEq].mlv, extBrand:EXTERIORS[setupExt].brand,
+    initialCost:setupCost(),
+  };
   try{ sessionStorage.setItem('cafeNewGame', JSON.stringify(payload)); }catch(e){}
   location.reload();
 };
@@ -1945,7 +2072,16 @@ const _newGame = (()=>{ try{ return JSON.parse(sessionStorage.getItem('cafeNewGa
 if(_newGame){
   try{ sessionStorage.removeItem('cafeNewGame'); }catch(e){}
   activeSlot=_newGame.slot; profile=_newGame.profile;
-  store.location=_newGame.loc; branches[0].loc=_newGame.loc;
+  const t=_newGame.tenant||{loc:'downtown'};
+  store.location=t.loc; branches[0].loc=t.loc;
+  store.vibe=_newGame.vibe||'cozy';
+  store.cityName=(_newGame.city&&_newGame.city.name)||'東京';
+  store.cityMul=(_newGame.city&&_newGame.city.mul)||1.0;
+  store.rentDaily=t.rent||0;
+  store.traffic=t.traffic||8000;
+  if(_newGame.mlv) equip.machine.lv=_newGame.mlv;
+  brand = 20 + (_newGame.extBrand||0);
+  sim.money = START_CAPITAL - (_newGame.initialCost||0);
   recomputePriceLevel(); saveGame();
   startGame();              // クリーンな初期状態で即開始
 } else {
