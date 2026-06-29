@@ -412,6 +412,20 @@
   </div>
 </div>
 
+<!-- 店舗の改装（外装・内装・設備） -->
+<div class="modal" id="modal-remodel">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-remodel" aria-label="閉じる">×</button>
+    <h2>店舗の改装</h2>
+    <div id="remodel-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot">
+      <div id="remodel-cost" style="margin:0 0 10px; font-weight:800"></div>
+      <button class="btn" id="remodel-go" style="width:100%">改装を始める</button>
+      <button class="btn ghost" id="remodel-cancel" style="width:100%; margin-top:8px">キャンセル</button>
+    </div>
+  </div>
+</div>
+
 <!-- 空港（都市移動） -->
 <div class="modal" id="modal-airport">
   <div class="sheet" style="max-width:420px">
@@ -722,10 +736,12 @@ function managersDailyTick(){
   const notes=[];
   branches.forEach((b,idx)=>{
     const m=b.manager; if(!m) return;
-    m.fuman = Math.max(0, Math.min(100, m.fuman + (m.bonus? -4 : 3)));
-    if(Math.random() < 0.25){           // トラブル発生
-      if(Math.random() < mgrApproval(m)) notes.push(`${b.name}：${m.name}がトラブルを無事処理`);
-      else { const loss=2000+(Math.random()*3000|0); sim.money-=loss; m.fuman=Math.min(100,m.fuman+8); notes.push(`${b.name}：対応失敗 −¥${loss.toLocaleString('ja-JP')}`); }
+    const del = m.del||{};
+    m.fuman = Math.max(0, Math.min(100, m.fuman + (m.bonus? -4 : 3) - (del.staffing?2:0)));   // スタッフ委任で士気維持→不満緩和
+    const incidentP = del.troubles ? 0.12 : 0.25;          // トラブル委任で発生・損失を抑制
+    if(Math.random() < incidentP){
+      if(Math.random() < mgrApproval(m) + (del.troubles?0.15:0)) notes.push(`${b.name}：${m.name}がトラブルを無事処理`);
+      else { const loss=(2000+(Math.random()*3000|0)) * (del.troubles?0.5:1)|0; sim.money-=loss; m.fuman=Math.min(100,m.fuman+8); notes.push(`${b.name}：対応失敗 −¥${loss.toLocaleString('ja-JP')}`); }
     }
     if(m.fuman>=100){ notes.push(`${b.name}：店長 ${m.name} が不満で辞職…`); dismissManager(idx); }
   });
@@ -1461,7 +1477,10 @@ function serveOne(){
   removeOrderTag(c);
   const ratio = Math.max(0, c.patience/c.patienceMax);
   const tip = Math.round(c.pay*ratio*0.3*(c.tipFactor||1)*qualityLevel());   // 待たせない×ペルソナ×常連×品質
-  const total = c.pay + tip;
+  let total = c.pay + tip;
+  const mgr = branches[0].manager;
+  if(mgr && mgr.del && mgr.del.products) total = Math.round(total*(1 + Math.min(0.10, mgr.shohin*0.02)));   // 委任：商品・価格を最適化
+  if(campaignOn.bogo) total = Math.round(total*0.62);                                                        // 1個買うと1個無料：客単価ダウン
   sim.money += total; sim.revToday += total; sim.servedToday++;
   dayStats.sold[c.order.id] = (dayStats.sold[c.order.id]||0) + 1;  // 商品別の販売を記録
   dayStats.served++; dayStats.tips += tip; dayStats.revenue += total;
@@ -1513,6 +1532,8 @@ const store = {
   cityMul: 1.0,         // 街の需要倍率（支店売上に影響）
   rentDaily: 0,         // テナント賃料（日次）。0なら立地デフォルト
   traffic: 8000,        // 交通量（1日の人通り）← 集客に影響
+  extIdx: 0,            // 外装インデックス（改装で変化）
+  remodelDays: 0,       // 改装中の休業日数（>0なら集客しない）
 };
 
 // ---- ペルソナ：見た目・注文傾向・行動・来店時間帯・店の好みが異なる ----
@@ -1649,6 +1670,7 @@ function addTable(x,z){
 }
 
 function trySpawnCustomer(dtGameMin){
+  if(store.remodelDays>0) return;             // 改装中は休業（集客なし）
   // 営業時間内のみ。時間あたりの来店ペース（仮）
   spawnAccum += dtGameMin;
   const interval = 7; // ゲーム内7分ごとに来店判定
@@ -1680,8 +1702,8 @@ function spawnCustomer(){
   const loy = regular ? loyalty[regular.name] : 0;
   const cust = {
     group:g, seat:null, state:'QUEUE', t:0, persona, regular, order,
-    stay: rrange(persona.stay),                  // 着席後の滞在(ゲーム分)
-    patience: rrange(persona.patience) * ambianceMult(), // 居心地が良いほど待てる
+    stay: rrange(persona.stay) * (campaignOn.music?1.15:1),       // 音楽配信で長居
+    patience: rrange(persona.patience) * ambianceMult() * (campaignOn.wifi?1.25:1), // Wi-Fiで待てる
     pay: order.price,                            // 客単価＝メニュー価格
     tipFactor: persona.tip + loy*0.05,           // 常連は通うほどチップが厚い
     tag:null, nameTag:null,
@@ -1968,8 +1990,12 @@ document.getElementById('m-next').onclick = ()=>{
   // 家賃・利息・人件費・店長給与・役員報酬を清算、支店純益を加算、運用を増やす、ブランド減衰
   sim.money -= plRent() + plInterest() + staffWage() + managerSalaries() + execSalaries() + campaignDailyCost();
   sim.money += branchesDailyNet();
+  if(campaignOn.catering){ sim.money += 3000 + Math.round(brand*25); }   // ケータリング：法人向けの固定収入
   finance.invest = Math.round(finance.invest * (1 + investRateEff()));
-  brand = Math.min(100, Math.max(0, brand - brandDecay() + campaignBrandGain()));   // マーケ施策でブランド維持/向上
+  const mgrM = branches[0].manager;
+  const decay = Math.max(0, brandDecay() - ((mgrM&&mgrM.del&&mgrM.del.marketing)?1:0));   // マーケ委任で減衰を緩和
+  brand = Math.min(100, Math.max(0, brand - decay + campaignBrandGain()));
+  if(store.remodelDays>0) store.remodelDays--;                            // 改装の休業をカウントダウン
   const mgrNotes = managersDailyTick();   // 店長の不満・トラブル・辞職
   if(mgrNotes.length) miniToast(mgrNotes[0]);
   // 週次集計（リセット前に加算）
@@ -2522,7 +2548,7 @@ document.getElementById('build-go').onclick = ()=>{
     b.mesh=makeCafeStore(lot.x, lot.z, 0xc9602e);
     store.location=lot.tenant.loc; store.vibe=vibe; store.cityName=city.name; store.cityMul=city.mul;
     store.rentDaily=lot.tenant.rent; store.traffic=lot.tenant.traffic; equip.machine.lv=mlv;
-    brand=Math.min(100, brand+extB); recomputePriceLevel();
+    brand=Math.min(100, brand+extB); store.extIdx=buildExt; recomputePriceLevel();
     built=b;
   } else {
     const b={ name:(branches.length+1)+'号店', loc:lot.tenant.loc, level:1, mesh:null, manager:null, built:true, city:lot.city, x:lot.x, z:lot.z };
@@ -2573,7 +2599,7 @@ function segBar(val,color='#5bbd6a'){ const n=5,f=val/100*n; let h='<span style=
 function radar(vals){ const cx=50,cy=50,R=34,n=vals.length; let grid='',poly='';
   for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n; grid+=`${i?'L':'M'}${(cx+Math.cos(a)*R).toFixed(1)} ${(cy+Math.sin(a)*R).toFixed(1)}`; const rr=R*vals[i]; poly+=`${(cx+Math.cos(a)*rr).toFixed(1)},${(cy+Math.sin(a)*rr).toFixed(1)} `; }
   return `<svg width="116" height="100" viewBox="0 0 100 100"><path d="${grid}Z" fill="none" stroke="#3a342c" stroke-width="1"/><path d="M50 16 L50 84 M21 33 L79 67 M79 33 L21 67" stroke="#3a342c" stroke-width="0.6"/><polygon points="${poly}" fill="rgba(224,137,74,.35)" stroke="#e0894a" stroke-width="1.6"/></svg>`; }
-function staffMorale(){ const need=Math.ceil((sim.custToday+8)/14); const adequacy=clampv(staff.length/Math.max(1,need),0,1.4); const wage=staff.length?staffWage()/staff.length:0; return Math.round(clampv(35+adequacy*30+Math.min(20,(wage-1500)/60)+(branches[0].manager?10:0),0,100)); }
+function staffMorale(){ const need=Math.ceil((sim.custToday+8)/14); const adequacy=clampv(staff.length/Math.max(1,need),0,1.4); const wage=staff.length?staffWage()/staff.length:0; const m=branches[0].manager; const delB=(m&&m.del&&m.del.staffing)?10:0; return Math.round(clampv(35+adequacy*30+Math.min(20,(wage-1500)/60)+(m?10:0)+delB,0,100)); }
 function staffSkill(){ return staff.length?Math.round(staff.reduce((a,s)=>a+s.skill,0)/staff.length/5*100):0; }
 
 function openShop(){ shopTab='service'; document.getElementById('shop-title').textContent=(profile.brandName||'店舗')+'（本店）'; renderShop(); document.getElementById('modal-shop').classList.add('show'); }
@@ -2673,14 +2699,12 @@ function shopFinance(){
   if(p.interest>0) h+=row('借入利息',p.interest,true);
   h+=`<div class="pl-row total"><span>総費用</span><span class="neg">−¥${p.expenses.toLocaleString('ja-JP')}</span></div>`;
   h+=`<div class="pl-row total" style="font-size:15px"><span>営業損益</span><span style="color:${p.op>=0?'var(--gold)':'var(--red)'}">${p.op<0?'−':''}¥${Math.abs(p.op).toLocaleString('ja-JP')}</span></div>`;
-  // 改装（内装・設備）
+  // 改装（外装・内装・設備の専用フロー）＋ 席の増設
   h+=`<div class="dash-h">店舗の改装</div>`;
-  const mLv=equip.machine.lv, mMax=equip.machine.max, mc=Math.round(equip.machine.base*Math.pow(1.8,mLv-1));
-  h+=`<div class="mrow"><div class="nm">エスプレッソマシン <b>Lv.${mLv}</b><div class="sub2">品質→チップUP</div></div><button class="mbtn" data-supeq="machine" ${mLv>=mMax||sim.money<mc?'disabled':''}>${mLv>=mMax?'最高':'強化 ¥'+mc.toLocaleString('ja-JP')}</button></div>`;
+  if(store.remodelDays>0) h+=`<div class="note" style="margin-top:0;color:var(--red)">改装中：あと ${store.remodelDays} 日休業（集客なし）</div>`;
+  h+=`<div class="mcard"><div class="thumb">${EXT_ART[store.extIdx||0]||ART.downtown}</div><div class="info"><div class="ttl">外装・内装・設備</div><div class="meta">外装 ${EXTERIORS[store.extIdx||0].name}／内装 ${VIBE_JP[store.vibe]}／マシン Lv.${equip.machine.lv}</div></div><div class="act"><button class="mbtn" data-sremodel="1">改装する</button></div></div>`;
   const full=extraUsed>=EXTRA_SLOTS.length, fc=furnitureCost();
   h+=`<div class="mrow"><div class="nm">テーブル席を増設<div class="sub2">満席で客を逃さない（現${seats.length}席）</div></div><button class="mbtn" data-sfurn="1" ${full||sim.money<fc?'disabled':''}>${full?'上限':'＋1席 ¥'+fc.toLocaleString('ja-JP')}</button></div>`;
-  h+=`<div class="dash-h" style="border:0">内装の雰囲気（評価・客層に影響）</div>`;
-  h+=['cozy','chic','pop'].map(k=>`<button class="mbtn ${store.vibe===k?'sel':''}" data-svibe="${k}" style="margin:3px 4px 3px 0">${VIBE_JP[k]}${store.vibe===k?'':` ¥${RENOVATE_COST.toLocaleString('ja-JP')}`}</button>`).join('');
   return h;
 }
 // 店舗スクリーンの操作
@@ -2696,13 +2720,58 @@ document.getElementById('shop-body').addEventListener('click', e=>{
   else if(t.dataset.stoggle){ const m=MENU.find(x=>x.id===t.dataset.stoggle); if(m){ m.enabled=!m.enabled; recomputePriceLevel(); } }
   else if(t.dataset.sprice){ const [id,dir]=t.dataset.sprice.split('|'); const m=MENU.find(x=>x.id===id); if(m){ m.price=Math.max(100,m.price+(dir==='+'?50:-50)); recomputePriceLevel(); } }
   else if(t.dataset.scamp){ campaignOn[t.dataset.scamp]=!campaignOn[t.dataset.scamp]; }
-  else if(t.dataset.supeq){ upgradeEquip(t.dataset.supeq); }
   else if(t.dataset.sfurn){ buyFurniture(); }
-  else if(t.dataset.svibe){ if(store.vibe!==t.dataset.svibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; dayStats.capex+=RENOVATE_COST; store.vibe=t.dataset.svibe; } }
+  else if(t.dataset.sremodel){ document.getElementById('modal-shop').classList.remove('show'); openRemodel(); return; }
   renderShop(); updateHUD();
 });
 document.getElementById('shop-enter').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); enterStore(); };
 document.getElementById('shop-manage').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); renderManage(); document.getElementById('modal-manage').classList.add('show'); };
+// ===== 店舗の改装（外装・内装・設備をカード選択＋休業）=====
+let rmExt=0, rmInt=0, rmEq=0;
+function openRemodel(){
+  rmExt = store.extIdx||0;
+  rmInt = Math.max(0, INTERIORS.findIndex(x=>x.vibe===store.vibe));
+  rmEq  = EQUIP_SETS.findIndex(x=>x.mlv===equip.machine.lv); if(rmEq<0) rmEq=EQUIP_SETS.length-1;
+  renderRemodel(); document.getElementById('modal-remodel').classList.add('show');
+}
+function remodelChanges(){
+  const exC = rmExt!==(store.extIdx||0) ? EXTERIORS[rmExt].cost : 0;
+  const inC = INTERIORS[rmInt].vibe!==store.vibe ? INTERIORS[rmInt].cost+RENOVATE_COST : 0;
+  const eqC = EQUIP_SETS[rmEq].mlv>equip.machine.lv ? EQUIP_SETS[rmEq].cost : 0;
+  return { exC, inC, eqC, total:exC+inC+eqC, downtime:Math.min(2,(inC?1:0)+(eqC?1:0)) };
+}
+function renderRemodel(){
+  const optRow=(label,arr,sel,key,art,curIdx)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
+    `<div class="opt-row">`+arr.map((o,i)=>`<button class="opt ${i===sel?'sel':''}" data-${key}="${i}"><div class="ot">${art(o,i)}</div><div class="on">${o.name}${i===curIdx?'（現状）':''}</div><div class="oc">${o.cost?'¥'+o.cost.toLocaleString('ja-JP'):'—'}</div></button>`).join('')+`</div>`;
+  const curEq=EQUIP_SETS.findIndex(x=>x.mlv===equip.machine.lv);
+  document.getElementById('remodel-body').innerHTML =
+    optRow('外装',EXTERIORS,rmExt,'rext',(o,i)=>EXT_ART[i]||EXT_ART[0], store.extIdx||0)
+  + optRow('内装',INTERIORS,rmInt,'rint',(o)=>ART[o.vibe]||ART.cozy, Math.max(0,INTERIORS.findIndex(x=>x.vibe===store.vibe)))
+  + optRow('設備（マシン）',EQUIP_SETS,rmEq,'req',(o,i)=>EQ_ART[i]||EQ_ART[0], curEq);
+  const ch=remodelChanges(), left=sim.money-ch.total;
+  document.getElementById('remodel-cost').innerHTML =
+    `改装費 <span class="gold">¥${ch.total.toLocaleString('ja-JP')}</span>${ch.downtime?` ／ 休業 <span style="color:var(--red)">${ch.downtime}日</span>`:' ／ 休業なし'} ／ 残り <span style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
+  const go=document.getElementById('remodel-go'); go.disabled = ch.total<=0 || left<0;
+  go.textContent = ch.total<=0 ? '変更なし' : (ch.downtime?`改装を始める（${ch.downtime}日休業）`:'改装する');
+}
+document.getElementById('remodel-body').addEventListener('click', e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.rext!==undefined) rmExt=+t.dataset.rext;
+  else if(t.dataset.rint!==undefined) rmInt=+t.dataset.rint;
+  else if(t.dataset.req!==undefined) rmEq=+t.dataset.req;
+  renderRemodel();
+});
+document.getElementById('remodel-cancel').onclick = ()=> document.getElementById('modal-remodel').classList.remove('show');
+document.getElementById('remodel-go').onclick = ()=>{
+  const ch=remodelChanges(); if(ch.total<=0 || sim.money<ch.total) return;
+  sim.money-=ch.total; dayStats.capex+=ch.total;
+  brand = Math.min(100, Math.max(0, brand + (EXTERIORS[rmExt].brand - (EXTERIORS[store.extIdx||0].brand||0))));
+  store.extIdx=rmExt; store.vibe=INTERIORS[rmInt].vibe; equip.machine.lv=Math.max(equip.machine.lv, EQUIP_SETS[rmEq].mlv);
+  store.remodelDays = ch.downtime; recomputePriceLevel();
+  document.getElementById('modal-remodel').classList.remove('show');
+  updateHUD(); saveGame();
+  flashHint(ch.downtime?`改装開始！ ${ch.downtime}日間は休業します`:'店舗を改装しました');
+};
 // ===== 物件情報（FOR LEASE）=====
 let leaseLot=null;
 const leaseDeposit = lot => lot ? lot.tenant.cost : 0;
@@ -2759,7 +2828,7 @@ function gameState(){
     profile,
     money:sim.money, day:sim.day, minutes:sim.minutes,
     custToday:sim.custToday, revToday:sim.revToday, servedToday:sim.servedToday, lostToday:sim.lostToday,
-    store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location, cityName:store.cityName, cityMul:store.cityMul, rentDaily:store.rentDaily, traffic:store.traffic },
+    store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location, cityName:store.cityName, cityMul:store.cityMul, rentDaily:store.rentDaily, traffic:store.traffic, extIdx:store.extIdx, remodelDays:store.remodelDays },
     menu:MENU.map(m=>({id:m.id,name:m.name,basePrice:m.basePrice,price:m.price,enabled:m.enabled,recipe:m.recipe})),
     materials:Object.fromEntries(Object.entries(materials).map(([k,v])=>[k,v.stock])),
     equip:Object.fromEntries(Object.entries(equip).map(([k,e])=>[k,e.lv])),
