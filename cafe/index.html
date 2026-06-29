@@ -177,6 +177,14 @@
   .mcard .ttl{font-weight:800; font-size:14.5px; line-height:1.3;}
   .mcard .meta{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.55;}
   .mcard .act{display:flex; flex-direction:column; gap:6px; align-items:stretch; flex-shrink:0;}
+  /* カスタマーレビュー */
+  .stars{display:inline-flex; gap:1px; vertical-align:middle;}
+  .rev-grid{display:flex; gap:16px; align-items:center; margin:6px 0 12px;}
+  .rev-big{font-size:36px; font-weight:800; line-height:1;}
+  .rev-metrics{flex:1; min-width:0;}
+  .rev-metric{display:flex; align-items:center; gap:8px; font-size:12.5px; margin:3px 0;}
+  .rev-metric .nm{color:var(--sub); width:56px; flex-shrink:0;}
+  .rev-metric .vv{margin-left:auto; width:30px; text-align:right; font-variant-numeric:tabular-nums;}
   /* 出店シートの画像つき選択タイル */
   .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
   .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
@@ -348,6 +356,32 @@
       <div id="build-cost" style="margin:0 0 10px; font-weight:800"></div>
       <button class="btn" id="build-go" style="width:100%">この内容で開店する</button>
       <button class="btn ghost" id="build-cancel" style="width:100%; margin-top:8px">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 物件情報（FOR LEASE をタップ） -->
+<div class="modal" id="modal-lease">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-lease" aria-label="閉じる">×</button>
+    <h2>物件情報（テナント募集）</h2>
+    <div id="lease-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot">
+      <button class="btn" id="lease-go" style="width:100%">この物件で出店する</button>
+      <button class="btn ghost" id="lease-cancel" style="width:100%; margin-top:8px">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 店舗スクリーン（自店をタップ） -->
+<div class="modal" id="modal-shop">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-shop" aria-label="閉じる">×</button>
+    <h2 id="shop-title">店舗</h2>
+    <div id="shop-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot">
+      <button class="btn" id="shop-enter" style="width:100%">店内に入る（接客）</button>
+      <button class="btn ghost" id="shop-manage" style="width:100%; margin-top:8px">経営パネルを開く</button>
     </div>
   </div>
 </div>
@@ -1320,10 +1354,10 @@ function overviewPick(e){
   const hit = raycaster.intersectObjects(targets.map(t=>t.o), false)[0];
   if(!hit) return;
   const t = targets.find(x=>x.o===hit.object); if(!t) return;
-  if(t.type==='lot') openBuildSheet(t.ref);
+  if(t.type==='lot') openLeaseInfo(t.ref);
   else if(t.type==='air') openAirport();
-  else if(t.type==='lm'){ openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
-  else if(t.type==='cafe'){ if(t.ref===branches[0]) enterStore(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
+  else if(t.type==='lm'){ if(t.ref.kind==='office') openManageTab('company'); else openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
+  else if(t.type==='cafe'){ if(t.ref===branches[0]) openShop(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
   else if(t.type==='rival') flashHint(`${t.ref.name}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`);
 }
 
@@ -2460,6 +2494,67 @@ document.getElementById('build-go').onclick = ()=>{
   saveGame(); updateHUD(); updateHint();
   flashHint(built===branches[0] ? '1号店をオープン！ オレンジの建物をタップして店内に入ろう／本社・焙煎工房も空きテナントに建てられます' : `${built.name}を出店！ 委任運営で純益が積み上がります`);
 };
+// ===== カスタマーレビュー（Coffee Inc風：価格/商品/接客/雰囲気）=====
+const clampv=(v,a,b)=>Math.max(a,Math.min(b,v));
+const STAR_F='<svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .6-5.3 4.7 1.6 7L12 17.1 5.7 20.8l1.6-7L2 9.1l7-.6z" fill="#f5b22a"/></svg>';
+const STAR_E='<svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .6-5.3 4.7 1.6 7L12 17.1 5.7 20.8l1.6-7L2 9.1l7-.6z" fill="#4a443a"/></svg>';
+const STAR_H='<svg width="15" height="15" viewBox="0 0 24 24"><defs><linearGradient id="shg"><stop offset="50%" stop-color="#f5b22a"/><stop offset="50%" stop-color="#4a443a"/></linearGradient></defs><path d="M12 2l3 6.5 7 .6-5.3 4.7 1.6 7L12 17.1 5.7 20.8l1.6-7L2 9.1l7-.6z" fill="url(#shg)"/></svg>';
+function starRow(v){ let h='<span class="stars">'; for(let i=1;i<=5;i++){ h+= v>=i-0.25?STAR_F : v>=i-0.75?STAR_H : STAR_E; } return h+'</span>'; }
+function storeReviews(){
+  const price = clampv((1.15-store.priceLevel)*5 + 2.6, 0,5);
+  const product = clampv((qualityLevel()-1)*6 + 2.2, 0,5);
+  const tot=(totalStats.served+sim.servedToday+totalStats.lost+sim.lostToday);
+  const servedRatio = tot>0 ? (totalStats.served+sim.servedToday)/tot : 0.72;
+  const service = clampv(servedRatio*3.0 + staff.length*0.45 + (branches[0].manager?0.6:0) + 0.8, 0,5);
+  const vibeScore={cozy:3.4, chic:4.1, pop:3.6}[store.vibe]||3.2;
+  const atmosphere = clampv(vibeScore + extraUsed*0.12 + (equip.decor.lv-1)*0.3, 0,5);
+  return { price, product, service, atmosphere, overall:(price+product+service+atmosphere)/4 };
+}
+function storeComments(r){
+  const c=[];
+  c.push(r.price<2.6?{v:r.price,t:'ちょっと高いかな…もう少し手頃だと通いやすい。'}:{v:r.price,t:'値段は納得感がある。コスパ良し。'});
+  c.push(r.product>=3.4?{v:r.product,t:'コーヒーが美味しい！また来たい。'}:{v:r.product,t:'味は普通かな。豆を良くしてほしい。'});
+  c.push(r.service<2.9?{v:r.service,t:'待ち時間が長かった。人手が足りてなさそう。'}:{v:r.service,t:'店員さんの対応が気持ちよかった。'});
+  c.push(r.atmosphere>=3.6?{v:r.atmosphere,t:'居心地がよくてつい長居しちゃう。'}:{v:r.atmosphere,t:'内装をもう少し良くすると映えそう。'});
+  return c;
+}
+// ===== 店舗スクリーン（自店タップ）=====
+function openShop(){
+  const r=storeReviews();
+  document.getElementById('shop-title').textContent = (profile.brandName||'店舗')+'（本店）';
+  const metric=(nm,v)=>`<div class="rev-metric"><span class="nm">${nm}</span>${starRow(v)}<span class="vv">${v.toFixed(1)}</span></div>`;
+  let h=`<div class="dash-h" style="margin-top:6px">カスタマーレビュー</div>`;
+  h+=`<div class="rev-grid"><div style="text-align:center"><div class="rev-big gold">${r.overall.toFixed(1)}</div>${starRow(r.overall)}<div class="sub2" style="margin-top:3px">${(totalStats.served+sim.servedToday)}件</div></div>`;
+  h+=`<div class="rev-metrics">${metric('価格',r.price)}${metric('商品',r.product)}${metric('接客',r.service)}${metric('雰囲気',r.atmosphere)}</div></div>`;
+  h+=`<div class="dash-h">店舗サマリー</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div>`;
+  h+=`<div class="kpi"><div class="v">${store.cityName}</div><div class="l">都市</div></div>`;
+  h+=`<div class="kpi"><div class="v">${staff.length}人</div><div class="l">スタッフ</div></div>`;
+  h+=`<div class="kpi"><div class="v">${qualityLevel().toFixed(2)}</div><div class="l">品質指数</div></div></div>`;
+  h+=`<div class="dash-h">お客様の声</div>`;
+  storeComments(r).forEach(c=> h+=`<div class="mcard"><div class="info"><div class="ttl" style="line-height:1">${starRow(c.v)}</div><div class="meta">${c.t}</div></div></div>`);
+  document.getElementById('shop-body').innerHTML=h;
+  document.getElementById('modal-shop').classList.add('show');
+}
+document.getElementById('shop-enter').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); enterStore(); };
+document.getElementById('shop-manage').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); renderManage(); document.getElementById('modal-manage').classList.add('show'); };
+// ===== 物件情報（FOR LEASE）=====
+let leaseLot=null;
+const leaseDeposit = lot => lot ? lot.tenant.cost : 0;
+function openLeaseInfo(lot){
+  leaseLot=lot; const t=lot.tenant, cityN=(CITIES.find(c=>c.id===lot.city)||{}).name||'';
+  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
+  let h=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div><div class="meta">${cityN}・${t.risk||''}</div></div></div>`;
+  h+=`<div class="note" style="margin-top:0">この建物の1階テナントが募集中です。契約して、内装・設備を決めれば出店できます。</div>`;
+  h+=`<div class="dash-kpis" style="margin-top:10px"><div class="kpi"><div class="v gold">¥${t.rent.toLocaleString('ja-JP')}/日</div><div class="l">賃料（毎日支払い）</div></div>`;
+  h+=`<div class="kpi"><div class="v">¥${leaseDeposit(lot).toLocaleString('ja-JP')}</div><div class="l">敷金（契約時）</div></div>`;
+  h+=`<div class="kpi"><div class="v">${t.traffic.toLocaleString('ja-JP')}</div><div class="l">通行量 / 日</div></div>`;
+  h+=`<div class="kpi"><div class="v">${t.traffic>11000?'A':t.traffic>8000?'B':'C'}</div><div class="l">立地ランク</div></div></div>`;
+  document.getElementById('lease-body').innerHTML=h;
+  document.getElementById('modal-lease').classList.add('show');
+}
+document.getElementById('lease-cancel').onclick = ()=> document.getElementById('modal-lease').classList.remove('show');
+document.getElementById('lease-go').onclick = ()=>{ document.getElementById('modal-lease').classList.remove('show'); if(leaseLot) openBuildSheet(leaseLot); };
 // 空港：都市移動
 function openAirport(){ renderAirport(); document.getElementById('modal-airport').classList.add('show'); }
 function renderAirport(){
