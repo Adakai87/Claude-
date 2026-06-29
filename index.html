@@ -40,6 +40,11 @@
   .hint{position:fixed; left:50%; transform:translateX(-50%); bottom:70px; background:var(--panel); border:1px solid var(--line);
     border-radius:20px; padding:6px 14px; font-size:12px; color:var(--sub); pointer-events:none; white-space:nowrap;}
 
+  /* 現在都市バナー（俯瞰時） */
+  .city-banner{position:fixed; left:50%; top:84px; transform:translateX(-50%); z-index:24; pointer-events:none;
+    background:rgba(26,20,14,.62); border:1px solid var(--gold); color:var(--gold); font-weight:800; letter-spacing:.06em;
+    border-radius:18px; padding:5px 18px; font-size:15px; box-shadow:0 3px 12px rgba(0,0,0,.4);}
+
   /* 移動パッド（バーチャルスティック） */
   #joystick{position:fixed; left:18px; bottom:84px; width:118px; height:118px; border-radius:50%;
     background:rgba(26,20,14,.45); border:1px solid var(--line); z-index:25; display:none; touch-action:none;}
@@ -250,7 +255,7 @@
     <h2 style="margin:0 0 2px">② 出店する街を選ぶ</h2>
     <div class="title-sub">街で需要・競合・交通量が変わります</div>
     <div id="city-grid"></div>
-    <button class="btn" id="city-next" style="width:100%; margin-top:6px">次へ：物件を探す</button>
+    <button class="btn" id="city-next" style="width:100%; margin-top:6px">この街のマップから始める</button>
     <span class="back-link" data-go="brand">← 戻る</span>
   </div>
   <!-- 新規③：テナント（物件）選び -->
@@ -283,6 +288,29 @@
     <div class="note" style="text-align:left">進行は「翌日へ」進むたび自動セーブされます。同じURLを開けば続きから遊べます。</div>
   </div>
 </div>
+
+<!-- 出店シート（空き物件タップで開く） -->
+<div class="modal" id="modal-build">
+  <div class="sheet">
+    <h2 id="build-title">出店する</h2>
+    <div id="build-body" style="text-align:left"></div>
+    <div id="build-cost" style="margin:12px 0; font-weight:800"></div>
+    <button class="btn" id="build-go" style="width:100%">この内容で開店する</button>
+    <button class="btn ghost" id="build-cancel" style="width:100%; margin-top:8px">キャンセル</button>
+  </div>
+</div>
+
+<!-- 空港（都市移動） -->
+<div class="modal" id="modal-airport">
+  <div class="sheet" style="max-width:420px">
+    <h2>空港 — 都市を移動</h2>
+    <div class="title-sub" style="margin-bottom:6px">行き先を選ぶと、その街のマップに移動します</div>
+    <div id="airport-list"></div>
+    <button class="btn ghost" id="airport-cancel" style="width:100%; margin-top:8px">閉じる</button>
+  </div>
+</div>
+
+<div id="city-banner" class="city-banner" style="display:none"></div>
 
 <div class="hud">
   <div class="panel stats">
@@ -395,7 +423,7 @@ const sim = {
   // 時間：分単位で保持。リアル1秒=ゲーム1分（=リアル1分でゲーム1時間）
   minutes: 8 * 60,   // 08:00 開店
   speed: 1,          // 0=停止, 1=等速, 3=倍速
-  mode: 'store',     // 'overview' | 'store'
+  mode: 'overview',  // 'overview'（俯瞰マップ＝ハブ） | 'store'（店内）
 };
 const OPEN_MIN = 8 * 60;
 const SEAT_PRICE = 600; // 1組あたりの平均客単価（仮）
@@ -487,13 +515,17 @@ function updateStaff(dtGameMin){
 
 // ---- 複数店舗 & 競合（シェア争い）----
 const CITY_DEMAND = 60000;     // 街全体の1日のカフェ需要（円指標）
-const RIVALS = [
-  { name:'グリーン珈琲', comp:13, color:0x2f9e63, pos:[-30,18] },
-  { name:'ブルーカフェ', comp:10, color:0x4a78c9, pos:[26,-28] },
-  { name:'まちの喫茶店', comp:7,  color:0x9a5b3a, pos:[-24,-24] },
-];
-const BRANCH_SPOTS = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12} ];
-const branches = [ { name:'本店', loc:'downtown', level:1, mesh:null } ]; // [0]=プレイ可能な本店
+// ---- ハブ（俯瞰マップ）：都市ごとに空き物件・ライバルを展開 ----
+let viewCity = 'tokyo';                 // 現在表示中の都市id
+const cityInited = {};                  // 初期化済みの都市id→true
+const LOT_POSITIONS   = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12}, {x:14,z:-15}, {x:-23,z:1} ];
+const RIVAL_POSITIONS = [ {x:-30,z:18}, {x:26,z:-28}, {x:-24,z:-24}, {x:30,z:6} ];
+const RIVAL_NAMES  = ['グリーン珈琲','ブルーカフェ','まちの喫茶店','ロースト堂','カフェ・ルミエール','大東珈琲','スワン珈琲'];
+const RIVAL_COLORS = [0x2f9e63,0x4a78c9,0x9a5b3a,0xb5552f,0x7a5cc0,0x2f8f9e];
+const lots = [];                        // 空き/建設済みの物件 {city,x,z,tenant,branch,group}
+const RIVALS = [];                      // 全都市のライバル（各 .city を持つ）
+// branches[0]=プレイ可能な本店。built=false の間はマップ上に未出店（空き物件から建てる）
+const branches = [ { name:'本店', loc:'downtown', level:1, mesh:null, manager:null, built:false, city:'tokyo', x:10, z:10 } ];
 const openCost   = () => 15000 + (branches.length-1)*10000;
 const branchUpCost = b => 6000 + (b.level-1)*4000;
 function mainComp(){
@@ -508,7 +540,7 @@ function mainComp(){
   return Math.max(2, c);
 }
 const branchComp = b => {
-  if(b===branches[0]) return mainComp();
+  if(b===branches[0]) return b.built ? mainComp() : 0;
   const base = 6 + (b.level-1)*3;
   return b.manager ? base + mgrRating(b.manager)*0.9 : base*0.5;     // 店長不在は半減
 };
@@ -652,18 +684,72 @@ function makeCafeBuilding(color, x, z, accent){
   g.userData.body=body; body.userData.group=g;
   return body;
 }
-function openBranch(loc){
-  if(branches.length-1 >= BRANCH_SPOTS.length) return false;
-  const c = openCost(); if(sim.money < c) return false;
-  sim.money -= c; dayStats.capex += c;
-  const sp = BRANCH_SPOTS[branches.length-1];
-  const b = { name:(branches.length+1)+'号店', loc, level:1, mesh:null };
-  b.mesh = makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0xc9772e);
-  b.mesh.userData.isCafe = true;
-  branches.push(b);
-  weekAccum.opens++;
-  return true;
+// 空き物件マーカー（土台＋FOR LEASE看板）。クリック判定は pad に対して行う
+function makeLotMarker(x,z){
+  const g = new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(5,0.14,5), new THREE.MeshStandardMaterial({ color:0xcdb98c }));
+  pad.position.y=0.07; pad.receiveShadow=true; g.add(pad);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,2.4,8), new THREE.MeshStandardMaterial({ color:0x6b5638 }));
+  post.position.set(1.7,1.2,1.7); g.add(post);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,0.14), new THREE.MeshStandardMaterial({ color:0xe0894a, emissive:0x3a2410 }));
+  board.position.set(1.7,2.3,1.7); g.add(board);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.0,0.18,0.16), new THREE.MeshStandardMaterial({ color:0xf3ede2 }));
+  stripe.position.set(1.7,2.3,1.78); g.add(stripe);
+  g.userData.lotPad = pad; pad.userData.group = g;
+  return g;
 }
+// 空港（全都市共通の旅行ハブ）：タップで都市移動
+let airportMesh;
+function makeAirport(){
+  const g = new THREE.Group(); g.position.set(24,0,21); overScene.add(g);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(9,3.2,6), new THREE.MeshStandardMaterial({ color:0xdfe4ec }));
+  body.position.y=1.6; body.castShadow=body.receiveShadow=true; g.add(body);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(9.1,1.4,6.1), new THREE.MeshStandardMaterial({ color:0x8fb8d8, emissive:0x18303f }));
+  glass.position.y=1.5; g.add(glass);
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.8,4.4,10), new THREE.MeshStandardMaterial({ color:0xc3c9d4 }));
+  tower.position.set(3.0,3.4,1.6); tower.castShadow=true; g.add(tower);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.8,1.0,1.8), new THREE.MeshStandardMaterial({ color:0x2f3744, emissive:0x101620 }));
+  cab.position.set(3.0,5.7,1.6); g.add(cab);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(9.4,0.4,6.4), new THREE.MeshStandardMaterial({ color:0xff9d4d }));
+  roof.position.y=3.3; g.add(roof);
+  // 滑走路（空港とすぐ分かる目印）
+  const run = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.06,9), new THREE.MeshStandardMaterial({ color:0x44474f }));
+  run.position.set(-7,0.05,1); run.receiveShadow=true; g.add(run);
+  for(let i=0;i<4;i++){ const dash=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.07,1.0), new THREE.MeshStandardMaterial({color:0xf3ede2})); dash.position.set(-7,0.06,-2.4+i*1.7); g.add(dash); }
+  airportMesh = body; body.userData.group = g;
+  return g;
+}
+// 都市を初期化（ライバルと空き物件を一度だけ生成）
+function initCity(cityId){
+  if(cityInited[cityId]) return;
+  cityInited[cityId] = true;
+  const city = CITIES.find(c=>c.id===cityId) || CITIES[0];
+  const nR = 2 + (Math.random()*2|0);
+  for(let i=0;i<nR && i<RIVAL_POSITIONS.length;i++){
+    const p = RIVAL_POSITIONS[i];
+    const r = { name:RIVAL_NAMES[(Math.random()*RIVAL_NAMES.length)|0], comp:6+(Math.random()*9|0),
+                color:RIVAL_COLORS[i%RIVAL_COLORS.length], pos:[p.x,p.z], city:cityId };
+    r.mesh = makeCafeBuilding(r.color, p.x, p.z, 0x3a3f4a);
+    r.mesh.userData.group.visible = (cityId===viewCity);
+    RIVALS.push(r);
+  }
+  const defs = genTenants(city);
+  for(let i=0;i<defs.length && i<LOT_POSITIONS.length;i++){
+    const p = LOT_POSITIONS[i];
+    const lot = { city:cityId, x:p.x, z:p.z, tenant:defs[i], branch:null, group:makeLotMarker(p.x,p.z) };
+    lot.group.visible = (cityId===viewCity);
+    lots.push(lot);
+  }
+}
+// 表示中の都市に合わせてメッシュの表示/非表示を切り替える
+function applyCityView(){
+  for(const b of branches){ if(b.built && b.mesh) b.mesh.userData.group.visible = (b.city===viewCity); }
+  for(const r of RIVALS){ if(r.mesh) r.mesh.userData.group.visible = (r.city===viewCity); }
+  for(const l of lots){ if(l.group) l.group.visible = (l.city===viewCity && !l.branch); }
+  const banner = document.getElementById('city-banner');
+  if(banner){ const c=CITIES.find(c=>c.id===viewCity); banner.textContent = c?c.name:''; }
+}
+function switchCity(cityId){ viewCity = cityId; initCity(cityId); applyCityView(); }
 
 // ---- Three.js 基本セット ----
 const app = document.getElementById('app');
@@ -880,9 +966,22 @@ function onClick(e){
   raycaster.setFromCamera(pointer, camera);
 
   if(sim.mode==='overview'){
-    const myMeshes = branches.map(b=>b.mesh).filter(Boolean);
-    if(raycaster.intersectObjects(myMeshes, false)[0]){ enterStore(); return; }
-    const rivalMeshes = RIVALS.map(r=>r.mesh).filter(Boolean);
+    // 1) 空き物件マーカー → 出店シート
+    const lotPads = lots.filter(l=>l.city===viewCity && !l.branch).map(l=>l.group.userData.lotPad);
+    const lh = raycaster.intersectObjects(lotPads, false)[0];
+    if(lh){ const lot = lots.find(l=>l.group.userData.lotPad===lh.object); if(lot){ openBuildSheet(lot); return; } }
+    // 2) 空港 → 都市移動
+    if(airportMesh && raycaster.intersectObject(airportMesh, false)[0]){ openAirport(); return; }
+    // 3) 自分のカフェ → 本店は入店 / 支店は情報
+    const myMeshes = branches.filter(b=>b.built && b.mesh && b.city===viewCity).map(b=>b.mesh);
+    const mh = raycaster.intersectObjects(myMeshes, false)[0];
+    if(mh){ const b = branches.find(x=>x.mesh===mh.object);
+      if(b===branches[0]) enterStore();
+      else flashHint(`${b.name}（委任運営）— 1日純益 約¥${branchDailyNet(b).toLocaleString('ja-JP')}`);
+      return;
+    }
+    // 4) ライバル → 情報
+    const rivalMeshes = RIVALS.filter(r=>r.mesh && r.city===viewCity).map(r=>r.mesh);
     const rh = raycaster.intersectObjects(rivalMeshes, false)[0];
     if(rh){ const r = RIVALS.find(x=>x.mesh===rh.object); flashHint(`${r?r.name:'ライバル店'}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`); }
   } else {
@@ -959,13 +1058,16 @@ function serveOne(){
 // =====================================================================
 const btnMode = document.getElementById('btn-mode');
 const hint = document.getElementById('hint');
-function enterStore(){ sim.mode='store'; if(player) player.userData.moveTarget=null; btnMode.textContent='街に出る（俯瞰）'; updateHint(); }
+function enterStore(){ if(!branches[0].built){ flashHint('まず空き物件（看板）をタップして1号店を出店しよう'); return; } sim.mode='store'; if(player) player.userData.moveTarget=null; btnMode.textContent='街に出る（俯瞰）'; updateHint(); }
 function enterOverview(){ sim.mode='overview'; if(player) player.userData.moveTarget=null; btnMode.textContent='店に入る'; clearBubble(); updateHint(); }
 btnMode.onclick = ()=> sim.mode==='store' ? enterOverview() : enterStore();
 function updateHint(){
   hint.textContent = sim.mode==='store'
     ? 'パッドで移動 ／ レジ・並ぶ客をタップ→提供 ／ くつろぐ客をタップ→会話'
-    : '自分のカフェ（オレンジの建物）をタップして中に入る ／ 緑・青の建物は競合店';
+    : (branches[0].built
+        ? '自分のカフェ（オレンジ）→入店 ／ 空き物件（看板）→出店 ／ 空港→都市移動'
+        : '空き物件（看板）をタップして1号店を出店しよう ／ 空港→都市移動');
+  const cb=document.getElementById('city-banner'); if(cb) cb.style.display = sim.mode==='overview' ? 'block' : 'none';
   const js=document.getElementById('joystick'); if(js) js.classList.toggle('show', sim.mode==='store');
 }
 let hintTimer = null;
@@ -1395,6 +1497,7 @@ function fmtClock(min){
 // =====================================================================
 const modal = document.getElementById('modal');
 document.getElementById('btn-close').onclick = ()=>{
+  if(!branches[0].built){ flashHint('まず空き物件をタップして1号店を出店しよう'); return; }
   sim.speed = 0; syncSpeedUI();
   document.getElementById('m-title').textContent = sim.day+'日目 閉店';
   document.getElementById('m-cust').textContent = `${sim.custToday}組（提供${sim.servedToday}・離脱${sim.lostToday}）`;
@@ -1714,7 +1817,7 @@ function renderManage(){
       }
     });
     h += `<div class="dash-h">店長候補</div>`;
-    const openStores = branches.map((b,i)=>({b,i})).filter(x=>!x.b.manager);
+    const openStores = branches.map((b,i)=>({b,i})).filter(x=>x.b.built && !x.b.manager);
     mgrCandidates.forEach((c,ci)=>{
       const stats=STAT_DEF.map(([k,jp])=>`${jp}${c[k]}`).join('・');
       const btns = openStores.length ? openStores.map(o=>`<button class="mbtn" data-massign="${ci}|${o.i}" ${sim.money<0?'disabled':''}>${o.b.name}へ</button>`).join('') : '<span class="sub2">配置先なし</span>';
@@ -1738,17 +1841,9 @@ function renderManage(){
       const act = main ? '' : `<button class="mbtn" data-upbranch="${i}" ${sim.money<branchUpCost(b)?'disabled':''}>強化<br>¥${branchUpCost(b).toLocaleString('ja-JP')}</button>`;
       h += mcard(ART.downtown, b.name, meta, act || '<span class="sub2">操作可</span>');
     });
-    // 新規出店
-    const full = branches.length-1 >= BRANCH_SPOTS.length;
-    h += `<div class="dash-h">新規出店 ${full?'（上限）':`（¥${openCost().toLocaleString('ja-JP')}）`}</div>`;
-    if(full){
-      h += `<div class="note" style="margin-top:0">出店上限に達しました（最大${BRANCH_SPOTS.length}支店）。</div>`;
-    } else {
-      for(const k in LOC_JP){
-        h += mcard(ART[k], LOC_JP[k], `家賃¥${(RENT[k]||0).toLocaleString('ja-JP')}/日・自動運営`,
-          `<button class="mbtn" data-openbranch="${k}" ${sim.money<openCost()?'disabled':''}>出店</button>`);
-      }
-    }
+    // 新規出店は俯瞰マップから（空き物件タップ／空港で都市移動）
+    h += `<div class="dash-h">新規出店</div>`;
+    h += `<div class="note" style="margin-top:0">出店は俯瞰マップから行います。閉店して「街に出る（俯瞰）」→ 空き物件（看板）をタップ、または空港から別の都市へ移動して出店してください。</div>`;
     h += `<div class="note">支店は自動運営。競争力（設備・人員・価格・支店Lv）でシェアが決まり、支店の純益が毎日のPLに加わります。</div>`;
   } else if(mtab==='finance'){
     const rent = plRent();
@@ -1849,8 +1944,6 @@ document.getElementById('manage-body').addEventListener('click', e=>{
     fireStaff(+t.dataset.fire);
   } else if(t.dataset.reroll){
     candidates = [makeCandidate(), makeCandidate(), makeCandidate()];
-  } else if(t.dataset.openbranch){
-    openBranch(t.dataset.openbranch);
   } else if(t.dataset.upbranch!==undefined){
     const b = branches[+t.dataset.upbranch];
     if(b && b!==branches[0] && sim.money>=branchUpCost(b)){ sim.money-=branchUpCost(b); dayStats.capex+=branchUpCost(b); b.level++; }
@@ -1888,6 +1981,82 @@ document.querySelectorAll('.m-tab').forEach(t=>{
 recomputePriceLevel();   // 起動時に価格帯を算出
 
 // =====================================================================
+//  出店シート（空き物件タップ）＆ 空港（都市移動）
+// =====================================================================
+let buildLot=null, buildInt=0, buildEq=0, buildExt=0;
+function buildCost(){ return (buildLot?buildLot.tenant.cost:0) + EXTERIORS[buildExt].cost + INTERIORS[buildInt].cost + EQUIP_SETS[buildEq].cost; }
+function openBuildSheet(lot){ buildLot=lot; buildInt=0; buildEq=0; buildExt=0; renderBuild(); document.getElementById('modal-build').classList.add('show'); }
+function renderBuild(){
+  const t=buildLot.tenant, cityN=(CITIES.find(c=>c.id===buildLot.city)||{}).name||'';
+  const first=!branches[0].built;
+  document.getElementById('build-title').textContent = first?'1号店を出店する':'新しいカフェを出店する';
+  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
+  const row=(label,arr,sel,key)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
+    arr.map((o,i)=>`<button class="mbtn ${i===sel?'sel':''}" data-${key}="${i}" style="margin:3px 4px 3px 0">${o.name}${o.cost?` +¥${o.cost.toLocaleString('ja-JP')}`:'（無料）'}</button>`).join('');
+  document.getElementById('build-body').innerHTML =
+    `<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
+    `<div class="meta">${cityN}・交通量 ${t.traffic.toLocaleString('ja-JP')}人/日</div>`+
+    `<div class="meta">賃料 ¥${t.rent.toLocaleString('ja-JP')}/日・物件取得 ¥${t.cost.toLocaleString('ja-JP')}</div></div></div>`+
+    row('外装',EXTERIORS,buildExt,'bext') + row('内装',INTERIORS,buildInt,'bint') + row('設備（マシン）',EQUIP_SETS,buildEq,'beq');
+  const cost=buildCost(), left=sim.money-cost;
+  document.getElementById('build-cost').innerHTML =
+    `初期費用 <span class="gold">¥${cost.toLocaleString('ja-JP')}</span> ／ 開業後の手元資金 <span class="${left>=0?'green':''}" style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
+  document.getElementById('build-go').disabled = left<0;
+}
+document.getElementById('build-body').addEventListener('click', e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.bext!==undefined) buildExt=+t.dataset.bext;
+  else if(t.dataset.bint!==undefined) buildInt=+t.dataset.bint;
+  else if(t.dataset.beq!==undefined) buildEq=+t.dataset.beq;
+  renderBuild();
+});
+document.getElementById('build-cancel').onclick = ()=> document.getElementById('modal-build').classList.remove('show');
+document.getElementById('build-go').onclick = ()=>{
+  const lot=buildLot; if(!lot || lot.branch) return;
+  const cost=buildCost(); if(sim.money<cost) return;
+  sim.money-=cost; dayStats.capex+=cost;
+  const city=CITIES.find(c=>c.id===lot.city)||CITIES[0];
+  const vibe=INTERIORS[buildInt].vibe, mlv=EQUIP_SETS[buildEq].mlv, extB=EXTERIORS[buildExt].brand;
+  let built;
+  if(!branches[0].built){
+    // 1号店＝プレイ可能な本店をこの物件に建てる
+    const b=branches[0];
+    b.built=true; b.loc=lot.tenant.loc; b.city=lot.city; b.x=lot.x; b.z=lot.z; b.level=1; b.name='本店';
+    b.mesh=makeCafeBuilding(0xe0894a, lot.x, lot.z, 0xc9602e); b.mesh.userData.isCafe=true;
+    store.location=lot.tenant.loc; store.vibe=vibe; store.cityName=city.name; store.cityMul=city.mul;
+    store.rentDaily=lot.tenant.rent; store.traffic=lot.tenant.traffic; equip.machine.lv=mlv;
+    brand=Math.min(100, brand+extB); recomputePriceLevel();
+    built=b;
+  } else {
+    const b={ name:(branches.length+1)+'号店', loc:lot.tenant.loc, level:1, mesh:null, manager:null, built:true, city:lot.city, x:lot.x, z:lot.z };
+    b.mesh=makeCafeBuilding(0xe0a85a, lot.x, lot.z, 0xc9772e); b.mesh.userData.isCafe=true;
+    branches.push(b); weekAccum.opens++;
+    built=b;
+  }
+  lot.branch=built;
+  applyCityView();
+  document.getElementById('modal-build').classList.remove('show');
+  saveGame(); updateHUD(); updateHint();
+  flashHint(built===branches[0] ? '1号店をオープン！ オレンジの建物をタップして店内に入ろう' : `${built.name}を出店！ 委任運営で純益が積み上がります`);
+};
+// 空港：都市移動
+function openAirport(){ renderAirport(); document.getElementById('modal-airport').classList.add('show'); }
+function renderAirport(){
+  document.getElementById('airport-list').innerHTML = CITIES.map(c=>{
+    const here=c.id===viewCity;
+    const mine=branches.filter(b=>b.built && b.city===c.id).length;
+    return `<div class="mcard ${here?'sel':''}" data-flycity="${c.id}"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">${c.name}${here?'（現在地）':''}</div><div class="meta">${c.desc}・需要×${c.mul.toFixed(2)}</div><div class="meta">自店舗 ${mine}店</div></div></div>`;
+  }).join('');
+}
+document.getElementById('airport-list').addEventListener('click', e=>{
+  const o=e.target.closest('[data-flycity]'); if(!o) return;
+  switchCity(o.dataset.flycity);
+  document.getElementById('modal-airport').classList.remove('show');
+  flashHint(((CITIES.find(c=>c.id===viewCity)||{}).name||'')+' に移動しました');
+});
+document.getElementById('airport-cancel').onclick = ()=> document.getElementById('modal-airport').classList.remove('show');
+
+// =====================================================================
 //  セーブ / ロード（localStorage）
 // =====================================================================
 // プロフィール（オーナー名・ブランド名・ロゴ）とセーブスロット
@@ -1918,8 +2087,11 @@ function gameState(){
     finance:{ debt:finance.debt, invest:finance.invest },
     company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised },
     lastProfit, spawnAccum, mgrCandidates,
-    weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal, rivalComps:RIVALS.map(r=>r.comp),
-    branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level, manager:b.manager||null})),
+    weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
+    viewCity,
+    rivals:RIVALS.map(r=>({name:r.name, comp:r.comp, color:r.color, pos:r.pos, city:r.city})),
+    lots:lots.map(l=>({city:l.city, x:l.x, z:l.z, tenant:l.tenant, built:!!l.branch})),
+    branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level, manager:b.manager||null, built:!!b.built, city:b.city, x:b.x, z:b.z})),
     staff:staff.map(s=>({name:s.name, skill:s.skill, wage:s.wage})),
     loyalty:{...loyalty}, totalStats, dayStats,
   };
@@ -1955,18 +2127,47 @@ function loadGame(slot){
   if(d.weekStartShare!=null) weekStartShare=d.weekStartShare;
   if(d.weekStartBrand!=null) weekStartBrand=d.weekStartBrand;
   if(d.lastJournal) lastJournal=d.lastJournal;
-  if(d.rivalComps) RIVALS.forEach((r,i)=>{ if(d.rivalComps[i]!=null) r.comp=d.rivalComps[i]; });
-  if(d.branches&&d.branches[0]){
-    branches[0].name=d.branches[0].name; branches[0].loc=d.branches[0].loc; branches[0].level=d.branches[0].level;
-    branches[0].manager=d.branches[0].manager||null;
+  // ---- ハブ（都市・ライバル・空き物件）の復元 ----
+  const b0 = d.branches && d.branches[0];
+  viewCity = d.viewCity || (b0 && b0.city) || 'tokyo';
+  // ライバル（新フォーマット）。旧データは後で initCity が生成
+  if(d.rivals){
+    d.rivals.forEach(rr=>{
+      const r={ name:rr.name, comp:rr.comp, color:rr.color, pos:rr.pos, city:rr.city||viewCity };
+      r.mesh=makeCafeBuilding(r.color, rr.pos[0], rr.pos[1], 0x3a3f4a); RIVALS.push(r);
+      cityInited[r.city]=true;
+    });
+  }
+  // 本店（builtが無い旧データは出店済みとして扱う）
+  if(b0){
+    branches[0].name=b0.name; branches[0].loc=b0.loc; branches[0].level=b0.level; branches[0].manager=b0.manager||null;
+    branches[0].built = (b0.built!==undefined ? !!b0.built : true);
+    branches[0].city = b0.city || viewCity;
+    branches[0].x = (b0.x!=null ? b0.x : 10); branches[0].z = (b0.z!=null ? b0.z : 10);
+    if(branches[0].built){ branches[0].mesh=makeCafeBuilding(0xe0894a, branches[0].x, branches[0].z, 0xc9602e); branches[0].mesh.userData.isCafe=true; }
     if(branches[0].manager){ mainMgrMesh=makeHuman(0x2a2e3a); mainMgrMesh.position.set(-3.4,0,-3.7); storeScene.add(mainMgrMesh); }
   }
+  // 支店
   if(d.branches) for(let i=1;i<d.branches.length;i++){
-    const sb=d.branches[i], sp=BRANCH_SPOTS[i-1]; if(!sp) break;
-    const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null, manager:sb.manager||null};
-    b.mesh=makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0xc9772e); b.mesh.userData.isCafe=true; branches.push(b);
+    const sb=d.branches[i];
+    const x=(sb.x!=null?sb.x:LOT_POSITIONS[(i-1)%LOT_POSITIONS.length].x), z=(sb.z!=null?sb.z:LOT_POSITIONS[(i-1)%LOT_POSITIONS.length].z);
+    const b={name:sb.name, loc:sb.loc, level:sb.level, mesh:null, manager:sb.manager||null, built:true, city:sb.city||viewCity, x, z};
+    b.mesh=makeCafeBuilding(0xe0a85a, x, z, 0xc9772e); b.mesh.userData.isCafe=true; branches.push(b);
   }
+  // 空き物件（建設済みは対応する店舗に紐付け）
+  if(d.lots){
+    d.lots.forEach(ld=>{
+      const lot={ city:ld.city, x:ld.x, z:ld.z, tenant:ld.tenant, branch:null, group:makeLotMarker(ld.x,ld.z) };
+      if(ld.built) lot.branch = branches.find(b=>b.built && b.city===ld.city && b.x===ld.x && b.z===ld.z) || true;
+      lots.push(lot); cityInited[ld.city]=true;
+    });
+  }
+  // 旧データ互換：ライバル/物件が無ければ生成し、旧rivalCompsを反映
+  initCity(viewCity);
+  if(!d.rivals && d.rivalComps) RIVALS.filter(r=>r.city===viewCity).forEach((r,i)=>{ if(d.rivalComps[i]!=null) r.comp=d.rivalComps[i]; });
   if(d.staff) d.staff.forEach(s=>hireStaff(s));
+  sim.mode='overview';
+  applyCityView();
   recomputePriceLevel();
   return true;
 }
@@ -2002,7 +2203,7 @@ joyEl.addEventListener('pointercancel', joyEnd);
 const titleEl = document.getElementById('title');
 function showScreen(name){ titleEl.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.dataset.screen===name)); }
 function showTitle(){ sim.speed=0; syncSpeedUI(); titleEl.classList.remove('hidden'); showScreen(profile.owner&&profile.owner!=='オーナー'?'menu':'login'); document.getElementById('menu-greet').textContent='ようこそ、'+profile.owner+' さん'; }
-function startGame(){ titleEl.classList.add('hidden'); sim.speed=1; syncSpeedUI(); updateHUD(); }
+function startGame(){ titleEl.classList.add('hidden'); sim.speed=1; syncSpeedUI(); updateHUD(); btnMode.textContent = sim.mode==='store' ? '街に出る（俯瞰）' : '店に入る'; updateHint(); }
 titleEl.querySelectorAll('[data-go]').forEach(b=> b.onclick=()=>showScreen(b.dataset.go));
 
 // ログイン
@@ -2032,44 +2233,13 @@ function renderCityGrid(){
     `<div class="mcard ${i===setupCity?'sel':''}" data-setcity="${i}"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">${c.name}</div><div class="meta">${c.desc}・需要×${c.mul.toFixed(2)}</div></div></div>`).join('');
 }
 document.getElementById('city-grid').addEventListener('click', e=>{ const o=e.target.closest('[data-setcity]'); if(!o) return; setupCity=+o.dataset.setcity; renderCityGrid(); });
-// ③ テナント選び（街を選ぶたびに物件を生成）
-document.getElementById('city-next').onclick = ()=>{ setupTenants=genTenants(CITIES[setupCity]); setupTenant=0; renderTenantGrid(); showScreen('tenant'); };
-function renderTenantGrid(){
-  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
-  document.getElementById('tenant-grid').innerHTML = setupTenants.map((t,i)=>
-    `<div class="mcard ${i===setupTenant?'sel':''}" data-settenant="${i}"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div><div class="meta">交通量 ${t.traffic.toLocaleString('ja-JP')}人/日・賃料¥${t.rent.toLocaleString('ja-JP')}/日</div><div class="meta">初期費用 ¥${t.cost.toLocaleString('ja-JP')}・${t.risk}</div></div></div>`).join('');
-}
-document.getElementById('tenant-grid').addEventListener('click', e=>{ const o=e.target.closest('[data-settenant]'); if(!o) return; setupTenant=+o.dataset.settenant; renderTenantGrid(); });
-// ④ 内装・設備
-document.getElementById('tenant-next').onclick = ()=>{ renderSetup(); showScreen('setup'); };
-function setupCost(){ return setupTenants[setupTenant].cost + EXTERIORS[setupExt].cost + INTERIORS[setupInt].cost + EQUIP_SETS[setupEq].cost; }
-function renderSetup(){
-  const row=(label,arr,sel,key)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
-    arr.map((o,i)=>`<button class="mbtn ${i===sel?'sel':''}" data-${key}="${i}" style="margin:3px 4px 3px 0">${o.name}${o.cost?` +¥${o.cost.toLocaleString('ja-JP')}`:'（無料）'}</button>`).join('');
-  document.getElementById('setup-body').innerHTML =
-    row('外装',EXTERIORS,setupExt,'setext') + row('内装',INTERIORS,setupInt,'setint') + row('初期設備（マシン）',EQUIP_SETS,setupEq,'seteq');
-  const cost=setupCost(), left=START_CAPITAL-cost;
-  document.getElementById('setup-cost').innerHTML =
-    `初期費用 <span class="gold">¥${cost.toLocaleString('ja-JP')}</span>　/　開業後の手元資金 <span class="${left>=0?'green':''}" style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
-  document.getElementById('setup-start').disabled = left<0;
-}
-document.getElementById('setup-body').addEventListener('click', e=>{
-  const t=e.target.closest('button'); if(!t) return;
-  if(t.dataset.setext!==undefined) setupExt=+t.dataset.setext;
-  else if(t.dataset.setint!==undefined) setupInt=+t.dataset.setint;
-  else if(t.dataset.seteq!==undefined) setupEq=+t.dataset.seteq;
-  renderSetup();
-});
-// 開店（クリーンな初期状態にするためリロード経由）
-document.getElementById('setup-start').onclick = ()=>{
-  const city=CITIES[setupCity], t=setupTenants[setupTenant];
+// ③ 街を決めたら俯瞰マップへ（出店は空き物件タップで行う）
+document.getElementById('city-next').onclick = ()=>{
+  const city=CITIES[setupCity];
   const payload = {
     slot:firstEmptySlot(),
     profile:{ owner:profile.owner, brandName:(document.getElementById('brand-name').value.trim()||'マイカフェ'), logo:selectedLogo },
-    city:{ name:city.name, mul:city.mul },
-    tenant:{ loc:t.loc, rent:t.rent, traffic:t.traffic },
-    vibe:INTERIORS[setupInt].vibe, mlv:EQUIP_SETS[setupEq].mlv, extBrand:EXTERIORS[setupExt].brand,
-    initialCost:setupCost(),
+    startCity:city.id,
   };
   try{ sessionStorage.setItem('cafeNewGame', JSON.stringify(payload)); }catch(e){}
   location.reload();
@@ -2114,11 +2284,8 @@ function updateHUD(){
 // =====================================================================
 storeScene = buildStoreScene();
 overScene  = buildOverviewScene();
-// 俯瞰に本店・ライバル店を配置
-myCafeMesh = makeCafeBuilding(0xe0894a, 10, 10, 0xc9602e);
-myCafeMesh.userData.isCafe = true;
-branches[0].mesh = myCafeMesh;
-RIVALS.forEach(r=>{ r.mesh = makeCafeBuilding(r.color, r.pos[0], r.pos[1], 0x3a3f4a); });
+// 俯瞰マップの旅行ハブ（空港）。本店・支店・ライバル・空き物件は新規/ロード時に都市ごとに配置する
+makeAirport();
 
 // =====================================================================
 //  メインループ
@@ -2132,7 +2299,7 @@ function animate(){
   const dtGameMin = dt * 60 * sim.speed / 60; // = dt*speed (分) … 1秒で1分
   if(sim.speed>0){
     sim.minutes += dt * sim.speed; // 1リアル秒で speed ゲーム分
-    if(sim.mode==='store' || true) trySpawnCustomer(dt*sim.speed);
+    if(branches[0].built) trySpawnCustomer(dt*sim.speed);   // 本店が出店済みのときのみ来客
   }
 
   updatePlayer(dt);
@@ -2165,18 +2332,17 @@ const _newGame = (()=>{ try{ return JSON.parse(sessionStorage.getItem('cafeNewGa
 if(_newGame){
   try{ sessionStorage.removeItem('cafeNewGame'); }catch(e){}
   activeSlot=_newGame.slot; profile=_newGame.profile;
-  const t=_newGame.tenant||{loc:'downtown'};
-  store.location=t.loc; branches[0].loc=t.loc;
-  store.vibe=_newGame.vibe||'cozy';
-  store.cityName=(_newGame.city&&_newGame.city.name)||'東京';
-  store.cityMul=(_newGame.city&&_newGame.city.mul)||1.0;
-  store.rentDaily=t.rent||0;
-  store.traffic=t.traffic||8000;
-  if(_newGame.mlv) equip.machine.lv=_newGame.mlv;
-  brand = 20 + (_newGame.extBrand||0);
-  sim.money = START_CAPITAL - (_newGame.initialCost||0);
+  const sc=_newGame.startCity || 'tokyo';
+  const city=CITIES.find(c=>c.id===sc) || CITIES[0];
+  viewCity=sc; branches[0].city=sc; branches[0].built=false;
+  store.cityName=city.name; store.cityMul=city.mul;
+  brand = 20;
+  sim.money = START_CAPITAL;     // 出店費用は空き物件タップ時に支払う
+  sim.mode = 'overview';         // 俯瞰マップ＝ハブからスタート
+  initCity(sc); applyCityView();
   recomputePriceLevel(); saveGame();
-  startGame();              // クリーンな初期状態で即開始
+  startGame();                    // マップ上で出店先を選ぶ
+  flashHint('空き物件（看板）をタップして1号店を出店しよう！ 空港から他都市にも行けます');
 } else {
   const ln=document.getElementById('login-name'); if(profile.owner && profile.owner!=='オーナー') ln.value=profile.owner;
   showTitle();
