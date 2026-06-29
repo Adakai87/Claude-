@@ -148,6 +148,23 @@
     opacity:0; transition:opacity .25s;}
   .toast-mini.show{opacity:1;}
 
+  /* オンボーディング画面 */
+  .screen{display:none; width:100%; max-width:360px; padding:22px; text-align:center;}
+  .screen.active{display:block;}
+  .field{width:100%; box-sizing:border-box; padding:13px 14px; border-radius:11px; border:1px solid var(--line);
+    background:#241a12; color:var(--txt); font-size:15px; margin:8px 0 14px; text-align:center; font-family:inherit;}
+  .logo-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 16px;}
+  .logo-opt{background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:10px 4px 6px; cursor:pointer;}
+  .logo-opt.sel{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent);}
+  .logo-opt .nm{font-size:10px; color:var(--sub); margin-top:4px;}
+  .slot{display:flex; align-items:center; gap:12px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:12px; padding:12px; margin:9px 0; cursor:pointer; text-align:left;}
+  .slot.empty{opacity:.65;}
+  .slot .si{flex:1; min-width:0;}
+  .slot .si .b{font-weight:800; font-size:15px;}
+  .slot .si .m{font-size:11px; color:var(--sub); margin-top:3px;}
+  .back-link{color:var(--sub); font-size:13px; margin-top:12px; cursor:pointer; display:inline-block;}
+
   /* ---- スマホ縦画面の調整 ---- */
   @media (max-width:480px){
     .hud{padding:8px; gap:6px; flex-wrap:wrap;}
@@ -167,9 +184,10 @@
 <div id="load">読み込み中…</div>
 <div id="toast-mini" class="toast-mini"></div>
 
-<!-- タイトル画面 -->
+<!-- タイトル / オンボーディング -->
 <div id="title" class="overlay">
-  <div class="title-card">
+  <!-- ログイン -->
+  <div class="screen active" data-screen="login">
     <svg class="title-emblem" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
       <circle cx="48" cy="48" r="46" fill="#1a140e" stroke="#e0894a" stroke-width="3"/>
       <path d="M30 44 h30 v8 a15 15 0 0 1 -30 0 Z" fill="#f4efe9"/>
@@ -178,9 +196,39 @@
       <path d="M40 36 c3 -3 -2 -6 1 -10 M48 36 c3 -3 -2 -6 1 -10 M56 36 c3 -3 -2 -6 1 -10" stroke="#caa24a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
     </svg>
     <div class="title-logo">CAFE <span>TYCOON</span></div>
-    <div class="title-sub">街でいちばんのカフェ帝国をつくろう。<br>接客から経営、出店、上場まで。</div>
-    <button class="btn" id="t-new">新しく始める</button>
-    <button class="btn ghost" id="t-continue">つづきから</button>
+    <div class="title-sub">オーナーとしてログイン</div>
+    <input id="login-name" class="field" placeholder="オーナー名（任意）" maxlength="12">
+    <button class="btn" id="login-go" style="width:100%">ログイン</button>
+  </div>
+  <!-- メインメニュー -->
+  <div class="screen" data-screen="menu">
+    <div class="title-logo" style="font-size:30px">CAFE <span>TYCOON</span></div>
+    <div class="title-sub" id="menu-greet">ようこそ</div>
+    <button class="btn" id="m-new" style="width:100%">新しく始める</button>
+    <button class="btn ghost" id="m-continue" style="width:100%; margin-top:10px">つづきから</button>
+  </div>
+  <!-- データ選択（つづき） -->
+  <div class="screen" data-screen="slots">
+    <h2 style="margin:0 0 6px">データを選択</h2>
+    <div id="slot-list"></div>
+    <span class="back-link" data-go="menu">← 戻る</span>
+  </div>
+  <!-- 新規：ブランド設定 -->
+  <div class="screen" data-screen="brand">
+    <h2 style="margin:0 0 2px">ブランド設定</h2>
+    <div class="title-sub">店名とロゴを決めよう（あとで変更可）</div>
+    <input id="brand-name" class="field" placeholder="ブランド名" maxlength="14" value="マイカフェ">
+    <div class="logo-grid" id="logo-grid"></div>
+    <button class="btn" id="brand-next" style="width:100%">次へ：出店場所</button>
+    <span class="back-link" data-go="menu">← 戻る</span>
+  </div>
+  <!-- 新規：出店場所 -->
+  <div class="screen" data-screen="loc">
+    <h2 style="margin:0 0 2px">出店場所を選ぶ</h2>
+    <div class="title-sub">立地で来る客層が変わります</div>
+    <div id="loc-grid"></div>
+    <button class="btn" id="loc-start" style="width:100%; margin-top:6px">この場所で開店！</button>
+    <span class="back-link" data-go="brand">← 戻る</span>
   </div>
 </div>
 
@@ -1494,6 +1542,7 @@ function renderManage(){
   } else if(mtab==='company'){
     const val = valuation(), nw = netWorth();
     const assets = sim.money + Math.round(finance.invest) + storeAssets();
+    h += mcard(logoBadge(profile.logo,58), profile.brandName, 'オーナー：'+profile.owner+'｜'+sim.day+'日目', '<span class="sub2">あなたの会社</span>');
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">¥${val.toLocaleString('ja-JP')}</div><div class="l">企業価値</div></div>
        <div class="kpi"><div class="v">${company.public?'上場済':'未上場'}</div><div class="l">ステータス</div></div>
@@ -1587,9 +1636,23 @@ recomputePriceLevel();   // 起動時に価格帯を算出
 // =====================================================================
 //  セーブ / ロード（localStorage）
 // =====================================================================
-const SAVE_KEY = 'cafeTycoon_v1';
+// プロフィール（オーナー名・ブランド名・ロゴ）とセーブスロット
+let profile = { owner:'オーナー', brandName:'マイカフェ', logo:0 };
+let activeSlot = 1;
+let selectedLogo = 0;
+const LOGOS = [
+  {name:'カップ',   color:'#e0894a', art:'<path d="M15 22 h18 v7 a9 9 0 0 1 -18 0 Z" fill="#fff"/><path d="M33 23 a5.5 5.5 0 0 1 0 10" fill="none" stroke="#fff" stroke-width="3"/>'},
+  {name:'リーフ',   color:'#3ddc97', art:'<path d="M24 12 C13 19 15 33 24 36 C33 33 35 19 24 12 Z" fill="#fff"/><path d="M24 15 V33" stroke="#3ddc97" stroke-width="2"/>'},
+  {name:'ビーン',   color:'#9a5b3a', art:'<ellipse cx="24" cy="24" rx="8.5" ry="12" fill="#fff"/><path d="M24 13 q-3 11 0 22" stroke="#9a5b3a" stroke-width="2.4" fill="none"/>'},
+  {name:'クラウン', color:'#ffce4d', art:'<path d="M13 32 l2 -13 6 6 3 -10 3 10 6 -6 2 13 Z" fill="#fff"/>'},
+  {name:'スター',   color:'#ff8ec7', art:'<path d="M24 12 l3.5 8 8.5 .8 -6.5 5.6 2 8.6 -7.5 -4.5 -7.5 4.5 2 -8.6 -6.5 -5.6 8.5 -.8 Z" fill="#fff"/>'},
+  {name:'ハート',   color:'#e0685e', art:'<path d="M24 34 C11 25 15 14 24 19 C33 14 37 25 24 34 Z" fill="#fff"/>'},
+];
+const logoBadge = (i,px)=>{ const L=LOGOS[i]||LOGOS[0]; return `<svg viewBox="0 0 48 48" width="${px}" height="${px}"><circle cx="24" cy="24" r="23" fill="${L.color}"/>${L.art}</svg>`; };
+const slotKey = n => 'cafeTycoon_slot'+n;
 function gameState(){
   return {
+    profile,
     money:sim.money, day:sim.day, minutes:sim.minutes,
     custToday:sim.custToday, revToday:sim.revToday, servedToday:sim.servedToday, lostToday:sim.lostToday,
     store:{ priceLevel:store.priceLevel, vibe:store.vibe, location:store.location },
@@ -1606,11 +1669,15 @@ function gameState(){
     loyalty:{...loyalty}, totalStats, dayStats,
   };
 }
-function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(gameState())); return true; }catch(e){ return false; } }
-function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
-function loadGame(){
-  let d; try{ d=JSON.parse(localStorage.getItem(SAVE_KEY)); }catch(e){ return false; }
+function saveGame(){ try{ localStorage.setItem(slotKey(activeSlot), JSON.stringify(gameState())); return true; }catch(e){ return false; } }
+function slotMeta(n){ try{ const d=JSON.parse(localStorage.getItem(slotKey(n))); if(!d) return null; return { brandName:(d.profile&&d.profile.brandName)||'マイカフェ', logo:(d.profile&&d.profile.logo)||0, day:d.day, money:d.money, owner:(d.profile&&d.profile.owner)||'' }; }catch(e){ return null; } }
+function anySave(){ for(let n=1;n<=3;n++) if(slotMeta(n)) return true; return false; }
+function firstEmptySlot(){ for(let n=1;n<=3;n++) if(!slotMeta(n)) return n; return 1; }
+function loadGame(slot){
+  let d; try{ d=JSON.parse(localStorage.getItem(slotKey(slot))); }catch(e){ return false; }
   if(!d) return false;
+  activeSlot = slot;
+  if(d.profile) profile = d.profile;
   sim.money=d.money; sim.day=d.day; sim.minutes=d.minutes;
   sim.custToday=d.custToday||0; sim.revToday=d.revToday||0; sim.servedToday=d.servedToday||0; sim.lostToday=d.lostToday||0;
   Object.assign(store, d.store||{});
@@ -1643,19 +1710,75 @@ function miniToast(msg){
 }
 
 // =====================================================================
-//  タイトル / 設定
+//  タイトル / オンボーディング / 設定
 // =====================================================================
 const titleEl = document.getElementById('title');
-function showTitle(){ sim.speed=0; syncSpeedUI(); titleEl.classList.remove('hidden'); document.getElementById('t-continue').disabled=!hasSave(); }
-function startGame(){ titleEl.classList.add('hidden'); sim.speed=1; syncSpeedUI(); }
-document.getElementById('t-new').onclick = ()=>{ startGame(); };
-document.getElementById('t-continue').onclick = ()=>{ if(loadGame()){ updateHUD(); } startGame(); };
+function showScreen(name){ titleEl.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.dataset.screen===name)); }
+function showTitle(){ sim.speed=0; syncSpeedUI(); titleEl.classList.remove('hidden'); showScreen(profile.owner&&profile.owner!=='オーナー'?'menu':'login'); document.getElementById('menu-greet').textContent='ようこそ、'+profile.owner+' さん'; }
+function startGame(){ titleEl.classList.add('hidden'); sim.speed=1; syncSpeedUI(); updateHUD(); }
+titleEl.querySelectorAll('[data-go]').forEach(b=> b.onclick=()=>showScreen(b.dataset.go));
+
+// ログイン
+document.getElementById('login-go').onclick = ()=>{
+  const v=document.getElementById('login-name').value.trim();
+  profile.owner = v || 'オーナー';
+  try{ localStorage.setItem('cafeTycoon_owner', profile.owner); }catch(e){}
+  document.getElementById('menu-greet').textContent='ようこそ、'+profile.owner+' さん';
+  showScreen('menu');
+};
+// メニュー
+document.getElementById('m-new').onclick = ()=>{ selectedLogo=0; renderLogoGrid(); document.getElementById('brand-name').value='マイカフェ'; showScreen('brand'); };
+document.getElementById('m-continue').onclick = ()=>{ renderSlots(); showScreen('slots'); };
+// ロゴ選択
+function renderLogoGrid(){
+  document.getElementById('logo-grid').innerHTML = LOGOS.map((L,i)=>
+    `<div class="logo-opt ${i===selectedLogo?'sel':''}" data-logo="${i}">${logoBadge(i,52)}<div class="nm">${L.name}</div></div>`).join('');
+}
+document.getElementById('logo-grid').addEventListener('click', e=>{
+  const o=e.target.closest('[data-logo]'); if(!o) return; selectedLogo=+o.dataset.logo; renderLogoGrid();
+});
+// ブランド→出店場所
+document.getElementById('brand-next').onclick = ()=>{ renderLocGrid(); showScreen('loc'); };
+let setupLoc = 'downtown';
+function renderLocGrid(){
+  const hint = { downtown:'会社員が多い', college:'学生が多い', residential:'家族が多い', tourist:'観光客が多い' };
+  document.getElementById('loc-grid').innerHTML = Object.keys(LOC_JP).map(k=>
+    `<div class="mcard ${k===setupLoc?'sel':''}" data-setloc="${k}"><div class="thumb">${ART[k]}</div><div class="info"><div class="ttl">${LOC_JP[k]}</div><div class="meta">${hint[k]}・家賃¥${(RENT[k]||0).toLocaleString('ja-JP')}/日</div></div></div>`).join('');
+}
+document.getElementById('loc-grid').addEventListener('click', e=>{
+  const o=e.target.closest('[data-setloc]'); if(!o) return; setupLoc=o.dataset.setloc; renderLocGrid();
+});
+// 新規スタート（クリーンな初期状態にするためリロード経由）
+document.getElementById('loc-start').onclick = ()=>{
+  const payload = { slot:firstEmptySlot(), loc:setupLoc,
+    profile:{ owner:profile.owner, brandName:(document.getElementById('brand-name').value.trim()||'マイカフェ'), logo:selectedLogo } };
+  try{ sessionStorage.setItem('cafeNewGame', JSON.stringify(payload)); }catch(e){}
+  location.reload();
+};
+// データ選択（つづき）
+function renderSlots(){
+  let h='';
+  for(let n=1;n<=3;n++){
+    const m=slotMeta(n);
+    if(m){
+      h += `<div class="slot" data-slot="${n}">${logoBadge(m.logo,40)}<div class="si"><div class="b">${m.brandName}</div><div class="m">${m.day}日目・所持金¥${(m.money||0).toLocaleString('ja-JP')}</div></div><span class="sub2">スロット${n}</span></div>`;
+    } else {
+      h += `<div class="slot empty"><div class="si"><div class="b">空きスロット</div><div class="m">スロット${n}</div></div></div>`;
+    }
+  }
+  document.getElementById('slot-list').innerHTML = h;
+}
+document.getElementById('slot-list').addEventListener('click', e=>{
+  const o=e.target.closest('[data-slot]'); if(!o) return;
+  if(loadGame(+o.dataset.slot)){ startGame(); }
+});
+// 設定
 const setModal = document.getElementById('modal-settings');
 document.getElementById('btn-settings').onclick = ()=> setModal.classList.add('show');
 document.getElementById('set-close').onclick = ()=> setModal.classList.remove('show');
 document.getElementById('set-save').onclick = ()=>{ miniToast(saveGame()?'セーブしました':'セーブ失敗'); setModal.classList.remove('show'); };
 document.getElementById('set-title').onclick = ()=>{ setModal.classList.remove('show'); showTitle(); };
-document.getElementById('set-reset').onclick = ()=>{ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); };
+document.getElementById('set-reset').onclick = ()=>{ if(confirm('このデータを消して最初からやり直しますか？')){ try{ localStorage.removeItem(slotKey(activeSlot)); }catch(e){} location.reload(); } };
 
 // =====================================================================
 //  HUD更新
@@ -1718,7 +1841,18 @@ addEventListener('resize', ()=>{
 btnMode.textContent = sim.mode==='store' ? '街に出る（俯瞰）' : '店に入る';
 updateHint();
 document.getElementById('load').style.display='none';
-showTitle();   // 起動時はタイトル画面（一時停止）
+try{ const o=localStorage.getItem('cafeTycoon_owner'); if(o) profile.owner=o; }catch(e){}
+const _newGame = (()=>{ try{ return JSON.parse(sessionStorage.getItem('cafeNewGame')); }catch(e){ return null; } })();
+if(_newGame){
+  try{ sessionStorage.removeItem('cafeNewGame'); }catch(e){}
+  activeSlot=_newGame.slot; profile=_newGame.profile;
+  store.location=_newGame.loc; branches[0].loc=_newGame.loc;
+  recomputePriceLevel(); saveGame();
+  startGame();              // クリーンな初期状態で即開始
+} else {
+  const ln=document.getElementById('login-name'); if(profile.owner && profile.owner!=='オーナー') ln.value=profile.owner;
+  showTitle();
+}
 animate();
 </script>
 </body>
