@@ -132,7 +132,9 @@
   /* 週刊カフェジャーナル（新聞UI） */
   #btn-journal{position:fixed; top:214px; right:12px; z-index:30; pointer-events:auto;
     background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:8px 12px; cursor:pointer;}
-  .sheet.news-sheet{max-width:470px; max-height:86vh; overflow-y:auto; background:#efe7d6; color:#2a2018; border:1px solid #b9a98f;}
+  .sheet.news-sheet{width:min(470px,93vw); max-height:88vh; overflow:hidden; background:#efe7d6; color:#2a2018; border:1px solid #b9a98f;
+    display:flex; flex-direction:column; position:relative;}
+  .sheet.news-sheet #news-body{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;}
   .news-mast{text-align:center; border-bottom:3px double #2a2018; padding-bottom:8px; margin-bottom:6px;}
   .news-mast .t{font-size:24px; font-weight:900; letter-spacing:3px; font-family:"游明朝","Yu Mincho",serif;}
   .news-mast .d{font-size:11px; color:#6a5e48; margin-top:3px;}
@@ -145,7 +147,23 @@
   .news-sheet .btn.ghost{background:#2a2018; color:#efe7d6; border-color:#2a2018;}
 
   /* カード型の選択肢（画像つき） */
-  .dash-sheet{max-height:86vh; overflow-y:auto;}
+  /* 経営/ダッシュボードのシート：ヘッダ（見出し＋タブ）と閉じるは固定、中身だけスクロール */
+  .sheet.dash-sheet{ width:min(480px,93vw); max-height:88vh; padding:0; text-align:left;
+    display:flex; flex-direction:column; overflow:hidden; position:relative; }
+  .sheet.dash-sheet > h2{ margin:0; padding:16px 18px 6px; font-size:19px; }
+  .sheet.dash-sheet > .dash-tabs{ margin:0; padding:0 18px 8px; flex:0 0 auto; }
+  .sheet.dash-sheet > #manage-body,
+  .sheet.dash-sheet > #dash-body{ flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px 18px 12px; }
+  .sheet.dash-sheet > .btn.ghost{ margin:0; flex:0 0 auto; width:100%; border-radius:0; border-width:1px 0 0;
+    border-bottom-left-radius:18px; border-bottom-right-radius:18px; }
+  /* 右上の×クローズ（常に見える） */
+  .sheet-x{ position:absolute; top:10px; right:12px; z-index:2; width:32px; height:32px; border-radius:50%;
+    border:1px solid var(--line); background:var(--panel2); color:var(--txt); font-size:18px; line-height:1; cursor:pointer; }
+  /* 出店シートなど：見出し固定・中身スクロール・ボタン固定フッタ */
+  .sheet.flex-sheet{ width:min(420px,93vw); max-height:90vh; padding:0; display:flex; flex-direction:column; overflow:hidden; position:relative; text-align:left; }
+  .sheet.flex-sheet > h2{ margin:0; padding:16px 18px 8px; text-align:center; }
+  .sheet.flex-sheet > .flex-body{ flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 18px; }
+  .sheet.flex-sheet > .flex-foot{ flex:0 0 auto; padding:12px 18px 16px; border-top:1px solid var(--line); }
   .mcard{display:flex; gap:12px; align-items:center; background:var(--panel2); border:1px solid var(--line);
     border-radius:13px; padding:11px; margin-bottom:10px;}
   .mcard.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
@@ -311,12 +329,15 @@
 
 <!-- 出店シート（空き物件タップで開く） -->
 <div class="modal" id="modal-build">
-  <div class="sheet">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-build" aria-label="閉じる">×</button>
     <h2 id="build-title">出店する</h2>
-    <div id="build-body" style="text-align:left"></div>
-    <div id="build-cost" style="margin:12px 0; font-weight:800"></div>
-    <button class="btn" id="build-go" style="width:100%">この内容で開店する</button>
-    <button class="btn ghost" id="build-cancel" style="width:100%; margin-top:8px">キャンセル</button>
+    <div id="build-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot">
+      <div id="build-cost" style="margin:0 0 10px; font-weight:800"></div>
+      <button class="btn" id="build-go" style="width:100%">この内容で開店する</button>
+      <button class="btn ghost" id="build-cancel" style="width:100%; margin-top:8px">キャンセル</button>
+    </div>
   </div>
 </div>
 
@@ -363,6 +384,7 @@
 
 <div class="modal" id="modal-journal">
   <div class="sheet news-sheet">
+    <button class="sheet-x" data-close="modal-journal" aria-label="閉じる" style="background:#e3d8c2;color:#2a2018;border-color:#b9a98f">×</button>
     <div class="news-mast"><div class="t">週刊カフェジャーナル</div><div class="d" id="news-date"></div></div>
     <div class="news-tabs">
       <button class="news-tab active" data-news="own">自店</button>
@@ -377,6 +399,7 @@
 
 <div class="modal" id="modal-manage">
   <div class="sheet dash-sheet">
+    <button class="sheet-x" data-close="modal-manage" aria-label="閉じる">×</button>
     <h2>経営（事務所）</h2>
     <div class="dash-tabs">
       <button class="m-tab active" data-mtab="menu">メニュー</button>
@@ -398,6 +421,7 @@
 
 <div class="modal" id="modal-dash">
   <div class="sheet dash-sheet">
+    <button class="sheet-x" data-close="modal-dash" aria-label="閉じる">×</button>
     <h2>経営ダッシュボード</h2>
     <div class="dash-tabs">
       <button class="dash-tab active" data-range="today">本日</button>
@@ -812,7 +836,8 @@ const RIVAL_CUP = '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M5 8
 const PIN_SVG = '<svg width="26" height="32" viewBox="0 0 26 32"><path d="M13 31S24 17 24 11A11 11 0 1 0 2 11c0 6 11 20 11 20z" fill="#2e8bff" stroke="#fff" stroke-width="2"/><circle cx="13" cy="11" r="4" fill="#fff"/></svg>';
 function updateMapMarkers(){
   const titleShown = !document.getElementById('title').classList.contains('hidden');
-  if(sim.mode!=='overview' || titleShown){ if(markerLayer.style.display!=='none') markerLayer.style.display='none'; return; }
+  const modalOpen = !!document.querySelector('.modal.show');
+  if(sim.mode!=='overview' || titleShown || modalOpen){ if(markerLayer.style.display!=='none') markerLayer.style.display='none'; return; }
   markerLayer.style.display='block';
   const want=new Set();
   const place=(key,cls,html,x,y,z)=>{
@@ -2265,6 +2290,8 @@ document.getElementById('build-body').addEventListener('click', e=>{
   renderBuild();
 });
 document.getElementById('build-cancel').onclick = ()=> document.getElementById('modal-build').classList.remove('show');
+// 全モーダル共通：右上×で閉じる
+document.querySelectorAll('.sheet-x[data-close]').forEach(b=> b.onclick=()=>{ const m=document.getElementById(b.dataset.close); if(m) m.classList.remove('show'); });
 document.getElementById('build-go').onclick = ()=>{
   const lot=buildLot; if(!lot || lot.branch) return;
   const cost=buildCost(); if(sim.money<cost) return;
