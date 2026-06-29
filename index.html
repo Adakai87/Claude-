@@ -320,6 +320,16 @@
   </div>
 </div>
 
+<!-- 不動産（空き物件ブラウザ） -->
+<div class="modal" id="modal-realestate">
+  <div class="sheet" style="max-width:440px">
+    <h2>不動産 — 物件情報</h2>
+    <div class="title-sub" id="re-sub" style="margin-bottom:6px">この街の空き物件。「出店」でそのまま開業できます</div>
+    <div id="re-list" style="max-height:60vh; overflow:auto"></div>
+    <button class="btn ghost" id="re-close" style="width:100%; margin-top:8px">閉じる</button>
+  </div>
+</div>
+
 <!-- 空港（都市移動） -->
 <div class="modal" id="modal-airport">
   <div class="sheet" style="max-width:420px">
@@ -473,10 +483,11 @@ const TENANT_DEFS = [
   {cat:'観光地の好立地',         loc:'tourist',     tr:[8000,13000],  rent:[3000,4200], cost:[26000,38000], risk:'人通り多め'},
   {cat:'住宅街の角地',           loc:'residential', tr:[4000,7000],   rent:[1600,2400], cost:[14000,22000], risk:'低リスク低リターン'},
 ];
-function genTenants(city){
-  const pool=[...TENANT_DEFS], out=[];
-  for(let i=0;i<3 && pool.length;i++){
-    const d=pool.splice((Math.random()*pool.length)|0,1)[0];
+function genTenants(city, n){
+  n = n || LOT_POSITIONS.length;            // マップの空き区画ぶん生成（種類は重複可）
+  const out=[];
+  for(let i=0;i<n;i++){
+    const d = TENANT_DEFS[(Math.random()*TENANT_DEFS.length)|0];
     out.push({
       cat:d.cat, loc:d.loc, risk:d.risk,
       traffic:Math.round((d.tr[0]+Math.random()*(d.tr[1]-d.tr[0]))*city.mul/100)*100,
@@ -539,7 +550,7 @@ const CITY_DEMAND = 60000;     // 街全体の1日のカフェ需要（円指標
 // ---- ハブ（俯瞰マップ）：都市ごとに空き物件・ライバルを展開 ----
 let viewCity = 'tokyo';                 // 現在表示中の都市id
 const cityInited = {};                  // 初期化済みの都市id→true
-const LOT_POSITIONS   = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12}, {x:14,z:-15}, {x:-23,z:1} ];
+const LOT_POSITIONS   = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12}, {x:14,z:-15}, {x:-30,z:28}, {x:34,z:-8}, {x:-8,z:38}, {x:40,z:30} ];
 const RIVAL_POSITIONS = [ {x:-30,z:18}, {x:26,z:-28}, {x:-24,z:-24}, {x:30,z:6} ];
 const RIVAL_NAMES  = ['グリーン珈琲','ブルーカフェ','まちの喫茶店','ロースト堂','カフェ・ルミエール','大東珈琲','スワン珈琲'];
 const RIVAL_COLORS = [0x2f9e63,0x4a78c9,0x9a5b3a,0xb5552f,0x7a5cc0,0x2f8f9e];
@@ -691,6 +702,7 @@ function payDividend(){
 }
 // 俯瞰マップにデザイン性のあるカフェ建物（屋根・ストライプ日除け・ドア・窓・看板・カップ看板）
 const cafeCups = [];
+const cityCars = [];   // 街を走る車（俯瞰の演出）
 function makeCafeBuilding(color, x, z, accent){
   const g = new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
   const body = new THREE.Mesh(new THREE.BoxGeometry(5,3.2,5), new THREE.MeshStandardMaterial({ color }));
@@ -767,7 +779,7 @@ function addLandmark(def){
     for(let r=0;r<Math.floor(h/2.4);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.0,7.1), new THREE.MeshStandardMaterial({color:0xbfe3ff, emissive:0x22425a, emissiveIntensity:0.4})); band.position.y=1.5+r*2.4; if(band.position.y<h-0.6) g.add(band); }
   }
   body.userData.group = g;
-  landmarks.push({ mesh:body, label:def.label, tab:def.tab, x:def.x, z:def.z, h });
+  landmarks.push({ mesh:body, label:def.label, tab:def.tab, kind:def.kind, x:def.x, z:def.z, h });
   return g;
 }
 
@@ -1046,7 +1058,7 @@ function buildOverviewScene(){
   }
 
   // 予約地点（カフェ/空き物件/ライバル/空港/ランドマーク）の近くにはビルを置かない
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...LANDMARK_DEFS, AIRPORT_POS, {x:0,z:0}];
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...LANDMARK_DEFS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ビルのパレット（壁色 / 屋根色）
@@ -1094,6 +1106,34 @@ function buildOverviewScene(){
     tree(x,z);
   }
 
+  // 公園（芝＋池＋木立＋ベンチ）
+  (function park(){
+    const px=-9, pz=-27;                                   // 道路の間の一区画を公園に
+    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(15,15), new THREE.MeshStandardMaterial({color:0x6fae5a}));
+    lawn.rotation.x=-Math.PI/2; lawn.position.set(px,0.03,pz); scene.add(lawn);
+    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.4,20), new THREE.MeshStandardMaterial({color:0x3aa6c0}));
+    pond.rotation.x=-Math.PI/2; pond.position.set(px+2,0.05,pz+2); scene.add(pond);
+    for(let i=0;i<7;i++){ const a=i/7*Math.PI*2; tree(px+Math.cos(a)*5.5-1, pz+Math.sin(a)*5.5-1); }
+    for(const o of [[-4,-4],[-4,4]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.3,pz+o[1]); scene.add(bn); }
+  })();
+
+  // 走る車（道路グリッド上を往復）
+  const CARCOL=[0xd24b4b,0x4b78d2,0xe0b24a,0x3fae6a,0xdddddd,0x9a5bd0,0x37424f];
+  function makeCar(){
+    const g=new THREE.Group();
+    const col=CARCOL[(Math.random()*CARCOL.length)|0];
+    const body=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.7,3.0), new THREE.MeshStandardMaterial({color:col})); body.position.y=0.45; body.castShadow=true; g.add(body);
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.6,1.5), new THREE.MeshStandardMaterial({color:0x223040})); cab.position.set(0,0.95,-0.1); g.add(cab);
+    scene.add(g);
+    const onX = Math.random()<0.5;                         // x軸沿い or z軸沿い
+    const road = ROADS[(Math.random()*ROADS.length)|0];
+    const dir = Math.random()<0.5?1:-1;
+    const lane = dir>0?1.6:-1.6;
+    const car={ g, onX, road, dir, p:(Math.random()-0.5)*180, speed:6+Math.random()*8, lane };
+    cityCars.push(car); return car;
+  }
+  for(let i=0;i<16;i++) makeCar();
+
   // カフェ（本店・支店・ライバル）と空き物件・空港は init で配置する
   scene._isStore = false;
   return scene;
@@ -1125,21 +1165,32 @@ function panBy(dx,dy){
 }
 applyPan();
 
+function setZoom(z){ overZoom = Math.max(26, Math.min(82, z)); sizeOverCam(); }
 let pdown=null, panMoved=false, lastPan=null;
+const activePtrs = new Map();              // ピンチ用に全ポインタを追跡
+let pinchStartDist=0, pinchStartZoom=0;
+const ptrDist = ()=>{ const a=[...activePtrs.values()]; return Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y); };
 renderer.domElement.addEventListener('pointerdown', e=>{
   if(sim.mode==='store'){ storePick(e); return; }
+  activePtrs.set(e.pointerId, {x:e.clientX,y:e.clientY});
+  if(activePtrs.size>=2){ pinchStartDist=ptrDist(); pinchStartZoom=overZoom; pdown=null; panMoved=true; return; }
   pdown={x:e.clientX,y:e.clientY,id:e.pointerId}; panMoved=false; lastPan={x:e.clientX,y:e.clientY};
 });
 renderer.domElement.addEventListener('pointermove', e=>{
-  if(sim.mode!=='overview' || !pdown || e.pointerId!==pdown.id) return;
+  if(sim.mode!=='overview') return;
+  if(activePtrs.has(e.pointerId)) activePtrs.set(e.pointerId, {x:e.clientX,y:e.clientY});
+  if(activePtrs.size>=2){ if(pinchStartDist>0) setZoom(pinchStartZoom * pinchStartDist/Math.max(1,ptrDist())); return; }  // 指を広げると拡大
+  if(!pdown || e.pointerId!==pdown.id) return;
   if(e.buttons===0){ pdown=null; return; }   // ボタンが押されていない移動ではパンしない（ホバー対策）
   const dx=e.clientX-lastPan.x, dy=e.clientY-lastPan.y; lastPan={x:e.clientX,y:e.clientY};
   if(Math.abs(e.clientX-pdown.x)+Math.abs(e.clientY-pdown.y)>6) panMoved=true;
   if(panMoved) panBy(dx,dy);
 });
-function endPan(e){ if(sim.mode==='overview' && pdown && !panMoved) overviewPick(e); pdown=null; }
+function endPan(e){ activePtrs.delete(e.pointerId); if(activePtrs.size<2) pinchStartDist=0;
+  if(sim.mode==='overview' && pdown && !panMoved && e.pointerId===pdown.id) overviewPick(e); pdown=null; }
 renderer.domElement.addEventListener('pointerup', endPan);
-renderer.domElement.addEventListener('pointercancel', ()=>{ pdown=null; });
+renderer.domElement.addEventListener('pointercancel', e=>{ activePtrs.delete(e.pointerId); if(activePtrs.size<2) pinchStartDist=0; pdown=null; });
+renderer.domElement.addEventListener('wheel', e=>{ if(sim.mode!=='overview') return; e.preventDefault(); setZoom(overZoom*(1+Math.sign(e.deltaY)*0.12)); }, {passive:false});
 
 function overviewPick(e){
   pointer.x = (e.clientX/innerWidth)*2-1;
@@ -1157,7 +1208,7 @@ function overviewPick(e){
   const t = targets.find(x=>x.o===hit.object); if(!t) return;
   if(t.type==='lot') openBuildSheet(t.ref);
   else if(t.type==='air') openAirport();
-  else if(t.type==='lm'){ openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
+  else if(t.type==='lm'){ if(t.ref.kind==='office') openRealEstate(); else openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
   else if(t.type==='cafe'){ if(t.ref===branches[0]) enterStore(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
   else if(t.type==='rival') flashHint(`${t.ref.name}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`);
 }
@@ -2221,6 +2272,35 @@ document.getElementById('build-go').onclick = ()=>{
   saveGame(); updateHUD(); updateHint();
   flashHint(built===branches[0] ? '1号店をオープン！ オレンジの建物をタップして店内に入ろう' : `${built.name}を出店！ 委任運営で純益が積み上がります`);
 };
+// 不動産：この街の空き物件を一覧 → そのまま出店
+function openRealEstate(){ renderRealEstate(); document.getElementById('modal-realestate').classList.add('show'); }
+function renderRealEstate(){
+  const cityN=(CITIES.find(c=>c.id===viewCity)||{}).name||'';
+  const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
+  const free=lots.filter(l=>l.city===viewCity && !l.branch);
+  const mine=branches.filter(b=>b.built && b.city===viewCity);
+  document.getElementById('re-sub').textContent = `${cityN}：空き ${free.length}件・自店舗 ${mine.length}件`;
+  let h='';
+  if(!free.length) h+=`<div class="note" style="margin-top:0">この街に空き物件はありません。空港から別の都市へ。</div>`;
+  free.forEach((l,i)=>{
+    const t=l.tenant;
+    h+=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
+       `<div class="meta">交通量 ${t.traffic.toLocaleString('ja-JP')}人/日・賃料¥${t.rent.toLocaleString('ja-JP')}/日</div>`+
+       `<div class="meta">物件取得 ¥${t.cost.toLocaleString('ja-JP')}・${t.risk}</div></div>`+
+       `<div class="act"><button class="mbtn" data-relot="${lots.indexOf(l)}">出店</button></div></div>`;
+  });
+  if(mine.length){ h+=`<div class="dash-h">営業中</div>`;
+    mine.forEach(b=>{ h+=`<div class="mcard"><div class="thumb">${locArt[b.loc]||ART.downtown}</div><div class="info"><div class="ttl">${b.name}</div><div class="meta">${LOC_JP[b.loc]||b.loc}・${b===branches[0]?'本店（実プレイ）':'委任運営'}</div></div></div>`; });
+  }
+  document.getElementById('re-list').innerHTML=h;
+}
+document.getElementById('re-list').addEventListener('click', e=>{
+  const t=e.target.closest('[data-relot]'); if(!t) return;
+  const lot=lots[+t.dataset.relot]; if(!lot || lot.branch) return;
+  document.getElementById('modal-realestate').classList.remove('show');
+  openBuildSheet(lot);
+});
+document.getElementById('re-close').onclick = ()=> document.getElementById('modal-realestate').classList.remove('show');
 // 空港：都市移動
 function openAirport(){ renderAirport(); document.getElementById('modal-airport').classList.add('show'); }
 function renderAirport(){
@@ -2493,8 +2573,16 @@ function animate(){
   updateOrderTags();
   updateNameTags();
 
-  // 俯瞰の各カフェのカップ看板を回す（ちょい演出）
-  if(sim.mode==='overview') for(const c of cafeCups) c.rotation.y += dt;
+  // 俯瞰の各カフェのカップ看板を回す＋車を走らせる（ちょい演出）
+  if(sim.mode==='overview'){
+    for(const c of cafeCups) c.rotation.y += dt;
+    for(const c of cityCars){
+      c.p += c.dir*c.speed*dt;
+      if(c.p>95) c.p=-95; else if(c.p<-95) c.p=95;
+      if(c.onX){ c.g.position.set(c.p,0,c.road+c.lane); c.g.rotation.y = c.dir>0?Math.PI/2:-Math.PI/2; }
+      else     { c.g.position.set(c.road+c.lane,0,c.p); c.g.rotation.y = c.dir>0?0:Math.PI; }
+    }
+  }
   updateMapMarkers();
 
   updateHUD();
