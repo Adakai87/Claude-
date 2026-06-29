@@ -104,6 +104,21 @@
   .low{color:var(--red); font-weight:800;}
   .note{font-size:12px; color:var(--sub); margin-top:10px; line-height:1.65;}
 
+  /* 週刊カフェジャーナル（新聞UI） */
+  #btn-journal{position:fixed; top:214px; right:12px; z-index:30; pointer-events:auto;
+    background:var(--panel); border:1px solid var(--line); color:var(--txt); border-radius:12px; padding:8px 12px; cursor:pointer;}
+  .sheet.news-sheet{max-width:470px; max-height:86vh; overflow-y:auto; background:#efe7d6; color:#2a2018; border:1px solid #b9a98f;}
+  .news-mast{text-align:center; border-bottom:3px double #2a2018; padding-bottom:8px; margin-bottom:6px;}
+  .news-mast .t{font-size:24px; font-weight:900; letter-spacing:3px; font-family:"游明朝","Yu Mincho",serif;}
+  .news-mast .d{font-size:11px; color:#6a5e48; margin-top:3px;}
+  .news-tabs{display:flex; gap:6px; margin:8px 0;}
+  .news-tab{flex:1; padding:7px 4px; border:1px solid #b9a98f; background:#e3d8c2; color:#5a4e38; font-weight:800; font-size:12px; border-radius:7px; cursor:pointer;}
+  .news-tab.active{background:#2a2018; color:#efe7d6; border-color:#2a2018;}
+  .news-head{font-size:16px; font-weight:900; margin:6px 0 4px; line-height:1.45; font-family:"游明朝","Yu Mincho",serif;}
+  .news-art{font-size:13px; line-height:1.75; border-top:1px solid #cbbfa6; padding:8px 0; color:#3a3024;}
+  .news-art b{color:#9a3b1a;}
+  .news-sheet .btn.ghost{background:#2a2018; color:#efe7d6; border-color:#2a2018;}
+
   /* カード型の選択肢（画像つき） */
   .dash-sheet{max-height:86vh; overflow-y:auto;}
   .mcard{display:flex; gap:12px; align-items:center; background:var(--panel2); border:1px solid var(--line);
@@ -288,12 +303,27 @@
 <div id="joystick"><div class="ring"></div><div class="knob" id="joy-knob"></div></div>
 <button id="btn-dash" title="ダッシュボード"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="2" y="10" width="3.6" height="7" rx="1"/><rect x="8.2" y="5" width="3.6" height="12" rx="1"/><rect x="14.4" y="2" width="3.6" height="15" rx="1"/></svg></button>
 <button id="btn-manage" title="経営（事務所）"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="3" y="3" width="9" height="14" rx="1"/><rect x="12" y="7" width="5" height="10" rx="1"/><g fill="#1a140e"><rect x="5" y="5.5" width="1.8" height="1.8"/><rect x="8" y="5.5" width="1.8" height="1.8"/><rect x="5" y="9" width="1.8" height="1.8"/><rect x="8" y="9" width="1.8" height="1.8"/><rect x="13.4" y="9.5" width="1.5" height="1.5"/></g></svg></button>
+<button id="btn-journal" title="週刊カフェジャーナル"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><g fill="#1a140e"><rect x="4.5" y="5.5" width="11" height="2.2"/><rect x="4.5" y="9" width="5" height="1.5"/><rect x="4.5" y="11.5" width="5" height="1.5"/><rect x="11" y="9" width="4.5" height="4"/></g></svg></button>
 <button id="btn-settings" title="設定"><svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path d="M10 6.5 a3.5 3.5 0 1 0 0 7 a3.5 3.5 0 0 0 0 -7 Z M10 8.5 a1.5 1.5 0 1 1 0 3 a1.5 1.5 0 0 1 0 -3 Z"/><path d="M10 1.6 l1.2 2.2 2.5 -.5 .3 2.5 2.2 1.2 -1.1 2.3 1.1 2.3 -2.2 1.2 -.3 2.5 -2.5 -.5 -1.2 2.2 -1.2 -2.2 -2.5 .5 -.3 -2.5 -2.2 -1.2 1.1 -2.3 -1.1 -2.3 2.2 -1.2 .3 -2.5 2.5 .5 Z" opacity=".55"/></svg></button>
 <div class="hint" id="hint"></div>
 
 <div class="bottom">
   <button class="btn ghost" id="btn-mode">店に入る</button>
   <button class="btn" id="btn-close">閉店する</button>
+</div>
+
+<div class="modal" id="modal-journal">
+  <div class="sheet news-sheet">
+    <div class="news-mast"><div class="t">週刊カフェジャーナル</div><div class="d" id="news-date"></div></div>
+    <div class="news-tabs">
+      <button class="news-tab active" data-news="own">自店</button>
+      <button class="news-tab" data-news="rival">競合</button>
+      <button class="news-tab" data-news="industry">業界</button>
+      <button class="news-tab" data-news="world">世間</button>
+    </div>
+    <div id="news-body"></div>
+    <button class="btn ghost" style="width:100%; margin-top:14px" id="news-close">閉じる</button>
+  </div>
 </div>
 
 <div class="modal" id="modal-manage">
@@ -631,6 +661,7 @@ function openBranch(loc){
   b.mesh = makeCafeBuilding(0xe0a85a, sp.x, sp.z, 0xc9772e);
   b.mesh.userData.isCafe = true;
   branches.push(b);
+  weekAccum.opens++;
   return true;
 }
 
@@ -1418,6 +1449,8 @@ document.getElementById('m-next').onclick = ()=>{
   brand = Math.max(0, brand - brandDecay());
   const mgrNotes = managersDailyTick();   // 店長の不満・トラブル・辞職
   if(mgrNotes.length) miniToast(mgrNotes[0]);
+  // 週次集計（リセット前に加算）
+  weekAccum.revenue += dayStats.revenue; weekAccum.served += sim.servedToday; weekAccum.lost += sim.lostToday; weekAccum.days++;
   // 本日分を累計へ移す
   mergeInto(totalStats, dayStats); dayStats = blankStats();
   // 翌日リセット
@@ -1429,6 +1462,13 @@ document.getElementById('m-next').onclick = ()=>{
   player.userData.task=null; player.userData.moveTarget=null;
   modal.classList.remove('show');
   sim.speed=1; syncSpeedUI();
+  // 7日ごとに週刊ジャーナル発行
+  if(weekAccum.days>=7){
+    genJournal();
+    weekAccum={ revenue:0, served:0, lost:0, days:0, opens:0 };
+    weekStartShare=playerShare(); weekStartBrand=brand;
+    openJournal();
+  }
   saveGame();   // 翌日へ進むたび自動セーブ
 };
 function syncSpeedUI(){
@@ -1479,6 +1519,52 @@ document.querySelectorAll('.dash-tab').forEach(t=>{
     renderDash();
   };
 });
+
+// =====================================================================
+//  週刊カフェジャーナル（週次新聞）
+// =====================================================================
+let weekNo = 0, newsTab = 'own', lastJournal = null;
+let weekAccum = { revenue:0, served:0, lost:0, days:0, opens:0 };
+let weekStartShare = 0, weekStartBrand = 20;
+function genJournal(){
+  weekNo++;
+  const share = Math.round(playerShare()*100);
+  const shareDelta = share - Math.round(weekStartShare*100);
+  const brandDelta = Math.round(brand - weekStartBrand);
+  const own = [
+    `今週の売上 <b>¥${weekAccum.revenue.toLocaleString('ja-JP')}</b>（提供 ${weekAccum.served}組 ／ 行列離脱 ${weekAccum.lost}組）。`,
+    `市場シェア <b>${share}%</b>（先週比 ${shareDelta>=0?'+':''}${shareDelta}pt）、ブランド力 <b>${Math.round(brand)}</b>（${brandDelta>=0?'+':''}${brandDelta}）。`,
+    weekAccum.opens>0 ? `今週、新たに <b>${weekAccum.opens}店舗</b>を出店。拡大路線を継続。` : `現在 ${branches.length}店舗を運営中。`,
+  ];
+  const rival = [];
+  if(Math.random() < 0.55){                    // 競合の参入・拡大（焦り誘発）
+    const r = RIVALS[(Math.random()*RIVALS.length)|0]; r.comp += 2 + (Math.random()*3|0);
+    rival.push(`<b>【速報】</b>競合「${r.name}」が${store.cityName}で攻勢。店舗網を拡大し、シェア争いが激化している。`);
+  }
+  rival.push(`競合各社の合計シェアは約 <b>${Math.max(0,100-share)}%</b>。${share<35?'このままでは押されぎみ、打ち手が要る。':'まずは優位を維持できている。'}`);
+  const trend = MENU[(Math.random()*MENU.length)|0];
+  const industry = [
+    `業界では今 <b>${trend.name}</b> に注目が集まる。品揃え・価格の見直しが奏功するか。`,
+    `コーヒー豆の相場は${Math.random()<0.5?'やや上昇':'おおむね安定'}。仕入れの好機を逃すな。`,
+  ];
+  const worldPool = ['週末は好天の予報。テラス需要が高まりそうだ。','近隣で大型イベント開催、人通り増の見込み。','寒波到来、ホットドリンクの動きに期待。','SNSで“映えカフェ”が話題、来店動機に。','新生活シーズン、学生客の動きが活発に。'];
+  const world = [ worldPool[(Math.random()*worldPool.length)|0] ];
+  const headline = (rival[0]&&rival[0].includes('速報')) ? rival[0] : own[0];
+  lastJournal = { issue:weekNo, day:sim.day, headline, sections:{ own, rival, industry, world } };
+  return lastJournal;
+}
+function renderJournal(){
+  const j=lastJournal; if(!j) return;
+  document.getElementById('news-date').textContent = `第${j.issue}号 ・ ${j.day}日目 ・ ${store.cityName}`;
+  document.querySelectorAll('.news-tab').forEach(x=>x.classList.toggle('active', x.dataset.news===newsTab));
+  const arts = j.sections[newsTab]||[];
+  document.getElementById('news-body').innerHTML =
+    `<div class="news-head">${j.headline}</div>` + arts.map(a=>`<div class="news-art">${a}</div>`).join('');
+}
+function openJournal(){ if(!lastJournal) genJournal(); newsTab='own'; renderJournal(); document.getElementById('modal-journal').classList.add('show'); }
+document.getElementById('btn-journal').onclick = openJournal;
+document.getElementById('news-close').onclick = ()=> document.getElementById('modal-journal').classList.remove('show');
+document.querySelectorAll('.news-tab').forEach(t=> t.onclick=()=>{ newsTab=t.dataset.news; renderJournal(); });
 
 // =====================================================================
 //  経営パネル（メニュー価格/開発・仕入れ・立地/内装）
@@ -1832,6 +1918,7 @@ function gameState(){
     finance:{ debt:finance.debt, invest:finance.invest },
     company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised },
     lastProfit, spawnAccum, mgrCandidates,
+    weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal, rivalComps:RIVALS.map(r=>r.comp),
     branches:branches.map(b=>({name:b.name, loc:b.loc, level:b.level, manager:b.manager||null})),
     staff:staff.map(s=>({name:s.name, skill:s.skill, wage:s.wage})),
     loyalty:{...loyalty}, totalStats, dayStats,
@@ -1863,6 +1950,12 @@ function loadGame(slot){
   for(let i=0;i<(d.extraUsed||0);i++){ const sp=EXTRA_SLOTS[i]; if(sp) addTable(sp.x,sp.z); }
   extraUsed=d.extraUsed||0;
   if(d.mgrCandidates) mgrCandidates = d.mgrCandidates;
+  if(d.weekNo!=null) weekNo=d.weekNo;
+  if(d.weekAccum) weekAccum=d.weekAccum;
+  if(d.weekStartShare!=null) weekStartShare=d.weekStartShare;
+  if(d.weekStartBrand!=null) weekStartBrand=d.weekStartBrand;
+  if(d.lastJournal) lastJournal=d.lastJournal;
+  if(d.rivalComps) RIVALS.forEach((r,i)=>{ if(d.rivalComps[i]!=null) r.comp=d.rivalComps[i]; });
   if(d.branches&&d.branches[0]){
     branches[0].name=d.branches[0].name; branches[0].loc=d.branches[0].loc; branches[0].level=d.branches[0].level;
     branches[0].manager=d.branches[0].manager||null;
