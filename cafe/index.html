@@ -177,6 +177,26 @@
   .mcard .ttl{font-weight:800; font-size:14.5px; line-height:1.3;}
   .mcard .meta{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.55;}
   .mcard .act{display:flex; flex-direction:column; gap:6px; align-items:stretch; flex-shrink:0;}
+  /* 店舗スクリーンのタブ（経営タブと別クラスで干渉回避） */
+  .s-tab{flex:0 0 auto; padding:8px 14px; border-radius:9px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--sub); font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;}
+  .s-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+  /* サブタブ（HOT/COLD/FOOD） */
+  .sub-tabs{display:flex; gap:6px; margin:6px 0 10px;}
+  .sub-tab{flex:1; padding:7px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--sub); font-weight:800; font-size:12px; cursor:pointer;}
+  .sub-tab.active{background:var(--accent); color:#231400; border-color:var(--accent);}
+  /* P&L 損益計算書 */
+  .pl-row{display:flex; justify-content:space-between; padding:6px 2px; font-size:13.5px; border-bottom:1px dashed var(--line);}
+  .pl-row.head{color:var(--sub); font-size:11px; letter-spacing:.06em; border-bottom:0; padding-bottom:2px;}
+  .pl-row.total{border-bottom:0; font-weight:800; border-top:1px solid var(--line); margin-top:2px;}
+  .pl-row .neg{color:var(--red);}
+  /* キャンペーンカード */
+  .camp-grid{display:grid; grid-template-columns:1fr 1fr; gap:9px;}
+  .camp{border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:10px; cursor:pointer; text-align:left;}
+  .camp.on{border-color:var(--green); box-shadow:0 0 0 1px var(--green);}
+  .camp .cn{font-weight:800; font-size:13px;}
+  .camp .cd{font-size:11px; color:var(--sub); margin:3px 0 6px; line-height:1.4;}
+  .camp .cc{font-size:12px; font-weight:800;} .camp .cc .on-t{color:var(--green);}
   /* カスタマーレビュー */
   .stars{display:inline-flex; gap:1px; vertical-align:middle;}
   .rev-grid{display:flex; gap:16px; align-items:center; margin:6px 0 12px;}
@@ -378,6 +398,12 @@
   <div class="sheet flex-sheet">
     <button class="sheet-x" data-close="modal-shop" aria-label="閉じる">×</button>
     <h2 id="shop-title">店舗</h2>
+    <div class="dash-tabs" id="shop-tabs" style="padding:0 16px 8px; flex:0 0 auto">
+      <button class="s-tab active" data-stab="service">サービス</button>
+      <button class="s-tab" data-stab="product">商品</button>
+      <button class="s-tab" data-stab="marketing">マーケ</button>
+      <button class="s-tab" data-stab="finance">会計</button>
+    </div>
     <div id="shop-body" class="flex-body" style="text-align:left"></div>
     <div class="flex-foot">
       <button class="btn" id="shop-enter" style="width:100%">店内に入る（接客）</button>
@@ -715,6 +741,21 @@ const MARKETING = [
   {id:'outdoor',    name:'屋外広告',            cost:9000,  brand:18, desc:'街の認知度を底上げ'},
   {id:'tvcm',       name:'テレビCM',            cost:20000, brand:32, desc:'全国区の知名度'},
 ];
+// 常設マーケ施策（ON/OFF。毎日コストがかかり、集客とブランドに効く）
+const CAMPAIGNS = [
+  {id:'wifi',    name:'フリーWi-Fi',       cost:300, traffic:0.05, brand:1, desc:'長居・常連が増える'},
+  {id:'bogo',    name:'1個買うと1個無料',   cost:600, traffic:0.14, brand:2, desc:'集客大／利益は圧迫'},
+  {id:'mail',    name:'ダイレクトメール',    cost:400, traffic:0.09, brand:2, desc:'近隣に新規集客'},
+  {id:'catering',name:'ケータリング',       cost:500, traffic:0.07, brand:1, desc:'法人・オフィス需要'},
+  {id:'sponsor', name:'地域スポンサー',      cost:200, traffic:0.02, brand:3, desc:'地域の評判UP'},
+  {id:'social',  name:'SNS運用',           cost:250, traffic:0.06, brand:3, desc:'認知を継続的に拡大'},
+  {id:'recycle', name:'リサイクルカップ',    cost:150, traffic:0.01, brand:2, desc:'環境配慮で好感度UP'},
+  {id:'music',   name:'フリー音楽配信',      cost:120, traffic:0.02, brand:1, desc:'店内の雰囲気UP'},
+];
+const campaignOn = {};
+const campaignTraffic   = () => CAMPAIGNS.reduce((a,c)=>a+(campaignOn[c.id]?c.traffic:0),0);
+const campaignDailyCost = () => CAMPAIGNS.reduce((a,c)=>a+(campaignOn[c.id]?c.cost:0),0);
+const campaignBrandGain = () => CAMPAIGNS.reduce((a,c)=>a+(campaignOn[c.id]?c.brand:0),0)*0.25;
 const marketingMult = () => 1 + (hasExec('cmo')?0.4:0);
 function runCampaign(id){
   const c = MARKETING.find(m=>m.id===id); if(!c || sim.money<c.cost) return;
@@ -1614,7 +1655,7 @@ function trySpawnCustomer(dtGameMin){
   while(spawnAccum >= interval){
     spawnAccum -= interval;
     if(queue.length >= queueCap()) continue;   // 行列が一杯なら入店しない（設備で拡張）
-    if(Math.random() < Math.min(0.95, 0.28 + brand/220 + (store.traffic||6000)/32000)) spawnCustomer();   // 交通量＋ブランドで集客
+    if(Math.random() < Math.min(0.97, (0.28 + brand/220 + (store.traffic||6000)/32000)*(1+campaignTraffic()))) spawnCustomer();   // 交通量＋ブランド＋マーケ施策で集客
   }
 }
 
@@ -1891,8 +1932,8 @@ function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
 function plBreakdown(){
   const tips = dayStats.tips;
   const sales = dayStats.revenue - tips;
-  const rent = plRent(), interest = plInterest(), wages = staffWage(), execSal = execSalaries(), mgrSal = managerSalaries();
-  const op = sales + tips - dayStats.cogs - wages - mgrSal - execSal - rent - interest;
+  const rent = plRent(), interest = plInterest(), wages = staffWage(), execSal = execSalaries(), mgrSal = managerSalaries(), mktg = campaignDailyCost();
+  const op = sales + tips - dayStats.cogs - wages - mgrSal - execSal - rent - interest - mktg;
   const row = (l,v,neg)=>`<div class="row"><span>${l}</span><span style="${neg?'color:var(--red)':''}">${neg?'−':''}¥${Math.abs(v).toLocaleString('ja-JP')}</span></div>`;
   let h = `<div class="dash-h">日次損益（PL）</div>`;
   h += row('売上（商品）', sales);
@@ -1901,6 +1942,7 @@ function plBreakdown(){
   if(wages>0) h += row('人件費', wages, true);
   if(mgrSal>0) h += row('店長給与', mgrSal, true);
   if(execSal>0) h += row('役員報酬', execSal, true);
+  if(mktg>0) h += row('マーケ施策', mktg, true);
   h += row(`家賃（${LOC_JP[store.location]}）`, rent, true);
   if(interest>0) h += row('借入利息', interest, true);
   const bnet = branchesDailyNet();
@@ -1924,10 +1966,10 @@ function miniBreakdown(){
 }
 document.getElementById('m-next').onclick = ()=>{
   // 家賃・利息・人件費・店長給与・役員報酬を清算、支店純益を加算、運用を増やす、ブランド減衰
-  sim.money -= plRent() + plInterest() + staffWage() + managerSalaries() + execSalaries();
+  sim.money -= plRent() + plInterest() + staffWage() + managerSalaries() + execSalaries() + campaignDailyCost();
   sim.money += branchesDailyNet();
   finance.invest = Math.round(finance.invest * (1 + investRateEff()));
-  brand = Math.max(0, brand - brandDecay());
+  brand = Math.min(100, Math.max(0, brand - brandDecay() + campaignBrandGain()));   // マーケ施策でブランド維持/向上
   const mgrNotes = managersDailyTick();   // 店長の不満・トラブル・辞職
   if(mgrNotes.length) miniToast(mgrNotes[0]);
   // 週次集計（リセット前に加算）
@@ -2518,24 +2560,147 @@ function storeComments(r){
   c.push(r.atmosphere>=3.6?{v:r.atmosphere,t:'居心地がよくてつい長居しちゃう。'}:{v:r.atmosphere,t:'内装をもう少し良くすると映えそう。'});
   return c;
 }
-// ===== 店舗スクリーン（自店タップ）=====
-function openShop(){
+// ===== 店舗スクリーン（自店タップ）：Service / Product / Marketing / Finance の4タブ =====
+let shopTab='service', shopCat='hot';
+const MENU_CAT = id => ({coffee:'hot',latte:'hot',matcha:'hot',boba:'cold',seasonal:'cold',cake:'food',croissant:'food',pudding:'food',sandwich:'food'})[id]||'hot';
+function itemRating(m){ const q=qualityLevel(); const priceFit=1-Math.min(1,Math.abs(m.price/m.basePrice-1)); return clampv(1.2+(q-1)*4+priceFit*2.2,0,5); }
+// 利益率ドーナツ
+function donut(pct,color,label='利益率'){ const r=15.9,c=2*Math.PI*r,off=c*(1-clampv(pct,0,100)/100);
+  return `<svg width="74" height="74" viewBox="0 0 40 40"><circle cx="20" cy="20" r="${r}" fill="none" stroke="#3a342c" stroke-width="5"/><circle cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 20 20)" stroke-linecap="round"/><text x="20" y="19" text-anchor="middle" font-size="8" fill="#fff" font-weight="800">${Math.round(pct)}%</text><text x="20" y="27" text-anchor="middle" font-size="4.6" fill="#9a917f">${label}</text></svg>`; }
+// セグメントバー（スキル/士気など 0-100）
+function segBar(val,color='#5bbd6a'){ const n=5,f=val/100*n; let h='<span style="display:inline-flex;gap:3px;vertical-align:middle">'; for(let i=0;i<n;i++){ const ff=Math.max(0,Math.min(1,f-i)); h+=`<span style="width:26px;height:12px;border-radius:3px;background:linear-gradient(90deg,${color} ${ff*100}%, #2a2620 ${ff*100}%)"></span>`; } return h+'</span>'; }
+// フレーバーのレーダー（5軸）
+function radar(vals){ const cx=50,cy=50,R=34,n=vals.length; let grid='',poly='';
+  for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n; grid+=`${i?'L':'M'}${(cx+Math.cos(a)*R).toFixed(1)} ${(cy+Math.sin(a)*R).toFixed(1)}`; const rr=R*vals[i]; poly+=`${(cx+Math.cos(a)*rr).toFixed(1)},${(cy+Math.sin(a)*rr).toFixed(1)} `; }
+  return `<svg width="116" height="100" viewBox="0 0 100 100"><path d="${grid}Z" fill="none" stroke="#3a342c" stroke-width="1"/><path d="M50 16 L50 84 M21 33 L79 67 M79 33 L21 67" stroke="#3a342c" stroke-width="0.6"/><polygon points="${poly}" fill="rgba(224,137,74,.35)" stroke="#e0894a" stroke-width="1.6"/></svg>`; }
+function staffMorale(){ const need=Math.ceil((sim.custToday+8)/14); const adequacy=clampv(staff.length/Math.max(1,need),0,1.4); const wage=staff.length?staffWage()/staff.length:0; return Math.round(clampv(35+adequacy*30+Math.min(20,(wage-1500)/60)+(branches[0].manager?10:0),0,100)); }
+function staffSkill(){ return staff.length?Math.round(staff.reduce((a,s)=>a+s.skill,0)/staff.length/5*100):0; }
+
+function openShop(){ shopTab='service'; document.getElementById('shop-title').textContent=(profile.brandName||'店舗')+'（本店）'; renderShop(); document.getElementById('modal-shop').classList.add('show'); }
+function renderShop(){
+  document.querySelectorAll('#shop-tabs .s-tab').forEach(t=>t.classList.toggle('active',t.dataset.stab===shopTab));
+  const el=document.getElementById('shop-body');
+  el.innerHTML = shopTab==='service'?shopService() : shopTab==='product'?shopProduct() : shopTab==='marketing'?shopMarketing() : shopFinance();
+}
+// --- サービス：レビュー＋スタッフ＋店長 ---
+function shopService(){
   const r=storeReviews();
-  document.getElementById('shop-title').textContent = (profile.brandName||'店舗')+'（本店）';
   const metric=(nm,v)=>`<div class="rev-metric"><span class="nm">${nm}</span>${starRow(v)}<span class="vv">${v.toFixed(1)}</span></div>`;
   let h=`<div class="dash-h" style="margin-top:6px">カスタマーレビュー</div>`;
   h+=`<div class="rev-grid"><div style="text-align:center"><div class="rev-big gold">${r.overall.toFixed(1)}</div>${starRow(r.overall)}<div class="sub2" style="margin-top:3px">${(totalStats.served+sim.servedToday)}件</div></div>`;
   h+=`<div class="rev-metrics">${metric('価格',r.price)}${metric('商品',r.product)}${metric('接客',r.service)}${metric('雰囲気',r.atmosphere)}</div></div>`;
-  h+=`<div class="dash-h">店舗サマリー</div>`;
-  h+=`<div class="dash-kpis"><div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div>`;
-  h+=`<div class="kpi"><div class="v">${store.cityName}</div><div class="l">都市</div></div>`;
-  h+=`<div class="kpi"><div class="v">${staff.length}人</div><div class="l">スタッフ</div></div>`;
-  h+=`<div class="kpi"><div class="v">${qualityLevel().toFixed(2)}</div><div class="l">品質指数</div></div></div>`;
-  h+=`<div class="dash-h">お客様の声</div>`;
-  storeComments(r).forEach(c=> h+=`<div class="mcard"><div class="info"><div class="ttl" style="line-height:1">${starRow(c.v)}</div><div class="meta">${c.t}</div></div></div>`);
-  document.getElementById('shop-body').innerHTML=h;
-  document.getElementById('modal-shop').classList.add('show');
+  storeComments(r).slice(0,2).forEach(c=> h+=`<div class="mcard"><div class="info"><div class="ttl" style="line-height:1">${starRow(c.v)}</div><div class="meta">${c.t}</div></div></div>`);
+  // フロアスタッフ
+  h+=`<div class="dash-h">フロアスタッフ</div>`;
+  h+=`<div class="mrow"><div class="nm">スタッフ人数<div class="sub2">多いほど提供が速い（行列をさばく）</div></div><div class="stepper"><button class="step-btn" data-sstaff="-1">−</button><span class="pz">${staff.length}人</span><button class="step-btn" data-sstaff="1">＋</button></div></div>`;
+  h+=`<div class="mrow"><div class="nm">スタッフスキル</div>${segBar(staffSkill(),'#5bbd6a')}<span class="vv" style="margin-left:8px">${staffSkill()}</span></div>`;
+  h+=`<div class="mrow"><div class="nm">スタッフ士気</div>${segBar(staffMorale(),'#e0b24a')}<span class="vv" style="margin-left:8px">${staffMorale()}</span></div>`;
+  h+=`<div class="note">人手不足だと士気が下がり、行列離脱が増えます。${staff.length<STAFF_SPOTS.length?'＋で次の候補を採用。':'（雇用上限）'}</div>`;
+  // 店長（オフィス契約で解放）
+  h+=`<div class="dash-h">店長（委任）</div>`;
+  if(!FACILITY.hq){ h+=`<div class="note" style="margin-top:0">🔒 店長の委任は<b>オフィス（本社）</b>を契約すると使えます。</div>`; return h; }
+  const m=branches[0].manager;
+  if(m){
+    const sk=[['人材','jinzai'],['商品','shohin'],['マーケ','senren'],['倫理','rinri']];
+    h+=`<div class="mcard"><div class="thumb">${ART.staff}</div><div class="info"><div class="ttl">${m.name} <b>★${mgrRating(m)}</b></div>`+
+       sk.map(([jp,k])=>`<div class="rev-metric"><span class="nm">${jp}</span>${segBar(m[k]*20,'#5bbd6a')}<span class="vv">${m[k]*20}</span></div>`).join('')+
+       `<div class="meta">給与¥${mgrSalary(m).toLocaleString('ja-JP')}/日・不満 ${Math.round(m.fuman)}%</div></div></div>`;
+    const dels=[['staffing','スタッフ・給与'],['products','商品・価格'],['marketing','店舗マーケ'],['troubles','店舗トラブル']];
+    m.del=m.del||{}; h+=`<div class="dash-h" style="border:0">委任する範囲</div>`;
+    h+=dels.map(([k,jp])=>`<div class="mrow"><div class="nm">${jp}を委任</div><button class="mbtn ${m.del[k]?'on':''}" data-sdel="${k}">${m.del[k]?'委任中':'する'}</button></div>`).join('');
+    h+=`<div class="mrow"><div class="nm">ボーナス給与（+30%）<div class="sub2">承認率↑・不満↓</div></div><button class="mbtn ${m.bonus?'on':''}" data-sbonus="1">${m.bonus?'支給中':'支給'}</button></div>`;
+    h+=`<div class="mrow"><div class="nm">店長を解任</div><button class="mbtn" data-sfire="1">解任</button></div>`;
+  } else {
+    h+=`<div class="note" style="margin-top:0">店長を置くと自動でレジを捌き（委任）、放置しても店が回ります。</div>`;
+    mgrCandidates.forEach((c,ci)=>{ const stats=[['人材','jinzai'],['商品','shohin'],['マーケ','senren'],['倫理','rinri']].map(([jp,k])=>`${jp}${c[k]}`).join('・');
+      h+=`<div class="mcard"><div class="thumb">${ART.staff}</div><div class="info"><div class="ttl">${c.name} <b>★${mgrRating(c)}</b></div><div class="meta">${stats}｜給与¥${c.salary.toLocaleString('ja-JP')}/日</div></div><div class="act"><button class="mbtn" data-shire="${ci}">採用</button></div></div>`; });
+  }
+  return h;
 }
+// --- 商品：HOT/COLD/FOOD のカード＋ブレンド ---
+function shopProduct(){
+  let h=`<div class="dash-h" style="margin-top:6px">提供商品</div>`;
+  h+=`<div class="sub-tabs">${['hot','cold','food'].map(c=>`<button class="sub-tab ${shopCat===c?'active':''}" data-scat="${c}">${({hot:'HOT',cold:'COLD',food:'FOOD'})[c]}</button>`).join('')}</div>`;
+  const items=MENU.filter(m=>MENU_CAT(m.id)===shopCat);
+  if(!items.length) h+=`<div class="note">このカテゴリの商品はまだありません（経営パネル→メニューで開発）。</div>`;
+  items.forEach(m=>{ const cost=materialCost(m), margin=m.price-cost, rate=m.price?Math.round(margin/m.price*100):0, sold=(totalStats.sold[m.id]||0)+(dayStats.sold[m.id]||0);
+    h+=`<div class="mcard"><div class="thumb">${menuThumb(m.id)}</div><div class="info"><div class="ttl">${m.name} <span style="font-size:12px">${starRow(itemRating(m))}</span></div>`+
+       `<div class="meta">累計 ${sold}杯・原価¥${cost}${inStock(m)?'':' <span class="low">在庫切れ</span>'}</div>`+
+       `<div class="mrow" style="border:0;padding:6px 0 0"><button class="mbtn ${m.enabled?'on':''}" data-stoggle="${m.id}">${m.enabled?'販売中':'停止中'}</button>`+
+       `<div class="stepper" style="margin-left:auto"><button class="step-btn" data-sprice="${m.id}|-">−</button><span class="pz">¥${m.price}</span><button class="step-btn" data-sprice="${m.id}|+">＋</button></div></div></div>`+
+       `<div class="act">${donut(rate, rate>=60?'#5bbd6a':rate>=35?'#e0b24a':'#e0685e')}</div></div>`;
+  });
+  // カンパニーブレンド
+  const g=beans.grade, mx=beans.max;
+  const fv=[0.3+g*0.12, 0.35+g*0.1, 0.45-g*0.02, 0.3+g*0.08, 0.4+g*0.09].map(v=>clampv(v,0.15,1));
+  h+=`<div class="dash-h">カンパニーブレンド</div>`;
+  h+=`<div class="mcard"><div class="thumb">${matThumb('bean')}</div><div class="info"><div class="ttl">${BEAN_NAMES[g-1]} <b>Lv.${g}</b></div><div class="meta">品質指数 ${qualityLevel().toFixed(2)}・${FACILITY.roastery?'焙煎工房で格上げ可':'焙煎工房で品質UP'}</div></div><div class="act" style="align-items:center">${radar(fv)}</div></div>`;
+  h+=`<div class="note">香り・コク・酸味・苦味・後味のバランス。豆グレードを上げると品質指数が伸びます（焙煎工房）。</div>`;
+  return h;
+}
+// --- マーケ：シェア＋常設施策（オフィス契約で解放）---
+function shopMarketing(){
+  if(!FACILITY.hq) return `<div class="note" style="margin-top:6px">🔒 マーケティングは<b>オフィス（本社）</b>を契約すると使えます。空きテナント→「本社」を建設してください。</div>`;
+  const share=Math.round(playerShare()*100);
+  let h=`<div class="dash-h" style="margin-top:6px">エリアの市場シェア</div>`;
+  h+=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px"><div>${donut(share,'#5bbd6a','シェア')}</div><div><div class="ttl">${profile.brandName||'自店'}</div><div class="meta">ブランド力 ${Math.round(brand)}／競合 ${RIVALS.filter(r=>r.city===viewCity).length}社</div></div></div>`;
+  h+=`<div class="dash-h">常設マーケ施策（ON/OFF・毎日課金）</div>`;
+  h+=`<div class="camp-grid">`+CAMPAIGNS.map(c=>`<div class="camp ${campaignOn[c.id]?'on':''}" data-scamp="${c.id}"><div class="cn">${c.name}</div><div class="cd">${c.desc}</div><div class="cc">${campaignOn[c.id]?'<span class="on-t">実施中</span>':'停止中'}・¥${c.cost}/日</div></div>`).join('')+`</div>`;
+  h+=`<div class="note">実施すると毎日コストがかかりますが、集客（通行客）とブランドが上がります。スポット広告は経営パネル→マーケから。</div>`;
+  return h;
+}
+// --- 会計：損益計算書＋改装/閉店 ---
+function shopPL(){
+  const tips=dayStats.tips, sales=dayStats.revenue-tips, cogs=dayStats.cogs;
+  const rent=plRent(), wages=staffWage(), mgrSal=mgrSalary(branches[0].manager), marketing=campaignDailyCost();
+  const depreciation=Math.round(50+Object.values(equip).reduce((a,e)=>a+(e.lv-1)*180,0)+extraUsed*40);
+  const interest=plInterest();
+  const expenses=cogs+rent+wages+mgrSal+marketing+depreciation+interest;
+  const revenue=sales+tips, op=revenue-expenses;
+  return {revenue,sales,tips,cogs,rent,wages,mgrSal,marketing,depreciation,interest,expenses,op};
+}
+function shopFinance(){
+  const p=shopPL();
+  const row=(l,v,neg)=>`<div class="pl-row"><span>${l}</span><span class="${neg?'neg':''}">${neg?'−':''}¥${Math.abs(v).toLocaleString('ja-JP')}</span></div>`;
+  let h=`<div class="dash-h" style="margin-top:6px">損益計算書（本日まで）</div>`;
+  h+=`<div class="pl-row head"><span>収益</span><span></span></div>`;
+  h+=row('商品売上',p.sales)+row('チップ',p.tips);
+  h+=`<div class="pl-row total"><span>総収益</span><span>¥${p.revenue.toLocaleString('ja-JP')}</span></div>`;
+  h+=`<div class="pl-row head" style="margin-top:8px"><span>費用</span><span></span></div>`;
+  h+=row('コーヒー豆・原価',p.cogs,true)+row('家賃',p.rent,true)+row('人件費',p.wages,true);
+  if(p.mgrSal>0) h+=row('店長給与',p.mgrSal,true);
+  h+=row('マーケティング',p.marketing,true)+row('減価償却',p.depreciation,true);
+  if(p.interest>0) h+=row('借入利息',p.interest,true);
+  h+=`<div class="pl-row total"><span>総費用</span><span class="neg">−¥${p.expenses.toLocaleString('ja-JP')}</span></div>`;
+  h+=`<div class="pl-row total" style="font-size:15px"><span>営業損益</span><span style="color:${p.op>=0?'var(--gold)':'var(--red)'}">${p.op<0?'−':''}¥${Math.abs(p.op).toLocaleString('ja-JP')}</span></div>`;
+  // 改装（内装・設備）
+  h+=`<div class="dash-h">店舗の改装</div>`;
+  const mLv=equip.machine.lv, mMax=equip.machine.max, mc=Math.round(equip.machine.base*Math.pow(1.8,mLv-1));
+  h+=`<div class="mrow"><div class="nm">エスプレッソマシン <b>Lv.${mLv}</b><div class="sub2">品質→チップUP</div></div><button class="mbtn" data-supeq="machine" ${mLv>=mMax||sim.money<mc?'disabled':''}>${mLv>=mMax?'最高':'強化 ¥'+mc.toLocaleString('ja-JP')}</button></div>`;
+  const full=extraUsed>=EXTRA_SLOTS.length, fc=furnitureCost();
+  h+=`<div class="mrow"><div class="nm">テーブル席を増設<div class="sub2">満席で客を逃さない（現${seats.length}席）</div></div><button class="mbtn" data-sfurn="1" ${full||sim.money<fc?'disabled':''}>${full?'上限':'＋1席 ¥'+fc.toLocaleString('ja-JP')}</button></div>`;
+  h+=`<div class="dash-h" style="border:0">内装の雰囲気（評価・客層に影響）</div>`;
+  h+=['cozy','chic','pop'].map(k=>`<button class="mbtn ${store.vibe===k?'sel':''}" data-svibe="${k}" style="margin:3px 4px 3px 0">${VIBE_JP[k]}${store.vibe===k?'':` ¥${RENOVATE_COST.toLocaleString('ja-JP')}`}</button>`).join('');
+  return h;
+}
+// 店舗スクリーンの操作
+document.getElementById('shop-tabs').addEventListener('click', e=>{ const t=e.target.closest('.s-tab'); if(!t) return; shopTab=t.dataset.stab; renderShop(); });
+document.getElementById('shop-body').addEventListener('click', e=>{
+  const t=e.target.closest('button, .camp'); if(!t) return;
+  if(t.dataset.scat){ shopCat=t.dataset.scat; }
+  else if(t.dataset.sstaff){ const d=+t.dataset.sstaff; if(d>0){ if(candidates[0] && hireStaff(candidates[0])) candidates[0]=makeCandidate(); } else if(staff.length) fireStaff(staff.length-1); }
+  else if(t.dataset.shire!==undefined){ assignManager(0, mgrCandidates[+t.dataset.shire]); }
+  else if(t.dataset.sfire){ dismissManager(0); }
+  else if(t.dataset.sbonus){ const m=branches[0].manager; if(m) m.bonus=!m.bonus; }
+  else if(t.dataset.sdel){ const m=branches[0].manager; if(m){ m.del=m.del||{}; m.del[t.dataset.sdel]=!m.del[t.dataset.sdel]; } }
+  else if(t.dataset.stoggle){ const m=MENU.find(x=>x.id===t.dataset.stoggle); if(m){ m.enabled=!m.enabled; recomputePriceLevel(); } }
+  else if(t.dataset.sprice){ const [id,dir]=t.dataset.sprice.split('|'); const m=MENU.find(x=>x.id===id); if(m){ m.price=Math.max(100,m.price+(dir==='+'?50:-50)); recomputePriceLevel(); } }
+  else if(t.dataset.scamp){ campaignOn[t.dataset.scamp]=!campaignOn[t.dataset.scamp]; }
+  else if(t.dataset.supeq){ upgradeEquip(t.dataset.supeq); }
+  else if(t.dataset.sfurn){ buyFurniture(); }
+  else if(t.dataset.svibe){ if(store.vibe!==t.dataset.svibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; dayStats.capex+=RENOVATE_COST; store.vibe=t.dataset.svibe; } }
+  renderShop(); updateHUD();
+});
 document.getElementById('shop-enter').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); enterStore(); };
 document.getElementById('shop-manage').onclick = ()=>{ document.getElementById('modal-shop').classList.remove('show'); renderManage(); document.getElementById('modal-manage').classList.add('show'); };
 // ===== 物件情報（FOR LEASE）=====
@@ -2606,6 +2771,7 @@ function gameState(){
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
     FACILITY:{...FACILITY},
+    campaignOn:{...campaignOn},
     facilities:landmarks.map(l=>({kind:l.kind, x:l.x, z:l.z, city:l.city})),
     rivals:RIVALS.map(r=>({name:r.name, comp:r.comp, color:r.color, pos:r.pos, city:r.city})),
     lots:lots.map(l=>({city:l.city, x:l.x, z:l.z, tenant:l.tenant, built:!!l.branch})),
@@ -2674,6 +2840,7 @@ function loadGame(slot){
   }
   // 施設（本社・焙煎工房）の復元
   if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
+  if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
   const facList=[];
   if(d.facilities) d.facilities.forEach(f=>{ const e=makeFacility(f.kind, f.x, f.z, f.city||viewCity); FACILITY[f.kind]=true; facList.push(e); });
   // 空き物件（建設済みは対応する店舗/施設に紐付け）
