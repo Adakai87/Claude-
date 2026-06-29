@@ -175,6 +175,15 @@
   .mcard .ttl{font-weight:800; font-size:14.5px; line-height:1.3;}
   .mcard .meta{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.55;}
   .mcard .act{display:flex; flex-direction:column; gap:6px; align-items:stretch; flex-shrink:0;}
+  /* 出店シートの画像つき選択タイル */
+  .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
+  .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
+  .opt.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .opt:disabled,.opt[disabled]{opacity:.45;}
+  .opt .ot{width:100%; height:46px; border-radius:8px; overflow:hidden; background:#11131c;}
+  .opt .ot svg{width:100%; height:100%; display:block;}
+  .opt .on{font-size:11.5px; font-weight:800; margin-top:5px; line-height:1.25;}
+  .opt .oc{font-size:10.5px; color:var(--sub); margin-top:2px;}
   .stepper{display:flex; align-items:center; gap:4px;}
   .stepper .pz{width:48px; text-align:center; font-weight:800; font-size:13px;}
   .step-btn{width:28px; height:28px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
@@ -743,11 +752,19 @@ function makeCafeBuilding(color, x, z, accent){
 // 空き物件マーカー（土台＋FOR LEASE看板）。クリック判定は pad に対して行う
 function makeLotMarker(x,z){
   const g = new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
-  // 区画（土台）。「FOR LEASE」看板はDOMバッジで上空に表示する
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(5,0.16,5), new THREE.MeshStandardMaterial({ color:0xd8c79e }));
-  pad.position.y=0.08; pad.receiveShadow=true; g.add(pad);
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.06,5.2), new THREE.MeshStandardMaterial({ color:0xe2362f }));
-  frame.position.y=0.04; g.add(frame);   // 赤い縁取りで「空き」を強調
+  // 整地済みの空き区画（舗装＋黄黒の工事フェンス）。「FOR LEASE」はDOMバッジで上空に表示
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(5,0.18,5), new THREE.MeshStandardMaterial({ color:0xc3bfb4 }));
+  pad.position.y=0.09; pad.receiveShadow=true; g.add(pad);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(5.4,0.08,5.4), new THREE.MeshStandardMaterial({ color:0x8f8a7e }));
+  base.position.y=0.04; g.add(base);
+  // フェンスの支柱（四隅＋辺）
+  const postMat=new THREE.MeshStandardMaterial({ color:0xe8b53a });
+  for(let i=0;i<4;i++){ const a=i*Math.PI/2; const px=Math.cos(a)*2.5, pz=Math.sin(a)*2.5;
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.9,6), postMat); post.position.set(px,0.45,pz); g.add(post); }
+  // 中央に小さな「建設可」標識
+  const sgn=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.9,0.1), new THREE.MeshStandardMaterial({ color:0xe2362f, emissive:0x3a0a08, emissiveIntensity:0.3 }));
+  sgn.position.set(0,0.9,0); g.add(sgn);
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.9,6), new THREE.MeshStandardMaterial({color:0x9a9388})); pole.position.set(0,0.45,0); g.add(pole);
   g.userData.lotPad = pad; pad.userData.group = g;
   return g;
 }
@@ -1075,37 +1092,88 @@ function buildOverviewScene(){
   const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
-  // ビルのパレット（壁色 / 屋根色）
-  const PAL = [
-    [0xe7e0d2,0x9a4f3a],[0xd9cbb2,0x6c7785],[0xc9b89a,0x8a5a3c],[0xbfc4cc,0x3f4654],
-    [0xb7c2bb,0x546b63],[0xe2cdb4,0xb5552f],[0xc6d2dc,0x4a78a8],[0xd6d0c4,0x3a3f4a],
-  ];
-  function townBuilding(x,z,big){
-    const g = new THREE.Group(); g.position.set(x,0,z); scene.add(g);
-    const w=2.6+Math.random()*(big?3.4:2.2), d=2.6+Math.random()*(big?3.4:2.2);
-    const h=(big?9+Math.random()*16:3.2+Math.random()*6);
-    const pal = PAL[(Math.random()*PAL.length)|0];
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({ color:pal[0] }));
-    body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(w*1.05,0.6,d*1.05), new THREE.MeshStandardMaterial({ color:pal[1] }));
-    roof.position.y=h+0.25; roof.castShadow=true; g.add(roof);
-    // 窓（正面）
-    const rows=Math.max(1,Math.floor(h/2.6)), cols=Math.max(1,Math.floor(w/1.6));
-    const winMat=new THREE.MeshStandardMaterial({ color:0xbfe3ff, emissive:0x22425a, emissiveIntensity:0.5 });
+  // ---- 建物パーツ（種類ごとにデザインを変える）----
+  const WALL_APT=[0xe7ddc9,0xd8c4a6,0xcdb89a,0xe0cdb0,0xdac7b4];
+  const WALL_OFFICE=[0xc2ccd6,0xaeb9c6,0xc9d2da,0xb6c2cf];
+  const SHOP_COL=[0xd98a5a,0x6fae8a,0xc96f6f,0x6f8fc9,0xd9b85a,0x8a6fc0];
+  const ROOFCOL=[0x8a4a36,0x556070,0x6b5638,0x3f4654,0x7a5a3a,0x46505c];
+  const pick=a=>a[(Math.random()*a.length)|0];
+  function winGrid(g,w,h,d,glass,em){
+    const mat=new THREE.MeshStandardMaterial({color:glass,emissive:em,emissiveIntensity:0.45});
+    const rows=Math.max(1,Math.floor((h-1.4)/2.2)), cols=Math.max(1,Math.round(w/1.6));
+    const cw=w/cols*0.56;
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
-      const win=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.0,0.08), winMat);
-      win.position.set(-w/2+0.9+c*1.5, 1.4+r*2.4, d/2+0.02); if(win.position.y<h-0.6) g.add(win);
+      const wy=1.6+r*2.2; if(wy>h-0.7) continue;
+      const f=new THREE.Mesh(new THREE.BoxGeometry(cw,1.1,0.06),mat); f.position.set(-w/2+(c+0.5)*(w/cols),wy,d/2+0.03); g.add(f);
+      const b=f.clone(); b.position.z=-d/2-0.03; g.add(b);
+    }
+  }
+  function rooftop(g,w,h,d){
+    if(h>7){ const t=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.0,8),new THREE.MeshStandardMaterial({color:0x9aa0a8})); t.position.set(w*0.22,h+0.6,d*0.1); g.add(t); }
+    const ac=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.4,0.9),new THREE.MeshStandardMaterial({color:0x8b9098})); ac.position.set(-w*0.2,h+0.45,-d*0.12); g.add(ac);
+  }
+  // type: 'office' | 'apartment' | 'shop' | 'house' | 'bank'
+  function townBuilding(x,z,type){
+    const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=(Math.random()*4|0)*Math.PI/2; scene.add(g);
+    if(type==='office'){
+      const w=4+Math.random()*2.5, d=4+Math.random()*2.5, h=12+Math.random()*16;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_OFFICE)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const glass=new THREE.Mesh(new THREE.BoxGeometry(w*1.005,h*0.9,d*1.005),new THREE.MeshStandardMaterial({color:0x9cc4e0,emissive:0x1b333f,emissiveIntensity:0.4})); glass.position.y=h/2; g.add(glass);
+      winGrid(g,w,h,d,0xcfe7f5,0x24414f); rooftop(g,w,h,d);
+    } else if(type==='apartment'){
+      const w=4.2+Math.random()*2.4, d=3.6+Math.random()*2, h=6+Math.random()*7;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.5,d*1.06),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.2; roof.castShadow=true; g.add(roof);
+      winGrid(g,w,h,d,0xbfe3ff,0x22425a);
+      // バルコニー
+      const rows=Math.max(1,Math.floor((h-1.4)/2.2));
+      for(let r=0;r<rows;r++){ const wy=1.6+r*2.2; if(wy>h-0.7)continue; const bal=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.18,0.5),new THREE.MeshStandardMaterial({color:0x6b6157})); bal.position.set(0,wy-0.55,d/2+0.25); g.add(bal); }
+      rooftop(g,w,h,d);
+    } else if(type==='shop'){
+      const w=4+Math.random()*2, d=4+Math.random()*1.6, h=3.2+Math.random()*1.8;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0xefe7d8})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.08,0.5,d*1.08),new THREE.MeshStandardMaterial({color:0x4a4750})); roof.position.y=h+0.15; g.add(roof);
+      const acc=pick(SHOP_COL);
+      const sign=new THREE.Mesh(new THREE.BoxGeometry(w*0.9,0.8,0.12),new THREE.MeshStandardMaterial({color:acc})); sign.position.set(0,h-0.5,d/2+0.06); g.add(sign);
+      // ストライプ日除け
+      for(let i=0;i<5;i++){ const s=new THREE.Mesh(new THREE.BoxGeometry(w/5*0.96,0.3,1.0),new THREE.MeshStandardMaterial({color:i%2?0xf3ede2:acc})); s.position.set(-w/2+(i+0.5)*(w/5),1.4,d/2+0.5); s.rotation.x=-0.25; g.add(s); }
+      const disp=new THREE.Mesh(new THREE.BoxGeometry(w*0.8,1.3,0.06),new THREE.MeshStandardMaterial({color:0xbfe3ff,emissive:0x24414f,emissiveIntensity:0.4})); disp.position.set(0,0.9,d/2+0.04); g.add(disp);
+    } else if(type==='bank'){
+      const w=5+Math.random()*1.5, d=5+Math.random()*1.5, h=5+Math.random()*2.5;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0xe6ddc8})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const ped=new THREE.Mesh(new THREE.BoxGeometry(w*1.12,0.6,d*1.12),new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.3; g.add(ped);
+      for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.28,h*0.7,10),new THREE.MeshStandardMaterial({color:0xf3ecdb})); c.position.set(-w/2+0.6+i*((w-1.2)/4),h*0.35+0.3,d/2+0.2); g.add(c); }
+      const ped2=new THREE.Mesh(new THREE.BoxGeometry(w*1.0,0.5,1.0),new THREE.MeshStandardMaterial({color:0xf3ecdb})); ped2.position.set(0,h*0.7+0.3,d/2+0.2); g.add(ped2);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.5,d*1.06),new THREE.MeshStandardMaterial({color:0x6c7785})); roof.position.y=h+0.2; g.add(roof);
+    } else { // house
+      const w=3+Math.random()*1.6, d=3+Math.random()*1.4, h=2.4+Math.random()*1.6;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*0.78,1.6,4),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.8; roof.rotation.y=Math.PI/4; roof.castShadow=true; g.add(roof);
+      const win=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,0.06),new THREE.MeshStandardMaterial({color:0xbfe3ff,emissive:0x22425a,emissiveIntensity:0.4})); win.position.set(0,h*0.55,d/2+0.03); g.add(win);
     }
     return g;
   }
-  // 区画の中心にビルを配置（道路の間）
+  // ---- 街区ごとに性格を変えて充填（都心＝高層オフィス / 住宅街 / 商店街）----
   const PCEN=[-81,-63,-45,-27,-9,9,27,45,63,81];
-  for(const cx of PCEN) for(const cz of PCEN){
-    if(near(cx,cz,10)) continue;
-    const big = Math.abs(cx)<30 && Math.abs(cz)<30;     // 中心部は高層
-    townBuilding(cx+(Math.random()-0.5)*5, cz+(Math.random()-0.5)*5, big);
-    if(Math.random()<0.4) townBuilding(cx+(Math.random()-0.5)*9, cz+(Math.random()-0.5)*9, false);
+  function fillBlock(cx,cz){
+    const r2 = cx*cx+cz*cz;
+    let kind;
+    if(r2<1200) kind = Math.random()<0.7?'downtown':'commercial';
+    else if(r2<4500) kind = pick(['downtown','commercial','residential','residential']);
+    else kind = pick(['residential','residential','suburb']);
+    const place=(ox,oz,type)=>{ const x=cx+ox, z=cz+oz; if(near(x,z,6.5)) return; townBuilding(x,z,type); };
+    if(kind==='downtown'){
+      place((Math.random()-0.5)*3,(Math.random()-0.5)*3, Math.random()<0.7?'office':'bank');
+      if(Math.random()<0.4) place(5.5*(Math.random()<.5?1:-1),5*(Math.random()<.5?1:-1),'apartment');
+    } else if(kind==='commercial'){
+      place(-4,0,'shop'); place(4,0,'shop'); if(Math.random()<0.6) place(0,5,'apartment'); if(Math.random()<0.5) place(0,-5,'shop');
+    } else if(kind==='residential'){
+      for(const o of [[-4,-4],[4,-4],[-4,4],[4,4]]) if(Math.random()<0.8) place(o[0]+(Math.random()-0.5)*2,o[1]+(Math.random()-0.5)*2, Math.random()<0.5?'house':'apartment');
+    } else { // suburb：家まばら＋緑
+      for(const o of [[-4,-4],[5,3],[-3,5]]) if(Math.random()<0.7) place(o[0],o[1],'house');
+    }
   }
+  for(const cx of PCEN) for(const cz of PCEN){ if(near(cx,cz,9)) continue; fillBlock(cx,cz); }
 
   // 街路樹
   function tree(x,z){
@@ -1933,6 +2001,17 @@ const ART = {
   pop: svgArt('#b8447f', `<circle cx="23" cy="27" r="8" fill="#ffce4d"/><rect x="33" y="19" width="13" height="13" rx="2" fill="#3ddc97"/><polygon points="32,38 42,50 22,50" fill="#6aa0ff"/><circle cx="44" cy="43" r="4" fill="#e0685e"/>`),
   staff: svgArt('#2e6f5a', `<circle cx="32" cy="19" r="7" fill="#f3d6b0"/><path d="M19 51 V40 a13 13 0 0 1 26 0 V51 Z" fill="#eef1f4"/><path d="M27 33 h10 v18 h-10 Z" fill="#2ec4a0"/><rect x="30" y="37" width="4" height="5" rx="1" fill="#0c3a2a"/>`),
 };
+// 出店シート用：外装・設備のサムネ（内装は ART.cozy/chic/pop を流用）
+const EXT_ART = [
+  svgArt('#9aa6b0', `<rect x="14" y="20" width="36" height="30" rx="2" fill="#e3d9c8"/><g fill="#bfe3ff"><rect x="19" y="26" width="7" height="8"/><rect x="29" y="26" width="7" height="8"/><rect x="39" y="26" width="6" height="8"/></g><rect x="28" y="40" width="9" height="10" fill="#7a5a3a"/>`),
+  svgArt('#7a4632', `<rect x="14" y="20" width="36" height="30" rx="2" fill="#b5552f"/><g stroke="#8a3f22" stroke-width="1"><path d="M14 27 H50 M14 34 H50 M14 41 H50"/><path d="M23 20 V27 M32 27 V34 M41 34 V41 M23 41 V48"/></g><rect x="28" y="41" width="9" height="9" fill="#3a2a1c"/>`),
+  svgArt('#cfd6de', `<rect x="14" y="18" width="36" height="32" rx="2" fill="#eef1f5"/><path d="M14 18 L50 50 M26 18 L50 38 M14 30 L34 50" stroke="#c7d0da" stroke-width="1.4"/><rect x="20" y="40" width="8" height="10" fill="#9fb0c2"/><rect x="36" y="40" width="8" height="10" fill="#9fb0c2"/>`),
+];
+const EQ_ART = [
+  svgArt('#6b7480', `<rect x="20" y="22" width="24" height="14" rx="3" fill="#d7dce2"/><circle cx="27" cy="29" r="1.8" fill="#7fc77f"/><circle cx="33" cy="29" r="1.8" fill="#e0894a"/><rect x="28" y="36" width="8" height="4" fill="#9aa1ab"/><rect x="26" y="42" width="12" height="7" rx="1" fill="#fff"/>`),
+  svgArt('#566370', `<rect x="15" y="18" width="34" height="18" rx="3" fill="#e7eaee"/><rect x="15" y="18" width="34" height="6" rx="3" fill="#aeb6c0"/><circle cx="24" cy="29" r="2.2" fill="#7fc77f"/><circle cx="32" cy="29" r="2.2" fill="#e0894a"/><circle cx="40" cy="29" r="2.2" fill="#6aa0ff"/><rect x="27" y="36" width="10" height="5" fill="#9aa1ab"/><rect x="24" y="41" width="16" height="8" rx="1" fill="#fff"/>`),
+  svgArt('#3f4853', `<rect x="12" y="15" width="40" height="21" rx="3" fill="#f0f3f6"/><rect x="12" y="15" width="40" height="7" rx="3" fill="#c2902f"/><g fill="#caa24a"><circle cx="22" cy="29" r="2.4"/><circle cx="32" cy="29" r="2.4"/><circle cx="42" cy="29" r="2.4"/></g><rect x="26" y="36" width="12" height="5" fill="#9aa1ab"/><rect x="22" y="41" width="20" height="9" rx="1" fill="#fff"/>`),
+];
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
@@ -2264,16 +2343,20 @@ function renderBuild(){
     types.map(ty=>`<button class="mbtn ${buildType===ty.k?'sel':''}" data-btype="${ty.k}" ${ty.ok?'':'disabled'} style="margin:3px 4px 3px 0">${ty.n}${(!ty.ok&&ty.k!=='cafe')?(FACILITY[ty.k]?'（建設済）':'（要カフェ）'):''}</button>`).join('');
   document.getElementById('build-title').textContent = buildType==='cafe' ? (first?'1号店を出店する':'カフェを出店する') : `${FAC_DEFS[buildType].label}を建設する`;
   const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
-  const row=(label,arr,sel,key)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
-    arr.map((o,i)=>`<button class="mbtn ${i===sel?'sel':''}" data-${key}="${i}" style="margin:3px 4px 3px 0">${o.name}${o.cost?` +¥${o.cost.toLocaleString('ja-JP')}`:'（無料）'}</button>`).join('');
+  // 画像つきの選択タイル
+  const optRow=(label,arr,sel,key,art)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
+    `<div class="opt-row">`+arr.map((o,i)=>`<button class="opt ${i===sel?'sel':''}" data-${key}="${i}"><div class="ot">${art(o,i)}</div><div class="on">${o.name}</div><div class="oc">${o.cost?'+¥'+o.cost.toLocaleString('ja-JP'):'無料'}</div></button>`).join('')+`</div>`;
   const plotCard=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
     `<div class="meta">${cityN}・交通量 ${t.traffic.toLocaleString('ja-JP')}人/日</div>`+
     `<div class="meta">${buildType==='cafe'?`賃料 ¥${t.rent.toLocaleString('ja-JP')}/日・`:''}物件取得 ¥${t.cost.toLocaleString('ja-JP')}</div></div></div>`;
   let detail;
   if(buildType==='cafe'){
-    detail = row('外装',EXTERIORS,buildExt,'bext') + row('内装',INTERIORS,buildInt,'bint') + row('設備（マシン）',EQUIP_SETS,buildEq,'beq');
+    detail = optRow('外装',EXTERIORS,buildExt,'bext',(o,i)=>EXT_ART[i]||EXT_ART[0])
+           + optRow('内装',INTERIORS,buildInt,'bint',(o)=>ART[o.vibe]||ART.cozy)
+           + optRow('設備（マシン）',EQUIP_SETS,buildEq,'beq',(o,i)=>EQ_ART[i]||EQ_ART[0]);
   } else {
-    detail = `<div class="note" style="margin-top:8px">${FAC_DEFS[buildType].desc}<br>建設費 ¥${FAC_DEFS[buildType].build.toLocaleString('ja-JP')}（＋物件取得）</div>`;
+    const fa = buildType==='hq' ? ART.downtown : ART.tourist;
+    detail = `<div class="mcard"><div class="thumb">${fa}</div><div class="info"><div class="ttl">${FAC_DEFS[buildType].label}</div><div class="meta">${FAC_DEFS[buildType].desc}</div><div class="meta">建設費 ¥${FAC_DEFS[buildType].build.toLocaleString('ja-JP')}（＋物件取得）</div></div></div>`;
   }
   document.getElementById('build-body').innerHTML = plotCard + typeRow + detail;
   const cost=buildCost(), left=sim.money-cost;
