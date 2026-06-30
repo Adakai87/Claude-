@@ -1303,14 +1303,17 @@ let storeScene, overScene;
 
 // ---- ライト共通生成 ----
 function addLights(scene, intensity=1){
-  const hemi = new THREE.HemisphereLight(0xfff3e0, 0x402a1a, 0.9*intensity);
+  const hemi = new THREE.HemisphereLight(0xffe6c4, 0x3a2a1e, 0.9*intensity);
   scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffe8c8, 1.0*intensity);
-  dir.position.set(8, 16, 6);
+  const dir = new THREE.DirectionalLight(0xffd9a0, 1.0*intensity);
+  dir.position.set(10, 13, 7);
   dir.castShadow = true;
   dir.shadow.mapSize.set(1024,1024);
   dir.shadow.camera.left=-20; dir.shadow.camera.right=20; dir.shadow.camera.top=20; dir.shadow.camera.bottom=-20;
   scene.add(dir);
+  const fill = new THREE.DirectionalLight(0x9fb6d8, 0.18*intensity);
+  fill.position.set(-8, 6, -6);
+  scene.add(fill);
 }
 
 // =====================================================================
@@ -1474,7 +1477,7 @@ let myCafeMesh;
 function buildOverviewScene(){
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xbfe3f5);
-  scene.fog = new THREE.Fog(0xbfe3f5, 200, 480);
+  scene.fog = new THREE.Fog(0xd8e3ea, 210, 470);
   addLights(scene, 1.15);
 
   // 水面 → 海岸の芝 → グレーの舗装（街全体の地面＝道路/歩道）
@@ -1500,7 +1503,7 @@ function buildOverviewScene(){
 
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
   const STADIUM_POS = {x:54,z:-54};
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, {x:-9,z:-27}];
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, {x:-9,z:-27}, {x:-66,z:-44}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ---- パレット（実在の街っぽい落ち着いた色）----
@@ -1528,10 +1531,18 @@ function buildOverviewScene(){
     x.fillStyle='#7c8086'; x.fillRect(0,0,16,16);       // フレーム（柱・梁）
     x.fillStyle='#eef4f9'; x.fillRect(2,3,12,10);       // 窓ガラス
     return c; })();
-  function facadeMat(col,w,h){
+  function facadeMat(col, w, h, lit){
     const t=new THREE.CanvasTexture(FACADE_BASE); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.magFilter=THREE.NearestFilter;
     t.repeat.set(Math.max(2,Math.round(w/2.2)), Math.max(2,Math.round(h/2.5)));
-    return new THREE.MeshStandardMaterial({ color:col, map:t, roughness:0.8 });
+    const m = new THREE.MeshStandardMaterial({ color: col, map: t, roughness: 0.8 });
+    if (lit === undefined) lit = Math.random() < (h > 12 ? 0.30 : 0.18);
+    if (lit){
+      m.emissiveMap = t;
+      const warm = Math.random() < 0.7;
+      m.emissive = new THREE.Color(warm ? 0xffb155 : 0xcfe2ff);
+      m.emissiveIntensity = warm ? (0.40 + Math.random()*0.15) : (0.30 + Math.random()*0.12);
+    }
+    return m;
   }
   // レンガ：横目地＋小さな窓を焼き込んだ1セル
   const BRICK_BASE = (()=>{ const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d');
@@ -1544,6 +1555,36 @@ function buildOverviewScene(){
   const DIAGRID_BASE = (()=>{ const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d');
     x.fillStyle='#5a6f80'; x.fillRect(0,0,16,16); x.strokeStyle='#cfe0ea'; x.lineWidth=2; x.beginPath(); x.moveTo(0,0); x.lineTo(16,16); x.moveTo(16,0); x.lineTo(0,16); x.stroke(); return c; })();
   function diagridMat(col,w,h){ const t=new THREE.CanvasTexture(DIAGRID_BASE); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.magFilter=THREE.NearestFilter; t.repeat.set(Math.max(2,Math.round(w/2.4)), Math.max(3,Math.round(h/2.4))); return new THREE.MeshStandardMaterial({ color:col, map:t, roughness:0.6, metalness:0.2 }); }
+  // ===== 教会(type'church')＋低コスト多様化 共有定義 =====
+  const CHURCH_STONE=[0xe7dec9,0xe2d6bf,0xeae3d2,0xdcd0b8];
+  const CHURCH_ROOF =[0x6b5640,0x556070,0x7a4636,0x4a4f57];
+  const STAINED     =[0x3f6fcf,0xcf4f6f,0x4fae8a,0x9a5fcf,0xcf9a3a];
+  const matCross = new THREE.MeshStandardMaterial({color:0xf2ece0});
+  function makeChurch(g,w,d){
+    const stone=new THREE.MeshStandardMaterial({color:pick(CHURCH_STONE), roughness:0.9});
+    const roofM=new THREE.MeshStandardMaterial({color:pick(CHURCH_ROOF), roughness:0.85});
+    const navH=3.2+Math.random()*1.6, navW=w*0.74, navD=d*0.94;
+    const nave=new THREE.Mesh(new THREE.BoxGeometry(navW,navH,navD), stone); nave.position.set(0,navH/2,0); nave.castShadow=nave.receiveShadow=true; g.add(nave);
+    const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(navW,navD)*0.66,1.7,4), roofM); roof.position.y=navH+0.78; roof.rotation.y=Math.PI/4; roof.castShadow=true; g.add(roof);
+    const towW=w*0.26, towH=navH+2.4+Math.random()*1.6;
+    const tower=new THREE.Mesh(new THREE.BoxGeometry(towW,towH,towW), stone); tower.position.set(-w*0.22,towH/2,d*0.30); tower.castShadow=true; g.add(tower);
+    const spire=new THREE.Mesh(new THREE.ConeGeometry(towW*0.78,1.9,4), roofM); spire.position.set(-w*0.22,towH+0.9,d*0.30); spire.rotation.y=Math.PI/4; spire.castShadow=true; g.add(spire);
+    const cv=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.55,0.07), matCross); cv.position.set(-w*0.22,towH+2.05,d*0.30); g.add(cv);
+    const ch=new THREE.Mesh(new THREE.BoxGeometry(0.30,0.07,0.07), matCross); ch.position.set(-w*0.22,towH+2.10,d*0.30); g.add(ch);
+    const sgCol=pick(STAINED);
+    const sg=new THREE.Mesh(new THREE.BoxGeometry(navW*0.34,navH*0.5,0.06), new THREE.MeshStandardMaterial({color:sgCol, emissive:sgCol, emissiveIntensity:0.55, roughness:0.4})); sg.position.set(w*0.06,navH*0.52,navD/2+0.04); g.add(sg);
+    const door=new THREE.Mesh(new THREE.BoxGeometry(navW*0.22,navH*0.4,0.08), new THREE.MeshStandardMaterial({color:0x4a3b2c})); door.position.set(w*0.06,navH*0.2,navD/2+0.04); g.add(door);
+  }
+  const matBulkhead=new THREE.MeshStandardMaterial({color:0x9a9ea4, roughness:0.9});
+  function decorate(g,w,h,d,baseCol){
+    const r=Math.random();
+    if(r<0.22){ const bw=w*0.34, bd=d*0.34, bh=1.0+Math.random()*0.8;
+      const bk=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), matBulkhead); bk.position.set(-w*0.18+(Math.random()-0.5)*w*0.1, h+bh/2, -d*0.18); bk.castShadow=true; g.add(bk);
+    } else if(r<0.42){ const band=new THREE.MeshStandardMaterial({color:(typeof baseCol==='number'?_b(baseCol,0.82):0xbdb6a6)});
+      const c1=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.28,d*1.06), band); c1.position.y=h-0.5; g.add(c1);
+      if(h>6){ const c2=new THREE.Mesh(new THREE.BoxGeometry(w*1.04,0.18,d*1.04), band); c2.position.y=h*0.5; g.add(c2); }
+    }
+  }
   // 屋上ディテール（ソーラー/ヘリポート/屋上庭園/AC/貯水タンク）
   function rooftop(g,w,h,d){
     const top=h, r=Math.random();
@@ -1566,11 +1607,13 @@ function buildOverviewScene(){
       // 上層のセットバック（高層ビルに段差）
       if(h>20 && Math.random()<0.6){ const sb=new THREE.Mesh(new THREE.BoxGeometry(w*0.6,3.2,d*0.6), facadeMat(dark?pick(GLASS_DARK):pick(WALL_OFFICE), w*0.6, 3.2)); sb.position.y=h+1.7; sb.castShadow=true; g.add(sb); }
       rooftop(g,w,h,d);
+      decorate(g,w,h,d, dark?0x3a4a57:0xc2c9d1);
     } else if(type==='apartment'){
       const h=5+Math.random()*7;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), facadeMat(pick(WALL_APT), w, h)); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
       const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,0.4,d*1.05),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.15; roof.castShadow=true; g.add(roof);
       rooftop(g,w,h,d);
+      decorate(g,w,h,d, 0xd6c4a6);
     } else if(type==='shop'){
       const h=3+Math.random()*1.6;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:0xefe7d8})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
@@ -1591,6 +1634,7 @@ function buildOverviewScene(){
       const cor=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,0.5,d*1.05),new THREE.MeshStandardMaterial({color:0x6a4a3a})); cor.position.y=h+0.1; g.add(cor);  // コーニス
       const para=new THREE.Mesh(new THREE.BoxGeometry(w*1.0,0.6,d*1.0),new THREE.MeshStandardMaterial({color:_b(pick(BRICK_COL),0.9)})); para.position.y=h-0.3; g.add(para);
       rooftop(g,w,h,d);
+      decorate(g,w,h,d, pick(BRICK_COL));
     } else if(type==='victorian'){
       const h=3.4+Math.random()*2.4, col=pick(VICT_COL);
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), facadeMat(col, w, h*1.1)); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
@@ -1611,6 +1655,47 @@ function buildOverviewScene(){
       const body=new THREE.Mesh(new THREE.CylinderGeometry(r*0.35,r,h,14), new THREE.MeshStandardMaterial({color:0x6fa9c9, metalness:0.35, roughness:0.35, emissive:0x18313f, emissiveIntensity:0.35})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
       for(let i=0;i<Math.floor(h/2.4);i++){ const ring=new THREE.Mesh(new THREE.CylinderGeometry(r*(1-0.013*i*2.4)*0.99,r*(1-0.013*i*2.4)*0.99,0.12,14), new THREE.MeshStandardMaterial({color:0xbfe0ef})); ring.position.y=1.4+i*2.4; g.add(ring); }
       const spire=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.25,3,8), new THREE.MeshStandardMaterial({color:0xcfe0ea})); spire.position.y=h+1.4; g.add(spire);
+    } else if(type==='church'){
+      makeChurch(g,w,d);
+    } else if(type==='civic'){
+      const STONE=0xe7e0cf, STONE_D=0xd8d0bd, TRIM=0xf2ede0;
+      const trimMat=new THREE.MeshStandardMaterial({color:TRIM, roughness:0.8});
+      const colMat =new THREE.MeshStandardMaterial({color:0xf4efe3, roughness:0.75});
+      const baseH=4.2;
+      const pod=new THREE.Mesh(new THREE.BoxGeometry(w*1.04,0.5,d*1.04), new THREE.MeshStandardMaterial({color:STONE_D})); pod.position.y=0.25; g.add(pod);
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,baseH,d), facadeMat(STONE, w, baseH, false)); body.position.y=baseH/2+0.4; body.castShadow=body.receiveShadow=true; g.add(body);
+      const cor=new THREE.Mesh(new THREE.BoxGeometry(w*1.06,0.55,d*1.06), trimMat); cor.position.y=baseH+0.4+0.1; g.add(cor);
+      const par=new THREE.Mesh(new THREE.BoxGeometry(w*1.0,0.35,d*1.0), new THREE.MeshStandardMaterial({color:STONE_D})); par.position.y=baseH+0.4+0.45; g.add(par);
+      const cpH=baseH+1.0, cpS=Math.min(w,d)*0.22;
+      for(const s of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        const cp=new THREE.Mesh(new THREE.BoxGeometry(cpS,cpH,cpS), facadeMat(STONE, cpS, cpH, false)); cp.position.set(s[0]*(w/2-cpS/2), cpH/2+0.4, s[1]*(d/2-cpS/2)); cp.castShadow=true; g.add(cp);
+        const cpc=new THREE.Mesh(new THREE.BoxGeometry(cpS*1.12,0.3,cpS*1.12), trimMat); cpc.position.set(s[0]*(w/2-cpS/2), cpH+0.45, s[1]*(d/2-cpS/2)); g.add(cpc);
+      }
+      function portico(axis){
+        const along=axis==='z'?w:d, n=6, colH=baseH*0.78, colR=0.22, span=along*0.72, edge=axis==='z'?d/2:w/2;
+        for(let i=0;i<n;i++){ const t=-span/2+span*(i/(n-1));
+          const c=new THREE.Mesh(new THREE.CylinderGeometry(colR,colR,colH,10), colMat);
+          if(axis==='z') c.position.set(t,colH/2+0.5,edge+0.5); else c.position.set(edge+0.5,colH/2+0.5,t); g.add(c); }
+        const beamL=span+0.8;
+        const beam=new THREE.Mesh(axis==='z'?new THREE.BoxGeometry(beamL,0.6,1.0):new THREE.BoxGeometry(1.0,0.6,beamL), trimMat);
+        if(axis==='z') beam.position.set(0,colH+0.85,edge+0.5); else beam.position.set(edge+0.5,colH+0.85,0); g.add(beam);
+      }
+      portico('z'); portico('x');
+      const dome=new THREE.Group(); dome.position.set(0,baseH+0.8,0); g.add(dome);
+      const drumR=Math.min(w,d)*0.28, drumH=2.6;
+      const drum=new THREE.Mesh(new THREE.CylinderGeometry(drumR,drumR*1.05,drumH,18), new THREE.MeshStandardMaterial({color:0xf3efe4, roughness:0.7})); drum.position.y=drumH/2; dome.add(drum);
+      const dring=new THREE.Mesh(new THREE.CylinderGeometry(drumR*1.08,drumR*1.08,0.3,18), trimMat); dring.position.y=drumH+0.1; dome.add(dring);
+      const cap=new THREE.Mesh(new THREE.SphereGeometry(drumR*1.02,18,12,0,Math.PI*2,0,Math.PI*0.5), new THREE.MeshStandardMaterial({color:0x4a5066, roughness:0.55, metalness:0.25})); cap.position.y=drumH+0.25; dome.add(cap);
+      const ribMat=new THREE.MeshStandardMaterial({color:0xc9a24a, metalness:0.5, roughness:0.4, emissive:0x3a2c08, emissiveIntensity:0.2});
+      const RIBS=8, ribH=drumR*1.04;
+      for(let i=0;i<RIBS;i++){ const a=i/RIBS*Math.PI*2;
+        const rib=new THREE.Mesh(new THREE.BoxGeometry(0.08,ribH,0.08), ribMat); rib.position.set(Math.cos(a)*drumR*0.7, drumH+0.25+ribH*0.42, Math.sin(a)*drumR*0.7); rib.rotation.z=Math.cos(a)*0.55; rib.rotation.x=-Math.sin(a)*0.55; dome.add(rib); }
+      const lanR=drumR*0.3;
+      const lan=new THREE.Mesh(new THREE.CylinderGeometry(lanR,lanR,0.9,10), new THREE.MeshStandardMaterial({color:0xd9b85a, metalness:0.5, roughness:0.4, emissive:0x4a3608, emissiveIntensity:0.25})); lan.position.y=drumH+0.25+drumR*1.0+0.45; dome.add(lan);
+      const lanCap=new THREE.Mesh(new THREE.SphereGeometry(lanR*1.05,10,6,0,Math.PI*2,0,Math.PI*0.5), ribMat); lanCap.position.y=lan.position.y+0.45; dome.add(lanCap);
+      const spire=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.12,1.2,8), ribMat); spire.position.y=lanCap.position.y+0.6; dome.add(spire);
+      const fin=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6), ribMat); fin.position.y=spire.position.y+0.7; dome.add(fin);
+      dome.children.forEach(m=>m.castShadow=true);
     } else { // house
       const h=2.2+Math.random()*1.4;
       const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
@@ -1645,18 +1730,22 @@ function buildOverviewScene(){
       if(Math.random()<0.6) placeB(cx+H*0.55, cz-H*0.55, pick(['apartment','shop','brick']), PLOT*0.32, PLOT*0.32);
     } else if(kind==='mid'){
       // 2x2 の中低層（レンガも混ぜる）
-      for(const o of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(Math.random()<0.85) placeB(cx+o[0]*H*0.5, cz+o[1]*H*0.5, pick(['apartment','apartment','office','shop','brick','brick']), PLOT*0.42, PLOT*0.42); }
+      for(const o of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(Math.random()<0.85) placeB(cx+o[0]*H*0.5, cz+o[1]*H*0.5, pick(['apartment','apartment','office','shop','brick','brick','church']), PLOT*0.42, PLOT*0.42); }
     } else if(kind==='commercial'){
       placeB(cx, cz-H*0.5, 'shop', PLOT*0.86, PLOT*0.36);
       placeB(cx, cz+H*0.45, pick(['apartment','office','brick']), PLOT*0.86, PLOT*0.42);
     } else if(kind==='blockhouse'){
       // 3x3 の住宅をぎっしり（ビクトリアン連棟住宅を多めに）
-      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.84) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment']), PLOT*0.27, PLOT*0.27); }
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.84) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment','church']), PLOT*0.27, PLOT*0.27); }
     } else { // green：小公園
       for(let i=0;i<6;i++){ const a=Math.random()*Math.PI*2, rr=Math.random()*H*0.7; tree(cx+Math.cos(a)*rr, cz+Math.sin(a)*rr, 0.9+Math.random()*0.4); }
     }
   }
   for(const cx of GRID) for(const cz of GRID){ if(near(cx,cz,11)) continue; fillPlot(cx,cz); }
+  // 市庁舎（ドーム建築ランドマーク：外周左・既存サービスと非干渉）
+  const CIVIC_POS={x:-66,z:-44};
+  plotPad(CIVIC_POS.x, CIVIC_POS.z, false);
+  townBuilding(CIVIC_POS.x, CIVIC_POS.z, 'civic', 14, 14);
 
   // ===== 道路システム（本家寄りの清潔グリッド：連続アスファルト帯＋白破線センター＋アーム口ゼブラ＋停止線）=====
   (function buildRoads(){
@@ -1701,6 +1790,46 @@ function buildOverviewScene(){
       else           add(geoStopV, white, cx + sign*(zebraCenter+stripeLen/2+0.5), yStop, cz);
     }
     for(const cx of ZRC) for(const cz of ZRC){ zebraBars(cx,cz,'h',1); zebraBars(cx,cz,'h',-1); zebraBars(cx,cz,'v',1); zebraBars(cx,cz,'v',-1); }
+  })();
+
+  // ===== 街路樹＆街灯：歩道エッジ沿いに等間隔（メッシュ上限つき）=====
+  (function streetFurniture(){
+    const EDGE = PLOT/2 - 0.6;
+    const poleGeo = new THREE.CylinderGeometry(0.06,0.08,2.6,5);
+    const poleMat = new THREE.MeshStandardMaterial({color:0x4a4f57, roughness:0.7});
+    const headGeo = new THREE.SphereGeometry(0.22,6,5);
+    const headMat = new THREE.MeshStandardMaterial({color:0xfff2cf, emissive:0xffe49a, emissiveIntensity:0.9});
+    function lamp(x,z){
+      const p=new THREE.Mesh(poleGeo,poleMat); p.position.set(x,1.3,z); p.castShadow=true; scene.add(p);
+      const h=new THREE.Mesh(headGeo,headMat); h.position.set(x,2.7,z); scene.add(h);
+    }
+    const MAX_TREES=200, MAX_LAMPS=70; let nTree=0, nLamp=0;
+    function lineUp(cx,cz,edge){
+      const downtown=(cx*cx+cz*cz)<2600;
+      const slots=[-EDGE*0.62, 0, EDGE*0.62];
+      let bx,bz,ax,az;
+      if(edge==='N'){ bz=cz-EDGE+0.4; ax=1; az=0; bx=cx; }
+      else if(edge==='S'){ bz=cz+EDGE-0.4; ax=1; az=0; bx=cx; }
+      else if(edge==='W'){ bx=cx-EDGE+0.4; ax=0; az=1; bz=cz; }
+      else { bx=cx+EDGE-0.4; ax=0; az=1; bz=cz; }
+      for(const s of slots){
+        const x=bx+ax*s, z=bz+az*s;
+        if(near(x,z,4.5)) continue;
+        if(Math.random()<0.4) continue;
+        const wantLamp=Math.random()<(downtown?0.5:0.22);
+        if(wantLamp){ if(nLamp<MAX_LAMPS){ lamp(x,z); nLamp++; } }
+        else { if(nTree<MAX_TREES){ tree(x,z,0.78+Math.random()*0.3); nTree++; } }
+      }
+    }
+    for(const cx of GRID) for(const cz of GRID){
+      if(near(cx,cz,11)) continue;
+      if(nTree>=MAX_TREES && nLamp>=MAX_LAMPS) break;
+      if(Math.random()<0.52) continue;
+      const edges=['N','S','E','W'];
+      for(let k=edges.length-1;k>0;k--){ const j=(Math.random()*(k+1))|0; [edges[k],edges[j]]=[edges[j],edges[k]]; }
+      const pickN=1+(Math.random()<0.5?1:0);
+      for(let e=0;e<pickN;e++) lineUp(cx,cz,edges[e]);
+    }
   })();
 
   // 公園（芝＋池＋木立＋ベンチ）
