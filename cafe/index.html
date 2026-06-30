@@ -205,6 +205,17 @@
   .rev-metric{display:flex; align-items:center; gap:8px; font-size:12.5px; margin:3px 0;}
   .rev-metric .nm{color:var(--sub); width:56px; flex-shrink:0;}
   .rev-metric .vv{margin-left:auto; width:30px; text-align:right; font-variant-numeric:tabular-nums;}
+  /* 出店/改装：大きめの選択カード（描き込みイラスト） */
+  .optbig{display:flex; gap:12px; align-items:center; border:1px solid var(--line); background:var(--panel2); border-radius:13px; padding:10px; margin-bottom:9px; cursor:pointer;}
+  .optbig.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .optbig .oimg{width:118px; height:90px; flex-shrink:0; border-radius:10px; overflow:hidden; background:radial-gradient(120% 120% at 50% 30%, #1d1812, #100c08);}
+  .optbig .oimg svg{width:100%; height:100%; display:block;}
+  .optbig .oinfo{flex:1; min-width:0;}
+  .optbig .onm{font-weight:800; font-size:14.5px; line-height:1.25;}
+  .optbig .ometa{font-size:11px; color:var(--sub); margin-top:3px; line-height:1.45;}
+  .optbig .ostat{display:flex; gap:10px; margin:5px 0 2px; flex-wrap:wrap;}
+  .optbig .ostat .lbl{font-size:9.5px; color:var(--sub); letter-spacing:.04em;}
+  .optbig .oprice{font-weight:800; font-size:15px; margin-top:4px;}
   /* 出店シートの画像つき選択タイル */
   .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
   .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
@@ -2205,17 +2216,94 @@ const ART = {
   pop: svgArt('#b8447f', `<circle cx="23" cy="27" r="8" fill="#ffce4d"/><rect x="33" y="19" width="13" height="13" rx="2" fill="#3ddc97"/><polygon points="32,38 42,50 22,50" fill="#6aa0ff"/><circle cx="44" cy="43" r="4" fill="#e0685e"/>`),
   staff: svgArt('#2e6f5a', `<circle cx="32" cy="19" r="7" fill="#f3d6b0"/><path d="M19 51 V40 a13 13 0 0 1 26 0 V51 Z" fill="#eef1f4"/><path d="M27 33 h10 v18 h-10 Z" fill="#2ec4a0"/><rect x="30" y="37" width="4" height="5" rx="1" fill="#0c3a2a"/>`),
 };
-// 出店シート用：外装・設備のサムネ（内装は ART.cozy/chic/pop を流用）
-const EXT_ART = [
-  svgArt('#9aa6b0', `<rect x="14" y="20" width="36" height="30" rx="2" fill="#e3d9c8"/><g fill="#bfe3ff"><rect x="19" y="26" width="7" height="8"/><rect x="29" y="26" width="7" height="8"/><rect x="39" y="26" width="6" height="8"/></g><rect x="28" y="40" width="9" height="10" fill="#7a5a3a"/>`),
-  svgArt('#7a4632', `<rect x="14" y="20" width="36" height="30" rx="2" fill="#b5552f"/><g stroke="#8a3f22" stroke-width="1"><path d="M14 27 H50 M14 34 H50 M14 41 H50"/><path d="M23 20 V27 M32 27 V34 M41 34 V41 M23 41 V48"/></g><rect x="28" y="41" width="9" height="9" fill="#3a2a1c"/>`),
-  svgArt('#cfd6de', `<rect x="14" y="18" width="36" height="32" rx="2" fill="#eef1f5"/><path d="M14 18 L50 50 M26 18 L50 38 M14 30 L34 50" stroke="#c7d0da" stroke-width="1.4"/><rect x="20" y="40" width="8" height="10" fill="#9fb0c2"/><rect x="36" y="40" width="8" height="10" fill="#9fb0c2"/>`),
-];
-const EQ_ART = [
-  svgArt('#6b7480', `<rect x="20" y="22" width="24" height="14" rx="3" fill="#d7dce2"/><circle cx="27" cy="29" r="1.8" fill="#7fc77f"/><circle cx="33" cy="29" r="1.8" fill="#e0894a"/><rect x="28" y="36" width="8" height="4" fill="#9aa1ab"/><rect x="26" y="42" width="12" height="7" rx="1" fill="#fff"/>`),
-  svgArt('#566370', `<rect x="15" y="18" width="34" height="18" rx="3" fill="#e7eaee"/><rect x="15" y="18" width="34" height="6" rx="3" fill="#aeb6c0"/><circle cx="24" cy="29" r="2.2" fill="#7fc77f"/><circle cx="32" cy="29" r="2.2" fill="#e0894a"/><circle cx="40" cy="29" r="2.2" fill="#6aa0ff"/><rect x="27" y="36" width="10" height="5" fill="#9aa1ab"/><rect x="24" y="41" width="16" height="8" rx="1" fill="#fff"/>`),
-  svgArt('#3f4853', `<rect x="12" y="15" width="40" height="21" rx="3" fill="#f0f3f6"/><rect x="12" y="15" width="40" height="7" rx="3" fill="#c2902f"/><g fill="#caa24a"><circle cx="22" cy="29" r="2.4"/><circle cx="32" cy="29" r="2.4"/><circle cx="42" cy="29" r="2.4"/></g><rect x="26" y="36" width="12" height="5" fill="#9aa1ab"/><rect x="22" y="41" width="20" height="9" rx="1" fill="#fff"/>`),
-];
+// ===== アイソメ・イラスト（描き込み用の立体パーツ）=====
+function _shade(hex,f){ const n=parseInt(hex.slice(1),16); let r=(n>>16)&255,g=(n>>8)&255,b=n&255; r=Math.min(255,r*f)|0;g=Math.min(255,g*f)|0;b=Math.min(255,b*f)|0; return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+const _IX=(x,z)=>64+(x-z)*8.6;
+const _IY=(x,z,h)=>66+(x+z)*4.9 - h*8.6;
+// 立方体（上面・前面(z+)・右面(x+)の3面）。col=ベース色から自動陰影
+function ibox(gx,gz,gy,w,d,h,col){
+  const P=(x,z,y)=>`${_IX(x,z).toFixed(1)},${_IY(x,z,y).toFixed(1)}`;
+  const T=col, L=_shade(col,0.82), R=_shade(col,0.66);
+  return `<polygon points="${P(gx+w,gz,gy)} ${P(gx+w,gz,gy+h)} ${P(gx+w,gz+d,gy+h)} ${P(gx+w,gz+d,gy)}" fill="${R}"/>`+
+         `<polygon points="${P(gx,gz+d,gy)} ${P(gx,gz+d,gy+h)} ${P(gx+w,gz+d,gy+h)} ${P(gx+w,gz+d,gy)}" fill="${L}"/>`+
+         `<polygon points="${P(gx,gz,gy+h)} ${P(gx+w,gz,gy+h)} ${P(gx+w,gz+d,gy+h)} ${P(gx,gz+d,gy+h)}" fill="${T}"/>`;
+}
+// 背面の壁に貼る額/メニュー（左壁=x面 / 奥壁=z面）
+function wallPanel(side,a,b,col){ // side:'x'(左壁,x=-4) or 'z'(奥壁,z=-4)
+  const P=(x,z,y)=>`${_IX(x,z).toFixed(1)},${_IY(x,z,y).toFixed(1)}`;
+  if(side==='z'){ const z=-3.92; return `<polygon points="${P(a,z,b)} ${P(a+1.4,z,b)} ${P(a+1.4,z,b+1.4)} ${P(a,z,b+1.4)}" fill="${col}"/>`; }
+  const x=-3.92; return `<polygon points="${P(x,a,b)} ${P(x,a+1.4,b)} ${P(x,a+1.4,b+1.4)} ${P(x,a,b+1.4)}" fill="${col}"/>`;
+}
+const isoArt=(inner)=>`<svg viewBox="0 0 128 104" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+function isoTable(gx,gz,wood){ return ibox(gx+0.55,gz+0.55,0,0.35,0.35,0.95,_shade(wood,0.7))+ibox(gx,gz,0.95,1.5,1.5,0.14,wood)
+  +ibox(gx-0.45,gz+0.45,0,0.5,0.5,0.55,_shade(wood,0.85))+ibox(gx+1.45,gz+0.45,0,0.5,0.5,0.55,_shade(wood,0.85)); }
+// 内装（部屋）：床・2壁・カウンター・テーブル/椅子・壁の額・メニュー
+function interiorArt(floor, wall, wood, accent){
+  let s='';
+  s+=ibox(-4,-4,-0.35,8,8,0.35,floor);                 // 床
+  s+=ibox(-4,-4,0,0.18,8,4.6,wall);                    // 左壁
+  s+=ibox(-4,-4,0,8,0.18,4.6,_shade(wall,0.92));       // 奥壁
+  // 壁の額（左壁）＆メニュー黒板（奥壁）
+  s+=wallPanel('x',-2.6,2.4,'#b5552f')+wallPanel('x',-0.4,2.4,'#caa24a')+wallPanel('x',1.8,2.4,'#7a4632');
+  s+=wallPanel('z',1.0,2.6,'#21251c')+wallPanel('z',2.6,2.6,'#21251c');
+  // カウンター（奥右）＋什器
+  s+=ibox(1.6,-3.6,0,1.6,5.6,1.7,wood);
+  s+=ibox(1.7,-1.0,1.7,1.4,2.2,0.5,_shade(accent,1.1)); // ディスプレイケース
+  s+=ibox(1.9,-3.2,1.7,0.8,0.8,0.7,'#cdd3da');          // マシン
+  // テーブル＆椅子（2x2）
+  for(const[gx,gz] of [[-2.6,-1.6],[-0.4,-1.6],[-2.6,1.0],[-0.4,1.0]]){
+    s+=isoTable(gx,gz,wood);
+    s+=ibox(gx-0.7,gz+0.5,0,0.55,0.55,0.55,_shade(wood,0.8));   // 椅子
+    s+=ibox(gx+1.6,gz+0.5,0,0.55,0.55,0.55,_shade(wood,0.8));
+  }
+  return isoArt(s);
+}
+// コーヒー器具（カウンター＋マシン）
+function machineArt(bodyCol, accent, heads, kind){
+  let s=ibox(-3.6,-2.2,-0.35,7.2,4.4,1.3,'#6f5236');     // カウンター
+  if(kind==='espresso'){
+    s+=ibox(-2.2,-1.3,1.3,4.4,2.6,1.7,bodyCol);          // 本体
+    s+=ibox(-2.2,-1.3,3.0,4.4,2.6,0.35,_shade(bodyCol,1.12)); // 天板
+    s+=ibox(-2.0,1.25,1.3,4.0,0.08,1.3,accent);          // フロントパネル(色)
+    for(let i=0;i<heads;i++){ const x=-1.6+i*(3.2/Math.max(1,heads-1||1));
+      s+=ibox(x,1.0,1.45,0.5,0.5,0.55,'#3a3f46'); s+=ibox(x+0.12,1.15,1.0,0.26,0.26,0.45,'#e9edf1'); }
+    s+=ibox(-1.8,-0.9,3.35,0.8,0.8,0.7,'#cdd3da');       // ホッパー
+    s+=ibox(1.4,-0.7,3.35,0.5,0.5,0.5,'#ffffff');        // カップ
+    s+=ibox(2.0,-0.7,3.35,0.5,0.5,0.5,'#ffffff');
+  } else if(kind==='siphon'){
+    s+=ibox(-2.6,-1.3,1.3,5.4,2.6,0.18,'#caa24a');       // 木の台
+    for(let i=0;i<4;i++){ const x=-2.2+i*1.4;
+      s+=ibox(x,0.0,1.48,0.9,0.9,1.0,'rgba(120,80,50,.55)'); // 下フラスコ（コーヒー）
+      s+=ibox(x+0.2,0.2,2.48,0.5,0.5,1.0,'rgba(180,210,235,.5)'); // 上ガラス
+      s+=ibox(x+0.25,0.25,2.0,0.4,0.4,0.5,'#3a2a1c');    // バーナー部
+    }
+    s+=ibox(-3.0,-1.6,1.3,5.6,0.12,2.0,'rgba(190,225,245,.25)'); // ガラスフード
+  } else {  // drip
+    s+=ibox(-1.6,-1.0,1.3,3.2,2.0,0.5,'#2a2f36');        // ベース
+    for(let i=0;i<3;i++){ const x=-1.2+i*1.2;
+      s+=ibox(x,-0.2,1.8,0.8,0.8,0.9,_shade(bodyCol,1.05)); s+=ibox(x+0.2,0.0,1.4,0.4,0.4,0.5,'#fff'); }
+    s+=ibox(-1.6,-1.0,1.8,0.4,2.0,1.6,bodyCol);          // 背パネル
+  }
+  return isoArt(s);
+}
+// 外装（店構え）：建物・窓・ドア・ストライプ日除け・看板
+function exteriorArt(wall, accent, kind){
+  let s=ibox(-3,-3,0,6,6,4.6, wall);
+  // 窓・ドア（前面 z=3）
+  const P=(x,z,y)=>`${_IX(x,z).toFixed(1)},${_IY(x,z,y).toFixed(1)}`;
+  const pane=(x,w,y,h,c)=>`<polygon points="${P(x,3.02,y)} ${P(x+w,3.02,y)} ${P(x+w,3.02,y+h)} ${P(x,3.02,y+h)}" fill="${c}"/>`;
+  s+=pane(-2.6,1.8,0.4,2.4,'#bfe3ff')+pane(0.8,1.8,0.4,2.4,'#bfe3ff');
+  s+=pane(-0.7,1.4,0,2.6,'#32261a');   // ドア
+  // 看板＋日除けストライプ
+  s+=`<polygon points="${P(-2.8,3.02,3.4)} ${P(2.8,3.02,3.4)} ${P(2.8,3.02,4.0)} ${P(-2.8,3.02,4.0)}" fill="#241a12"/>`;
+  for(let i=0;i<6;i++){ const x=-3+i; s+=ibox(x,2.7,3.0,1,0.5,0.16, i%2?'#f3ede2':accent); }
+  return isoArt(s);
+}
+// 出店/改装シート用：外装3種・内装4種・設備3種
+const EXT_ART = [ exteriorArt('#d8cdbb','#e0894a','std'), exteriorArt('#9a4f32','#caa24a','brick'), exteriorArt('#e7e6e2','#7fa0c0','marble') ];
+const INT_ART = [ interiorArt('#caa178','#c9b9a0','#caa86a','#8fae7a'), interiorArt('#6b6f78','#9aa0aa','#3a3f46','#5f7fb9'), interiorArt('#b86a9a','#e6c84a','#caa24a','#5fc0a0') ];
+const EQ_ART  = [ machineArt('#9aa0aa','#c95a4a',2,'drip'), machineArt('#dfe3ea','#c95a4a',2,'espresso'), machineArt('#3f4853','#caa24a',3,'espresso') ];
+const EQ_STARS = [ {q:2,pr:3}, {q:3,pr:3}, {q:5,pr:4} ];   // 品質 / 生産性
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
@@ -2542,6 +2630,14 @@ function buildCost(){
   return plot + (FAC_DEFS[buildType]?FAC_DEFS[buildType].build:0);
 }
 function openBuildSheet(lot){ buildLot=lot; buildInt=0; buildEq=0; buildExt=0; buildType='cafe'; renderBuild(); document.getElementById('modal-build').classList.add('show'); }
+// 大きめの選択カード（描き込みイラスト＋価格、設備は品質/生産性の★）
+function bigOptCards(label,arr,sel,key,art,stars){
+  return `<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
+    arr.map((o,i)=>`<button class="optbig ${i===sel?'sel':''}" data-${key}="${i}"><div class="oimg">${art(o,i)}</div>`+
+      `<div class="oinfo"><div class="onm">${o.name}</div>`+
+      (stars?`<div class="ostat"><div><div class="lbl">品質</div>${starRow(stars[i].q)}</div><div><div class="lbl">生産性</div>${starRow(stars[i].pr)}</div></div>`:'')+
+      `<div class="oprice">${o.cost?'¥'+o.cost.toLocaleString('ja-JP'):'無料'}</div></div></button>`).join('');
+}
 function renderBuild(){
   const t=buildLot.tenant, cityN=(CITIES.find(c=>c.id===buildLot.city)||{}).name||'';
   const first=!branches[0].built;
@@ -2559,16 +2655,14 @@ function renderBuild(){
   document.getElementById('build-title').textContent = buildType==='cafe' ? (first?'1号店を出店する':'カフェを出店する') : `${FAC_DEFS[buildType].label}を建設する`;
   const locArt={downtown:ART.downtown,college:ART.college,residential:ART.residential,tourist:ART.tourist};
   // 画像つきの選択タイル
-  const optRow=(label,arr,sel,key,art)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
-    `<div class="opt-row">`+arr.map((o,i)=>`<button class="opt ${i===sel?'sel':''}" data-${key}="${i}"><div class="ot">${art(o,i)}</div><div class="on">${o.name}</div><div class="oc">${o.cost?'+¥'+o.cost.toLocaleString('ja-JP'):'無料'}</div></button>`).join('')+`</div>`;
   const plotCard=`<div class="mcard"><div class="thumb">${locArt[t.loc]||ART.downtown}</div><div class="info"><div class="ttl">${t.cat}</div>`+
     `<div class="meta">${cityN}・交通量 ${t.traffic.toLocaleString('ja-JP')}人/日</div>`+
     `<div class="meta">${buildType==='cafe'?`賃料 ¥${t.rent.toLocaleString('ja-JP')}/日・`:''}物件取得 ¥${t.cost.toLocaleString('ja-JP')}</div></div></div>`;
   let detail;
   if(buildType==='cafe'){
-    detail = optRow('外装',EXTERIORS,buildExt,'bext',(o,i)=>EXT_ART[i]||EXT_ART[0])
-           + optRow('内装',INTERIORS,buildInt,'bint',(o)=>ART[o.vibe]||ART.cozy)
-           + optRow('設備（マシン）',EQUIP_SETS,buildEq,'beq',(o,i)=>EQ_ART[i]||EQ_ART[0]);
+    detail = bigOptCards('外装',EXTERIORS,buildExt,'bext',(o,i)=>EXT_ART[i]||EXT_ART[0])
+           + bigOptCards('内装',INTERIORS,buildInt,'bint',(o,i)=>INT_ART[i]||INT_ART[0])
+           + bigOptCards('設備（マシン）',EQUIP_SETS,buildEq,'beq',(o,i)=>EQ_ART[i]||EQ_ART[0], EQ_STARS);
   } else {
     const fa = {hq:ART.downtown, roastery:ART.tourist, farm:ART.residential, warehouse:ART.college}[buildType] || ART.downtown;
     detail = `<div class="mcard"><div class="thumb">${fa}</div><div class="info"><div class="ttl">${FAC_DEFS[buildType].label}</div><div class="meta">${FAC_DEFS[buildType].desc}</div><div class="meta">建設費 ¥${FAC_DEFS[buildType].build.toLocaleString('ja-JP')}（＋物件取得）</div></div></div>`;
@@ -2808,13 +2902,10 @@ function remodelChanges(){
   return { exC, inC, eqC, total:exC+inC+eqC, downtime:Math.min(2,(inC?1:0)+(eqC?1:0)) };
 }
 function renderRemodel(){
-  const optRow=(label,arr,sel,key,art,curIdx)=>`<div class="dash-h" style="border:0;padding-left:0">${label}</div>`+
-    `<div class="opt-row">`+arr.map((o,i)=>`<button class="opt ${i===sel?'sel':''}" data-${key}="${i}"><div class="ot">${art(o,i)}</div><div class="on">${o.name}${i===curIdx?'（現状）':''}</div><div class="oc">${o.cost?'¥'+o.cost.toLocaleString('ja-JP'):'—'}</div></button>`).join('')+`</div>`;
-  const curEq=EQUIP_SETS.findIndex(x=>x.mlv===equip.machine.lv);
   document.getElementById('remodel-body').innerHTML =
-    optRow('外装',EXTERIORS,rmExt,'rext',(o,i)=>EXT_ART[i]||EXT_ART[0], store.extIdx||0)
-  + optRow('内装',INTERIORS,rmInt,'rint',(o)=>ART[o.vibe]||ART.cozy, Math.max(0,INTERIORS.findIndex(x=>x.vibe===store.vibe)))
-  + optRow('設備（マシン）',EQUIP_SETS,rmEq,'req',(o,i)=>EQ_ART[i]||EQ_ART[0], curEq);
+    bigOptCards('外装',EXTERIORS,rmExt,'rext',(o,i)=>EXT_ART[i]||EXT_ART[0])
+  + bigOptCards('内装',INTERIORS,rmInt,'rint',(o,i)=>INT_ART[i]||INT_ART[0])
+  + bigOptCards('設備（マシン）',EQUIP_SETS,rmEq,'req',(o,i)=>EQ_ART[i]||EQ_ART[0], EQ_STARS);
   const ch=remodelChanges(), left=sim.money-ch.total;
   document.getElementById('remodel-cost').innerHTML =
     `改装費 <span class="gold">¥${ch.total.toLocaleString('ja-JP')}</span>${ch.downtime?` ／ 休業 <span style="color:var(--red)">${ch.downtime}日</span>`:' ／ 休業なし'} ／ 残り <span style="${left<0?'color:var(--red)':''}">¥${left.toLocaleString('ja-JP')}</span>`;
