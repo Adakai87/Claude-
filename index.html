@@ -1798,8 +1798,8 @@ function buildOverviewScene(){
   // ===== 道路システム（本家寄りの清潔グリッド：連続アスファルト帯＋白破線センター＋アーム口ゼブラ＋停止線）=====
   (function buildRoads(){
     const RC=[]; for(let k=-99;k<=99;k+=STEP) RC.push(k);   // {±11,±33,±55,±77,±99}
-    const HALF = (STEP-PLOT)/2 + 1.2;                       // 道路実効半幅 ≈ 4.2 → 幅~8.4（歩道を縮めた前提）
-    const RW   = HALF*2;                                    // 道路幅 ≈ 8.4
+    const HALF = (STEP-PLOT)/2;                             // 道路半幅 = 3（区画の隙間ぴったり＝建物にはみ出さない）
+    const RW   = HALF*2;                                    // 道路幅 = 6（隙間と一致）
     const LIM  = 99;
     const yRoad=0.015, yPatch=0.018, yMark=0.05, yZebra=0.055, yStop=0.056;
     const asphalt  = new THREE.MeshStandardMaterial({color:0x8e9296, roughness:0.96});
@@ -1824,20 +1824,26 @@ function buildOverviewScene(){
       for(let x=-markRange; x<markRange; x+=DASH+GAP){ const px=x+DASH/2; if(isNearInter(px)) continue; add(geoDashH, whiteD, px, yMark, c); }
       for(let z=-markRange; z<markRange; z+=DASH+GAP){ const pz=z+DASH/2; if(isNearInter(pz)) continue; add(geoDashV, whiteD, c, yMark, pz); }
     }
-    const STRIPES=5, SW=RW-1.4, stripeW=0.5, stripePitch=(RW-1.4)/5, zebraCenter=HALF+0.4, stripeLen=2.6;
-    const ZRC = RC.filter(v=>Math.abs(v)<=34);   // {±11,±33}（中央寄りに限定＝軽量化）
-    const geoBarH = new THREE.PlaneGeometry(stripeW, stripeLen);
-    const geoBarV = new THREE.PlaneGeometry(stripeLen, stripeW);
-    const geoStopH= new THREE.PlaneGeometry(SW+0.6, 0.5);
-    const geoStopV= new THREE.PlaneGeometry(0.5, SW+0.6);
-    function zebraBars(cx,cz,axis,sign){
-      for(let i=0;i<STRIPES;i++){ const off=-SW/2 + stripePitch*(i+0.5);
-        if(axis==='h') add(geoBarH, white, cx+off, yZebra, cz + sign*zebraCenter);
-        else           add(geoBarV, white, cx + sign*zebraCenter, yZebra, cz+off); }
-      if(axis==='h') add(geoStopH, white, cx, yStop, cz + sign*(zebraCenter+stripeLen/2+0.5));
-      else           add(geoStopV, white, cx + sign*(zebraCenter+stripeLen/2+0.5), yStop, cz);
+    // 横断歩道(ゼブラ)＋停止線：各交差点の4辺。縞は道路幅いっぱい（道路の縦/横コリドーは建物が無いので絶対にはみ出さない）
+    const ZRC = RC.filter(v=>Math.abs(v)<=34);   // {±11,±33}（中央寄り）
+    const CWH = HALF - 0.4;                       // ゼブラ横断半幅(=2.6) → 道路[±3]内
+    const NSTR = 4, sPitch = 0.6, sThick = 0.42, mouth = HALF + 0.25;   // mouth=3.25（交差点の口）
+    const cwX = new THREE.PlaneGeometry(CWH*2, sThick);  // 南北道路を横断（x方向に長い縞・z方向へ並ぶ）
+    const cwZ = new THREE.PlaneGeometry(sThick, CWH*2);  // 東西道路を横断
+    const stopX = new THREE.PlaneGeometry(CWH*2, 0.5);
+    const stopZ = new THREE.PlaneGeometry(0.5, CWH*2);
+    function crosswalk(cx,cz){
+      for(const sgn of [1,-1]){
+        for(let i=0;i<NSTR;i++){ const off=mouth+i*sPitch;
+          add(cwX, white, cx, yZebra, cz+sgn*off);   // 北/南口（縦道路を横断）
+          add(cwZ, white, cx+sgn*off, yZebra, cz);   // 東/西口（横道路を横断）
+        }
+        const so=mouth+NSTR*sPitch+0.2;
+        add(stopX, white, cx, yStop, cz+sgn*so);     // 停止線
+        add(stopZ, white, cx+sgn*so, yStop, cz);
+      }
     }
-    for(const cx of ZRC) for(const cz of ZRC){ zebraBars(cx,cz,'h',1); zebraBars(cx,cz,'h',-1); zebraBars(cx,cz,'v',1); zebraBars(cx,cz,'v',-1); }
+    for(const cx of ZRC) for(const cz of ZRC) crosswalk(cx,cz);
   })();
 
   // ===== 街路樹＆街灯：歩道エッジ沿いに等間隔（メッシュ上限つき）=====
