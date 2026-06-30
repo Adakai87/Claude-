@@ -171,6 +171,9 @@
   .mcard.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
   .thumb{width:58px; height:58px; border-radius:11px; overflow:hidden; flex-shrink:0; background:#11131c;}
   .thumb svg, .thumb .ethumb{width:100%; height:100%; display:block;}
+  /* 投資（銀行/証券/不動産/オークション/投資銀行）・施設の画面は画像を大きく見やすく */
+  #svc-body .thumb, #facility-body .thumb{width:84px; height:84px; border-radius:13px;}
+  #svc-body .mcard, #facility-body .mcard{align-items:center;}
   .ethumb{display:flex; align-items:center; justify-content:center;}
   .ethumb svg{width:80%; height:80%;}
   .mcard .info{flex:1; min-width:0;}
@@ -208,7 +211,7 @@
   /* 出店/改装：大きめの選択カード（描き込みイラスト） */
   .optbig{display:flex; gap:12px; align-items:center; border:1px solid var(--line); background:var(--panel2); border-radius:13px; padding:10px; margin-bottom:9px; cursor:pointer;}
   .optbig.sel{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
-  .optbig .oimg{width:118px; height:90px; flex-shrink:0; border-radius:10px; overflow:hidden; background:radial-gradient(120% 120% at 50% 30%, #1d1812, #100c08);}
+  .optbig .oimg{width:138px; height:106px; flex-shrink:0; border-radius:11px; overflow:hidden; background:radial-gradient(120% 120% at 50% 30%, #1d1812, #100c08);}
   .optbig .oimg svg{width:100%; height:100%; display:block;}
   .optbig .oinfo{flex:1; min-width:0;}
   .optbig .onm{font-weight:800; font-size:14.5px; line-height:1.25;}
@@ -259,6 +262,27 @@
   /* 施設（焙煎/農園/倉庫）画面のヒーロー */
   .fac-hero{width:100%; aspect-ratio:16/8; border-radius:14px; overflow:hidden; margin:2px 0 12px; background:radial-gradient(130% 120% at 50% 25%, #2a2218, #140e08);}
   .fac-hero svg{width:100%; height:100%; display:block;}
+  /* 幹部ダッシュボードのカード */
+  .execcard{border:1px solid var(--line); background:var(--panel2); border-radius:12px; padding:11px 12px; margin-bottom:9px;}
+  .execcard.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .exhead{display:flex; align-items:center; gap:8px;}
+  .exstatus{font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; background:#555; color:#1a140e;}
+  .exstatus.on{background:var(--accent);}
+  .exname{font-size:14px; flex:1; min-width:0;}
+  .exsal{font-size:11px; color:var(--sub);}
+  .exfx{margin:7px 0 4px;}
+  .exbadge{display:inline-block; font-size:11px; font-weight:700; color:var(--gold); background:#0003; border:1px solid var(--line); padding:3px 8px; border-radius:7px;}
+  .exlive{font-size:11.5px; color:var(--sub);}
+  .execcard.on .exlive{color:var(--green);}
+  /* 実績／ミッション一覧 */
+  .achrow{display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:9px 11px; margin-bottom:8px; opacity:.7;}
+  .achrow.done{opacity:1; border-color:var(--gold);}
+  .achico{font-size:22px; width:30px; text-align:center; flex-shrink:0;}
+  .achmain{flex:1; min-width:0;}
+  .achn{font-weight:800; font-size:13.5px;}
+  .achd{font-size:11px; color:var(--sub); margin-top:2px;}
+  .achr{font-size:12px; font-weight:800; color:var(--gold);}
+  .achok{color:var(--green);}
   /* 出店シートの画像つき選択タイル */
   .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
   .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
@@ -486,6 +510,16 @@
   </div>
 </div>
 
+<!-- 実績／ミッション -->
+<div class="modal" id="modal-ach">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-ach" aria-label="閉じる">×</button>
+    <h2 id="ach-title">実績・ミッション</h2>
+    <div id="ach-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot"><button class="btn ghost" data-close="modal-ach" style="width:100%">閉じる</button></div>
+  </div>
+</div>
+
 <!-- 施設（焙煎工房・農園・倉庫）の内部画面 -->
 <div class="modal" id="modal-facility">
   <div class="sheet flex-sheet">
@@ -688,8 +722,11 @@ const EQUIP_SETS = [ {name:'エントリー機',cost:0,mlv:1}, {name:'スタン�
 const RENT = { downtown:4000, college:2500, residential:2000, tourist:3500 }; // 立地別の日次家賃（テナント未設定時のフォールバック）
 const LOAN_RATE = 0.02;     // 借入の日利
 const INVEST_RATE = 0.015;  // 運用の日利
-const finance = { debt:0, invest:0 };
+const finance = { debt:0, invest:0, bond:0 };
+const BOND_RATE = 0.012;   // 社債のクーポン（借入より低利だが発行手数料3%）
 function takeLoan(n){ sim.money += n; finance.debt += n; }
+function issueBond(n){ const fee=Math.round(n*0.03); sim.money += n - fee; finance.bond += n; if(typeof dayStats!=='undefined') dayStats.capex += fee; }
+function redeemBond(n){ n=Math.min(n, finance.bond, sim.money); if(n<=0) return; sim.money-=n; finance.bond-=n; }
 function repayLoan(n){ const a=Math.min(n, finance.debt, sim.money); if(a>0){ sim.money-=a; finance.debt-=a; } }
 function deposit(n){ const a=Math.min(n, sim.money); if(a>0){ sim.money-=a; finance.invest+=a; } }
 function withdrawAll(){ sim.money += Math.round(finance.invest); finance.invest = 0; }
@@ -961,17 +998,23 @@ const loanRateEff   = () => Math.max(0.006, LOAN_RATE - (hasExec('cfo')?0.008:0)
 const devDiscount   = () => (hasExec('cto')?0.7:1) * (deptOn('products')?0.7:1);  // 商品開発部：開発費−30%
 const brandDecay    = () => hasExec('cmo')?1:3;
 // 会社（企業価値・IPO・配当）
-const company = { public:false, dividendsPaid:0, ipoRaised:0, acquired:0, buyback:0 };
+const company = { public:false, dividendsPaid:0, ipoRaised:0, acquired:0, buyback:0, vcDone:false, vcRaised:0 };
+function raiseVC(){
+  if(company.public || company.vcDone) return;
+  const raise = Math.round(Math.max(20000, valuation()*0.25));
+  company.vcDone = true; company.vcRaised = raise;
+  sim.money += raise; brand = Math.min(100, brand+3);   // VCのネットワーク効果でブランド微増
+}
 let lastProfit = 0;   // 直近の総損益（企業価値の素）
 function storeAssets(){ return branches.length*15000 + extraUsed*1200 + Object.values(equip).reduce((a,e)=>a+(e.lv-1)*2500,0); }
 function valuation(){
   return Math.max(0, Math.round(brand*2200 + playerShare()*150000 + Math.max(0,lastProfit)*200 + storeAssets() + finance.invest + company.acquired*14000 + company.buyback*0.45));
 }
-function netWorth(){ return sim.money + Math.round(finance.invest) + storeAssets() - finance.debt; }
+function netWorth(){ return sim.money + Math.round(finance.invest) + storeAssets() - finance.debt - finance.bond; }
 function doIPO(){
   if(company.public) return;
   if(valuation() < 120000) return;          // 上場には企業価値12万以上
-  const raised = Math.round(valuation()*0.3);
+  const raised = Math.round(valuation()*0.3 * (company.vcDone?0.85:1));   // VC出資済みは希薄化で調達減
   company.public = true; company.ipoRaised = raised;
   sim.money += raised; brand = Math.min(100, brand+10);
 }
@@ -979,6 +1022,34 @@ function payDividend(){
   if(sim.money < 10000) return;
   sim.money -= 10000; company.dividendsPaid += 10000;
   brand = Math.min(100, brand + 4);          // 株主・市場の評価UP
+}
+// ---- 実績／ミッション（条件達成で報酬：現金＋ブランド）----
+const ACHIEVEMENTS = [
+  {id:'open1',   name:'はじめての一杯',   desc:'1号店を出店する',            reward:3000,  check:()=>branches[0].built},
+  {id:'menu8',   name:'豊富なメニュー',   desc:'メニューを8品に増やす',       reward:6000,  check:()=>MENU.length>=8},
+  {id:'brand50', name:'人気店',          desc:'ブランド力 50 到達',          reward:6000,  check:()=>brand>=50},
+  {id:'brand80', name:'街の名店',        desc:'ブランド力 80 到達',          reward:14000, check:()=>brand>=80},
+  {id:'cash100k',name:'まとまった資金',   desc:'現金 ¥100,000 到達',          reward:5000,  check:()=>sim.money>=100000},
+  {id:'cash500k',name:'富豪',            desc:'現金 ¥500,000 到達',          reward:25000, check:()=>sim.money>=500000},
+  {id:'hq',      name:'本社設立',        desc:'オフィス（本社）を契約',       reward:8000,  check:()=>FACILITY.hq},
+  {id:'depts3',  name:'組織化',          desc:'部署を3つ設置',               reward:12000, check:()=>Object.values(office.dept).filter(Boolean).length>=3},
+  {id:'allfac',  name:'垂直統合',        desc:'焙煎・農園・倉庫をすべて建設',  reward:15000, check:()=>FACILITY.roastery&&FACILITY.farm&&FACILITY.warehouse},
+  {id:'stores3', name:'チェーン展開',     desc:'店舗を3つに',                 reward:10000, check:()=>branches.filter(b=>b.built).length>=3},
+  {id:'stores5', name:'フランチャイズ',   desc:'店舗を5つに',                 reward:25000, check:()=>branches.filter(b=>b.built).length>=5},
+  {id:'cities2', name:'多都市展開',       desc:'2都市に出店',                 reward:12000, check:()=>new Set(branches.filter(b=>b.built).map(b=>b.city)).size>=2},
+  {id:'mna',     name:'買収王',          desc:'競合を1社買収（M&A）',        reward:15000, check:()=>company.acquired>=1},
+  {id:'ipo',     name:'上場企業',        desc:'IPO（株式上場）を実施',        reward:30000, check:()=>company.public},
+];
+let achieved = [];   // 達成済みのid配列
+function checkAchievements(){
+  let any=false;
+  for(const a of ACHIEVEMENTS){
+    if(achieved.includes(a.id)) continue;
+    let ok=false; try{ ok=a.check(); }catch(e){}
+    if(ok){ achieved.push(a.id); sim.money+=a.reward; brand=Math.min(100,brand+2); any=true;
+      if(typeof miniToast==='function') miniToast(`🏆 実績達成「${a.name}」 +¥${a.reward.toLocaleString('ja-JP')}`); }
+  }
+  return any;
 }
 // 俯瞰マップにデザイン性のあるカフェ建物（屋根・ストライプ日除け・ドア・窓・看板・カップ看板）
 const cafeCups = [];
@@ -1251,6 +1322,21 @@ let player;                       // プレイヤー（店長）
 let storeFloor;                   // 床（タップ移動のレイキャスト対象）
 let moveMarker;                   // タップ先マーカー
 let counterMesh;                  // 注文カウンター（レジ）
+let storeWallMat, storeDoorMat;   // 内装の雰囲気で色替えするマテリアル
+// 内装の雰囲気（vibe）と外装でストアの3Dの色を切り替える
+const VIBE_3D = {
+  cozy: { floor:0x6b4f36, wall:0x8a6c4a, counter:0x4a3b2a, door:0xcaa24a, bg:0x1d160f },
+  chic: { floor:0x39343d, wall:0x2f2b33, counter:0x211d26, door:0xc9a24a, bg:0x14121a },
+  pop:  { floor:0x9a7a52, wall:0xc56a6a, counter:0x4f8a6a, door:0xffce4d, bg:0x231410 },
+};
+function applyStoreVibe(){
+  const p = VIBE_3D[store.vibe] || VIBE_3D.cozy;
+  if(storeFloor) storeFloor.material.color.setHex(p.floor);
+  if(storeWallMat) storeWallMat.color.setHex(p.wall);
+  if(counterMesh) counterMesh.material.color.setHex(p.counter);
+  if(storeDoorMat) storeDoorMat.color.setHex(p.door);
+  if(storeScene){ storeScene.background = new THREE.Color(p.bg); if(storeScene.fog) storeScene.fog.color.setHex(p.bg); }
+}
 const customers = [];             // 客リスト
 
 // ---- 注文カウンターの行列 ----
@@ -1285,6 +1371,7 @@ function buildStoreScene(){
 
   // 壁（3面・正面は開口＝入口側）
   const wallMat = new THREE.MeshStandardMaterial({ color:0x8a6c4a });
+  storeWallMat = wallMat;
   const wallH = 3;
   const mkWall = (w,h,d,x,y,z)=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; scene.add(m); };
   mkWall(STORE.w, wallH, 0.3, 0, wallH/2, -STORE.d/2);          // 奥
@@ -1307,6 +1394,7 @@ function buildStoreScene(){
 
   // 入口マット（手前中央）
   const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.6), new THREE.MeshStandardMaterial({ color:0xcaa24a }));
+  storeDoorMat = door.material;
   door.rotation.x=-Math.PI/2; door.position.set(0,0.01, STORE.d/2 - 0.9);
   scene.add(door);
 
@@ -2198,7 +2286,7 @@ document.getElementById('btn-close').onclick = ()=>{
 };
 // 日次PL（営業損益）
 function plRent(){ return Math.round((store.rentDaily || RENT[store.location] || 0) * (1 - lobbyRentCut())); }
-function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
+function plInterest(){ return Math.round(finance.debt*loanRateEff() + finance.bond*BOND_RATE); }
 function plBreakdown(){
   const tips = dayStats.tips;
   const sales = dayStats.revenue - tips;
@@ -2751,8 +2839,8 @@ function renderManage(){
     const rent = plRent();
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div>
-       <div class="kpi"><div class="v" style="color:var(--red)">¥${finance.debt.toLocaleString('ja-JP')}</div><div class="l">借入残（日利2%）</div></div>
-       <div class="kpi"><div class="v green">¥${Math.round(finance.invest).toLocaleString('ja-JP')}</div><div class="l">運用中（日利1.5%）</div></div>
+       <div class="kpi"><div class="v" style="color:var(--red)">¥${(finance.debt+finance.bond).toLocaleString('ja-JP')}</div><div class="l">有利子負債（借入${finance.debt>0?'+社債':''}）</div></div>
+       <div class="kpi"><div class="v green">¥${Math.round(finance.invest).toLocaleString('ja-JP')}</div><div class="l">運用中（日利${(investRateEff()*100).toFixed(1)}%）</div></div>
        <div class="kpi"><div class="v">¥${rent.toLocaleString('ja-JP')}/日</div><div class="l">家賃（${LOC_JP[store.location]}）</div></div>
      </div>`;
     h += `<div class="dash-h">借入 / 返済</div>`;
@@ -2760,11 +2848,20 @@ function renderManage(){
       <button class="mbtn" data-loan="10000">+¥1万</button><button class="mbtn" data-loan="30000">+¥3万</button></div>`;
     h += `<div class="mrow"><div class="nm">返済する<div class="sub2">借入残・現金の範囲で返済</div></div>
       <button class="mbtn" data-repay="10000" ${finance.debt<=0||sim.money<=0?'disabled':''}>¥1万 返済</button></div>`;
+    h += `<div class="dash-h">社債の発行（中期・低利1.2%／発行手数料3%）</div>`;
+    h += `<div class="mrow"><div class="nm">社債を発行<div class="sub2">借入より低金利で大型調達（残高 ¥${finance.bond.toLocaleString('ja-JP')}）</div></div>
+      <button class="mbtn" data-bond="50000">¥5万</button><button class="mbtn" data-bond="100000">¥10万</button></div>`;
+    h += `<div class="mrow"><div class="nm">社債を償還<div class="sub2">残高・現金の範囲で買い戻し</div></div>
+      <button class="mbtn" data-redeem="20000" ${finance.bond<=0||sim.money<=0?'disabled':''}>¥2万 償還</button></div>`;
+    h += `<div class="dash-h">エクイティ（増資）</div>`;
+    if(company.public){ h += `<div class="note" style="margin-top:0">上場済み。増資は投資銀行の自社株買い・配当を利用してください。</div>`; }
+    else if(company.vcDone){ h += `<div class="note" style="margin-top:0">VC出資 実施済み（調達 ¥${company.vcRaised.toLocaleString('ja-JP')}）。上場時の調達は希薄化で15%減になります。</div>`; }
+    else { h += `<div class="mrow"><div class="nm">ベンチャー出資を受ける<div class="sub2">企業価値の25%（約¥${Math.round(Math.max(20000,valuation()*0.25)).toLocaleString('ja-JP')}）を一度だけ調達。返済不要だが株式希薄化</div></div><button class="mbtn" data-vc="1">出資受入</button></div>`; }
     h += `<div class="dash-h">投資（運用）</div>`;
-    h += `<div class="mrow"><div class="nm">余剰資金を運用<div class="sub2">毎日+1.5%で増える</div></div>
+    h += `<div class="mrow"><div class="nm">余剰資金を運用<div class="sub2">毎日+${(investRateEff()*100).toFixed(1)}%で増える</div></div>
       <button class="mbtn" data-deposit="10000" ${sim.money<10000?'disabled':''}>¥1万 預入</button>
       <button class="mbtn" data-withdraw="1" ${finance.invest<=0?'disabled':''}>全額引出</button></div>`;
-    h += `<div class="note">毎日の閉店時に家賃と借入利息が引かれ、運用は+1.5%増えます。日次の損益は閉店サマリーで確認できます。</div>`;
+    h += `<div class="note">調達手段：①借入（即時・高利2%）②社債（低利1.2%・手数料）③増資（返済不要・希薄化）。閉店時に利息・クーポンが引かれます。</div>`;
   } else if(mtab==='marketing'){
     if(!deptOn('marketing')){ el.innerHTML = `<div class="note" style="margin-top:0">🔒 マーケティングには本社に<b>マーケ部</b>の設置が必要です。<br><br>会社タブ→「部署を管理」からマーケ部を追加してください。</div>`; return; }
     h += `<div class="dash-kpis">
@@ -2780,10 +2877,24 @@ function renderManage(){
     if(!FACILITY.hq){
       h += `<div class="note" style="margin-top:0">🔒 幹部（C-level）の招へいは <b>本社</b> を建てると解放されます。俯瞰マップの空きテナントをタップ→「本社」を建設してください。</div>`;
     } else {
-      h += `<div class="dash-h">役員（C-level）｜雇うと報酬が固定費に</div>`;
+      const hiredN = Object.values(execRoles).filter(e=>e.hired).length;
+      h += `<div class="dash-kpis"><div class="kpi"><div class="v gold">${hiredN}/4</div><div class="l">在籍役員</div></div><div class="kpi"><div class="v" style="color:var(--red)">¥${execSalaries().toLocaleString('ja-JP')}/日</div><div class="l">役員報酬</div></div></div>`;
+      // 役員ごとの「現在の効果」を数値で可視化
+      const cooDelta = Math.round(branchesDailyNet() - branchesDailyNet()/1.2);
+      const cfoDelta = Math.round(finance.invest*0.01);
+      const fx = {
+        coo:{ stat:'支店純益 ×1.20', live: hasExec('coo')?`現在 +¥${Math.max(0,cooDelta).toLocaleString('ja-JP')}/日`:'支店があるほど効果大' },
+        cfo:{ stat:`運用利率 1.5% → 2.5%`, live: hasExec('cfo')?`運用益 +¥${cfoDelta.toLocaleString('ja-JP')}/日・借入金利↓`:'運用残高・借入があるほど有利' },
+        cmo:{ stat:'マーケ効果 ×1.40', live: hasExec('cmo')?`ブランド減衰 3 → 1/日`:'ブランド維持＆販促が強化' },
+        cto:{ stat:'開発費 −30%・品質指数 +0.15', live: hasExec('cto')?`品質指数 現在 ${qualityLevel().toFixed(2)}`:'新メニュー開発と品質に寄与' },
+      };
+      h += `<div class="dash-h">役員（C-level）｜効果ダッシュボード</div>`;
       for(const [k,e] of Object.entries(execRoles)){
-        h += mcard(ART.staff, e.name, `${e.desc}・報酬¥${e.salary.toLocaleString('ja-JP')}/日`,
-          `<button class="mbtn ${e.hired?'on':''}" data-exec="${k}">${e.hired?'契約中':'招へい'}</button>`, e.hired);
+        const on=e.hired, f=fx[k];
+        h += `<div class="execcard ${on?'on':''}"><div class="exhead"><span class="exstatus ${on?'on':''}">${on?'契約中':'未契約'}</span><b class="exname">${e.name}</b><span class="exsal">¥${e.salary.toLocaleString('ja-JP')}/日</span></div>`+
+             `<div class="exfx"><span class="exbadge">${f.stat}</span></div>`+
+             `<div class="exlive">${on?'✓ ':''}${f.live}</div>`+
+             `<button class="mbtn ${on?'on':''}" data-exec="${k}" style="width:100%;margin-top:7px">${on?'解任する':'招へいする'}</button></div>`;
       }
       h += `<div class="note">役員は会社全体に効く強力なボーナス。報酬は毎日の閉店PLに「役員報酬」として計上されます。</div>`;
     }
@@ -2797,6 +2908,7 @@ function renderManage(){
     h += mcard(logoBadge(profile.logo,58), profile.brandName, 'オーナー：'+profile.owner+'｜'+sim.day+'日目', '<span class="sub2">あなたの会社</span>');
     const dcount=DEPT_DEFS.filter(d=>office.dept[d.key]).length;
     h += `<div class="mcard"><div class="thumb">${OFFICE_ART}</div><div class="info"><div class="ttl">オフィス（本社）</div><div class="meta">${office.maxFloors}フロア・${office.sqft.toLocaleString('en-US')}sqft／部署 ${dcount}/${DEPT_DEFS.length}</div></div><div class="act"><button class="mbtn" data-openoffice="1">部署を管理</button></div></div>`;
+    h += `<div class="mcard"><div class="thumb" style="font-size:30px;display:flex;align-items:center;justify-content:center">🏆</div><div class="info"><div class="ttl">実績・ミッション</div><div class="meta">達成 ${achieved.length}/${ACHIEVEMENTS.length}・目標達成で報酬</div></div><div class="act"><button class="mbtn" data-openach="1">一覧を見る</button></div></div>`;
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">¥${val.toLocaleString('ja-JP')}</div><div class="l">企業価値</div></div>
        <div class="kpi"><div class="v">${company.public?'上場済':'未上場'}</div><div class="l">ステータス</div></div>
@@ -2804,7 +2916,7 @@ function renderManage(){
        <div class="kpi"><div class="v">${Math.round(brand)}</div><div class="l">ブランド</div></div></div>`;
     h += `<div class="dash-h">貸借（B/S）</div>`;
     h += `<div class="mrow"><div class="nm">資産（現金＋運用＋店舗）</div><span>¥${assets.toLocaleString('ja-JP')}</span></div>`;
-    h += `<div class="mrow"><div class="nm">負債（借入）</div><span class="${finance.debt>0?'low':''}">¥${finance.debt.toLocaleString('ja-JP')}</span></div>`;
+    h += `<div class="mrow"><div class="nm">負債（借入＋社債）</div><span class="${(finance.debt+finance.bond)>0?'low':''}">¥${(finance.debt+finance.bond).toLocaleString('ja-JP')}</span></div>`;
     h += `<div class="mrow"><div class="nm"><b>純資産（資本）</b></div><b>¥${nw.toLocaleString('ja-JP')}</b></div>`;
     h += `<div class="dash-h">資本政策</div>`;
     if(!deptOn('finance')){
@@ -2823,6 +2935,7 @@ function renderManage(){
 document.getElementById('manage-body').addEventListener('click', e=>{
   const t = e.target.closest('button'); if(!t) return;
   if(t.dataset.openoffice){ openOffice(); return; }
+  if(t.dataset.openach){ openAch(); return; }
   if(t.dataset.price){
     const [id,dir] = t.dataset.price.split('|'); const m = MENU.find(x=>x.id===id);
     if(m){ m.price = Math.max(100, m.price + (dir==='+'?50:-50)); recomputePriceLevel(); }
@@ -2845,7 +2958,7 @@ document.getElementById('manage-body').addEventListener('click', e=>{
   } else if(t.dataset.loc){
     if(store.location!==t.dataset.loc && sim.money>=RELOCATE_COST){ sim.money-=RELOCATE_COST; dayStats.capex+=RELOCATE_COST; store.location=t.dataset.loc; store.rentDaily=RENT[t.dataset.loc]||0; store.traffic={downtown:11000,college:8000,residential:5000,tourist:10000}[t.dataset.loc]||7000; }
   } else if(t.dataset.vibe){
-    if(store.vibe!==t.dataset.vibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; dayStats.capex+=RENOVATE_COST; store.vibe=t.dataset.vibe; }
+    if(store.vibe!==t.dataset.vibe && sim.money>=RENOVATE_COST){ sim.money-=RENOVATE_COST; dayStats.capex+=RENOVATE_COST; store.vibe=t.dataset.vibe; applyStoreVibe(); }
   } else if(t.dataset.loan){
     takeLoan(+t.dataset.loan);
   } else if(t.dataset.repay){
@@ -2854,6 +2967,12 @@ document.getElementById('manage-body').addEventListener('click', e=>{
     deposit(+t.dataset.deposit);
   } else if(t.dataset.withdraw){
     withdrawAll();
+  } else if(t.dataset.bond){
+    issueBond(+t.dataset.bond);
+  } else if(t.dataset.redeem){
+    redeemBond(+t.dataset.redeem);
+  } else if(t.dataset.vc){
+    raiseVC();
   } else if(t.dataset.hire!==undefined){
     const i=+t.dataset.hire; if(candidates[i] && hireStaff(candidates[i])) candidates[i]=makeCandidate();
   } else if(t.dataset.fire!==undefined){
@@ -2993,7 +3112,7 @@ document.getElementById('build-go').onclick = ()=>{
     const b=branches[0];
     b.built=true; b.loc=lot.tenant.loc; b.city=lot.city; b.x=lot.x; b.z=lot.z; b.level=1; b.name='本店';
     b.mesh=makeCafeStore(lot.x, lot.z, 0xc9602e);
-    store.location=lot.tenant.loc; store.vibe=vibe; store.cityName=city.name; store.cityMul=city.mul;
+    store.location=lot.tenant.loc; store.vibe=vibe; store.cityName=city.name; store.cityMul=city.mul; applyStoreVibe();
     store.rentDaily=lot.tenant.rent; store.traffic=lot.tenant.traffic; equip.machine.lv=mlv;
     brand=Math.min(100, brand+extB); store.extIdx=buildExt; recomputePriceLevel();
     built=b;
@@ -3212,6 +3331,7 @@ document.getElementById('remodel-go').onclick = ()=>{
   sim.money-=ch.total; dayStats.capex+=ch.total;
   brand = Math.min(100, Math.max(0, brand + (EXTERIORS[rmExt].brand - (EXTERIORS[store.extIdx||0].brand||0))));
   store.extIdx=rmExt; store.vibe=INTERIORS[rmInt].vibe; equip.machine.lv=Math.max(equip.machine.lv, EQUIP_SETS[rmEq].mlv);
+  applyStoreVibe();
   store.remodelDays = ch.downtime; recomputePriceLevel();
   document.getElementById('modal-remodel').classList.remove('show');
   updateHUD(); saveGame();
@@ -3267,6 +3387,21 @@ function renderOffice(){
             <span class="dept-cap">CAPACITY ${d.cap} desks</span>
           </div>
         </div></div>`;
+  });
+  el.innerHTML=h;
+}
+// ===== 実績／ミッション =====
+function openAch(){ checkAchievements(); renderAch(); document.getElementById('modal-ach').classList.add('show'); }
+function renderAch(){
+  const el=document.getElementById('ach-body'); const done=achieved.length, total=ACHIEVEMENTS.length;
+  const reward=ACHIEVEMENTS.filter(a=>achieved.includes(a.id)).reduce((s,a)=>s+a.reward,0);
+  let h=`<div class="dash-kpis"><div class="kpi"><div class="v gold">${done}/${total}</div><div class="l">達成数</div></div><div class="kpi"><div class="v green">¥${reward.toLocaleString('ja-JP')}</div><div class="l">獲得報酬 累計</div></div></div>`;
+  h+=`<div class="note" style="margin-top:0">目標を達成すると自動で報酬（現金＋ブランド）がもらえます。</div>`;
+  h+=`<div class="dash-h">実績一覧</div>`;
+  // 未達成を上に、達成済みを下に
+  const order=[...ACHIEVEMENTS].sort((a,b)=> (achieved.includes(a.id)?1:0)-(achieved.includes(b.id)?1:0));
+  order.forEach(a=>{ const ok=achieved.includes(a.id);
+    h+=`<div class="achrow ${ok?'done':''}"><div class="achico">${ok?'🏆':'🔒'}</div><div class="achmain"><div class="achn">${a.name}</div><div class="achd">${a.desc}</div></div><div class="achr">${ok?'<span class="achok">達成</span>':'+¥'+a.reward.toLocaleString('ja-JP')}</div></div>`;
   });
   el.innerHTML=h;
 }
@@ -3458,8 +3593,9 @@ function gameState(){
     equip:Object.fromEntries(Object.entries(equip).map(([k,e])=>[k,e.lv])),
     extraUsed, beans:beans.grade, brand,
     execs:Object.fromEntries(Object.entries(execRoles).map(([k,e])=>[k,e.hired])),
-    finance:{ debt:finance.debt, invest:finance.invest },
-    company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised, acquired:company.acquired, buyback:company.buyback },
+    finance:{ debt:finance.debt, invest:finance.invest, bond:finance.bond },
+    company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised, acquired:company.acquired, buyback:company.buyback, vcDone:company.vcDone, vcRaised:company.vcRaised },
+    achieved,
     lastProfit, spawnAccum, mgrCandidates,
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
@@ -3487,13 +3623,15 @@ function loadGame(slot){
   sim.money=d.money; sim.day=d.day; sim.minutes=d.minutes;
   sim.custToday=d.custToday||0; sim.revToday=d.revToday||0; sim.servedToday=d.servedToday||0; sim.lostToday=d.lostToday||0;
   Object.assign(store, d.store||{});
+  applyStoreVibe();
   if(d.menu){ MENU.length=0; d.menu.forEach(m=>MENU.push(m)); }
   for(const k in (d.materials||{})) if(materials[k]) materials[k].stock=d.materials[k];
   for(const k in (d.equip||{}))     if(equip[k]) equip[k].lv=d.equip[k];
   for(const k in (d.execs||{}))     if(execRoles[k]) execRoles[k].hired=d.execs[k];
   beans.grade=d.beans||1; brand=(d.brand!=null?d.brand:20);
-  if(d.finance){ finance.debt=d.finance.debt; finance.invest=d.finance.invest; }
-  if(d.company){ company.public=d.company.public; company.dividendsPaid=d.company.dividendsPaid; company.ipoRaised=d.company.ipoRaised; company.acquired=d.company.acquired||0; company.buyback=d.company.buyback||0; }
+  if(d.finance){ finance.debt=d.finance.debt; finance.invest=d.finance.invest; finance.bond=d.finance.bond||0; }
+  if(d.company){ company.public=d.company.public; company.dividendsPaid=d.company.dividendsPaid; company.ipoRaised=d.company.ipoRaised; company.acquired=d.company.acquired||0; company.buyback=d.company.buyback||0; company.vcDone=!!d.company.vcDone; company.vcRaised=d.company.vcRaised||0; }
+  achieved = Array.isArray(d.achieved)?d.achieved:[];
   lastProfit=d.lastProfit||0; spawnAccum=d.spawnAccum||0;
   Object.assign(loyalty, d.loyalty||{});
   if(d.totalStats) totalStats=d.totalStats;
@@ -3664,7 +3802,9 @@ document.getElementById('set-reset').onclick = ()=>{ if(confirm('このデータ
 // =====================================================================
 //  HUD更新
 // =====================================================================
+let _inHUD=false;
 function updateHUD(){
+  if(!_inHUD){ _inHUD=true; try{ checkAchievements(); }catch(e){} _inHUD=false; }
   document.getElementById('s-money').textContent = '¥'+sim.money.toLocaleString('ja-JP');
   document.getElementById('s-day').textContent = sim.day+'日目';
   document.getElementById('s-cust').textContent = sim.servedToday+'/'+sim.custToday;
