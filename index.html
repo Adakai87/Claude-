@@ -1302,6 +1302,49 @@ const activeCam = () => sim.mode==='store' ? camera : overCam;
 let storeScene, overScene;
 
 // ---- ライト共通生成 ----
+// =====================================================================
+//  時間帯（昼/夕/夜）表現  — ゲーム内時刻 sim.minutes に自動連動
+//  昼(t=0)は現状値に完全一致＝明るい昼景を保持。夜(t=1)で窓明かり＋街灯が灯る。
+//  再ビルド不要・毎フレーム色/強度の代入のみ。
+// =====================================================================
+const TOD = { litMats:[], lampMats:[], refs:null, lastT:-1, manual:null };
+function todPhase(minutes){
+  const h = ((minutes/60) % 24 + 24) % 24;
+  const s = x => x<=0?0 : x>=1?1 : x*x*(3-2*x);
+  if(h>=5  && h<16)    return 0;
+  if(h>=16 && h<18.5)  return 0.55*s((h-16)/2.5);
+  if(h>=18.5 && h<20)  return 0.55+0.45*s((h-18.5)/1.5);
+  if(h>=20 || h<4.5)   return 1;
+  return 1 - s((h-4.5)/0.5);
+}
+const _todA=new THREE.Color(), _todB=new THREE.Color();
+function todLerpC(out, t, day, dusk, night){
+  if(t<=0.55){ _todA.setHex(day);  _todB.setHex(dusk);  return out.copy(_todA).lerp(_todB, t/0.55); }
+  _todA.setHex(dusk); _todB.setHex(night); return out.copy(_todA).lerp(_todB, (t-0.55)/0.45);
+}
+function todLerpN(t, a, b, c){ return t<=0.55 ? a+(b-a)*(t/0.55) : b+(c-b)*((t-0.55)/0.45); }
+function applyTimeOfDay(t){
+  if(Math.abs(t - TOD.lastT) < 0.012) return;
+  TOD.lastT = t;
+  const r = TOD.refs; if(!r) return;
+  todLerpC(r.bg,        t, 0xbfe3f5, 0xf3a86b, 0x1b2740);
+  todLerpC(r.fog.color, t, 0xd8e3ea, 0xe7b07a, 0x223049);
+  r.fog.near = todLerpN(t, 210, 200, 150);
+  r.fog.far  = todLerpN(t, 470, 455, 420);
+  todLerpC(r.dir.color, t, 0xffd9a0, 0xff9d5a, 0x6f86c4);
+  r.dir.intensity = todLerpN(t, 1.0*1.15, 0.85, 0.30);
+  todLerpC(r.hemi.color,       t, 0xffe6c4, 0xffb98a, 0x2c3a5c);
+  todLerpC(r.hemi.groundColor, t, 0x3a2a1e, 0x4a2f22, 0x141a26);
+  r.hemi.intensity = todLerpN(t, 0.9*1.15, 0.7, 0.42);
+  todLerpC(r.fill.color, t, 0x9fb6d8, 0xb6a6c8, 0x6f86c4);
+  r.fill.intensity = todLerpN(t, 0.18*1.15, 0.18, 0.30);
+  const litScale  = todLerpN(t, 0.05, 0.35, 1.0);
+  for(const w of TOD.litMats)  w.m.emissiveIntensity = w.base * litScale;
+  const lampScale = todLerpN(t, 0.15, 0.6, 1.3);
+  for(const L of TOD.lampMats) L.m.emissiveIntensity = L.base * lampScale;
+}
+window.setTimeOfDay = (t)=>{ TOD.manual = (t==null?null:Math.max(0,Math.min(1,t))); TOD.lastT=-1; };
+
 function addLights(scene, intensity=1){
   const hemi = new THREE.HemisphereLight(0xffe6c4, 0x3a2a1e, 0.9*intensity);
   scene.add(hemi);
@@ -1314,6 +1357,7 @@ function addLights(scene, intensity=1){
   const fill = new THREE.DirectionalLight(0x9fb6d8, 0.18*intensity);
   fill.position.set(-8, 6, -6);
   scene.add(fill);
+  return { hemi, dir, fill };   // 俯瞰の時間帯制御用に参照を返す
 }
 
 // =====================================================================
@@ -1478,7 +1522,9 @@ function buildOverviewScene(){
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xbfe3f5);
   scene.fog = new THREE.Fog(0xd8e3ea, 210, 470);
-  addLights(scene, 1.15);
+  TOD.litMats.length = 0; TOD.lampMats.length = 0; TOD.lastT = -1;   // 再ビルド時リセット
+  const _L = addLights(scene, 1.15);
+  TOD.refs = { dir:_L.dir, hemi:_L.hemi, fill:_L.fill, fog:scene.fog, bg:scene.background };
 
   // 水面 → 海岸の芝 → グレーの舗装（街全体の地面＝道路/歩道）
   const water = new THREE.Mesh(new THREE.PlaneGeometry(560,560), new THREE.MeshStandardMaterial({ color:0x1fa8c6, roughness:0.35 }));
@@ -1540,7 +1586,9 @@ function buildOverviewScene(){
       m.emissiveMap = t;
       const warm = Math.random() < 0.7;
       m.emissive = new THREE.Color(warm ? 0xffb155 : 0xcfe2ff);
-      m.emissiveIntensity = warm ? (0.40 + Math.random()*0.15) : (0.30 + Math.random()*0.12);
+      const base = warm ? (0.40 + Math.random()*0.15) : (0.30 + Math.random()*0.12);
+      m.emissiveIntensity = base * 0.05;       // 初期は昼=ほぼ消灯
+      TOD.litMats.push({ m, base });           // applyTimeOfDayが毎フレ強度を設定
     }
     return m;
   }
@@ -1799,6 +1847,7 @@ function buildOverviewScene(){
     const poleMat = new THREE.MeshStandardMaterial({color:0x4a4f57, roughness:0.7});
     const headGeo = new THREE.SphereGeometry(0.22,6,5);
     const headMat = new THREE.MeshStandardMaterial({color:0xfff2cf, emissive:0xffe49a, emissiveIntensity:0.9});
+    TOD.lampMats.push({ m: headMat, base: 0.9 });   // 1材を全街灯で共有→1要素で全灯ランプ
     function lamp(x,z){
       const p=new THREE.Mesh(poleGeo,poleMat); p.position.set(x,1.3,z); p.castShadow=true; scene.add(p);
       const h=new THREE.Mesh(headGeo,headMat); h.position.set(x,2.7,z); scene.add(h);
@@ -4110,6 +4159,8 @@ function animate(){
       if(c.onX){ c.g.position.set(c.p,0,c.road+c.lane); c.g.rotation.y = c.dir>0?Math.PI/2:-Math.PI/2; }
       else     { c.g.position.set(c.road+c.lane,0,c.p); c.g.rotation.y = c.dir>0?0:Math.PI; }
     }
+    const _t = (TOD.manual!=null) ? TOD.manual : todPhase(sim.minutes);
+    applyTimeOfDay(_t);   // 時間帯を俯瞰シーンへ適用（軽量・再ビルドなし）
   }
   updateMapMarkers();
 
