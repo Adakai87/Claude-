@@ -719,7 +719,8 @@ const FAC_DEFS = {
 };
 const FACILITY = { hq:false, roastery:false, farm:false, warehouse:false };
 // ---- オフィス（本社）：契約後、フロアに「部署」を追加して会社機能を解放 ----
-const office = { leased:false, maxFloors:5, sqft:4320, dept:{} };  // dept[key]=true
+const office = { leased:false, floors:2, maxFloors:5, sqft:4320, dept:{} };  // floors=契約済みフロア数（=部署スロット数）
+const floorCost = () => Math.round(16000 + office.floors*9000);  // 次のフロアの増設費
 const DEPT_DEFS = [
   {key:'hr',        name:'人事部',     en:'Human Resources', color:'#5f9e6a', cap:16,
    desc:'健康保険・退職金などの福利厚生を全スタッフに提供。モラルと定着率が上がり離職を防ぐ。'},
@@ -741,8 +742,9 @@ const SERVICE_DEFS = {
   agency:     { label:'広告代理店', color:0x7a6fb0 },
   auction:    { label:'オークションハウス', color:0x7a3a4a },
   lobby:      { label:'ロビー会社',          color:0xcabf9a },
+  ibank:      { label:'投資銀行',            color:0x2f3a48 },
 };
-const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34}, {key:'auction',x:-58,z:2}, {key:'lobby',x:58,z:2} ];
+const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34}, {key:'auction',x:-58,z:2}, {key:'lobby',x:58,z:2}, {key:'ibank',x:0,z:-52} ];
 const cityServices = [];                // {key,mesh,group,x,z,city}
 // 株式市場（自社=TRB。価格は日次でドリフト）
 const STOCKS = [
@@ -924,11 +926,11 @@ const loanRateEff   = () => Math.max(0.006, LOAN_RATE - (hasExec('cfo')?0.008:0)
 const devDiscount   = () => (hasExec('cto')?0.7:1) * (deptOn('products')?0.7:1);  // 商品開発部：開発費−30%
 const brandDecay    = () => hasExec('cmo')?1:3;
 // 会社（企業価値・IPO・配当）
-const company = { public:false, dividendsPaid:0, ipoRaised:0 };
+const company = { public:false, dividendsPaid:0, ipoRaised:0, acquired:0, buyback:0 };
 let lastProfit = 0;   // 直近の総損益（企業価値の素）
 function storeAssets(){ return branches.length*15000 + extraUsed*1200 + Object.values(equip).reduce((a,e)=>a+(e.lv-1)*2500,0); }
 function valuation(){
-  return Math.max(0, Math.round(brand*2200 + playerShare()*150000 + Math.max(0,lastProfit)*200 + storeAssets() + finance.invest));
+  return Math.max(0, Math.round(brand*2200 + playerShare()*150000 + Math.max(0,lastProfit)*200 + storeAssets() + finance.invest + company.acquired*14000 + company.buyback*0.45));
 }
 function netWorth(){ return sim.money + Math.round(finance.invest) + storeAssets() - finance.debt; }
 function doIPO(){
@@ -1059,7 +1061,7 @@ function ensureServices(cityId){ if(cityServices.some(s=>s.city===cityId)) retur
 function makeServiceBuilding(key, x, z, cityId){
   const def=SERVICE_DEFS[key];
   const g=new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
-  const h = key==='stock'?16 : key==='realestate'?13 : key==='auction'?9 : key==='lobby'?8 : 7;
+  const h = key==='stock'?16 : key==='ibank'?18 : key==='realestate'?13 : key==='auction'?9 : key==='lobby'?8 : 7;
   const body=new THREE.Mesh(new THREE.BoxGeometry(8,h,7), new THREE.MeshStandardMaterial({color:def.color})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
   const roof=new THREE.Mesh(new THREE.BoxGeometry(8.4,0.5,7.4), new THREE.MeshStandardMaterial({color:0x33343d})); roof.position.y=h+0.25; g.add(roof);
   if(key==='bank'){ const ped=new THREE.Mesh(new THREE.BoxGeometry(8.8,0.6,7.7), new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.3; g.add(ped);
@@ -1080,6 +1082,12 @@ function makeServiceBuilding(key, x, z, cityId){
     const dome=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,10,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0xc9cdd4})); dome.position.y=h+0.2; g.add(dome);
     const drum=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.4,1.4,16), new THREE.MeshStandardMaterial({color:0xe3ddcd})); drum.position.y=h-0.4; g.add(drum);
     for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,h*0.6,8), new THREE.MeshStandardMaterial({color:0xf2ecdd})); c.position.set(-3.0+i*1.5,h*0.3+0.35,3.7); g.add(c); }
+  }
+  else if(key==='ibank'){     // 投資銀行：黒ガラス高層＋金のクラウン＋縦リブ
+    const gl=new THREE.Mesh(new THREE.BoxGeometry(8.05,h*0.95,7.05), new THREE.MeshStandardMaterial({color:0x26303c,emissive:0x0e1620,emissiveIntensity:0.5})); gl.position.y=h/2; g.add(gl);
+    for(let r=0;r<Math.floor(h/2.4);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.15,0.16,7.15), new THREE.MeshStandardMaterial({color:0x3c4c5e})); band.position.y=1.6+r*2.4; g.add(band); }
+    const crown=new THREE.Mesh(new THREE.BoxGeometry(8.2,1.0,7.2), new THREE.MeshStandardMaterial({color:0xcaa24a,emissive:0x4a3a10,emissiveIntensity:0.5})); crown.position.y=h-0.4; g.add(crown);
+    const spire=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.3,3.2,6), new THREE.MeshStandardMaterial({color:0xd8c060})); spire.position.y=h+1.8; g.add(spire);
   }
   else { const stripe=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.4,7.1), new THREE.MeshStandardMaterial({color:0x9a6fd0,emissive:0x2a1850,emissiveIntensity:0.4})); stripe.position.y=h*0.6; g.add(stripe); }
   body.userData.group=g;
@@ -1149,7 +1157,7 @@ function updateMapMarkers(){
   };
   // ランドマーク（全都市共通）＋空港のラベル
   landmarks.filter(l=>l.city===viewCity).forEach(lm=> place('lm'+lm.kind,'land', lm.label, lm.x, lm.h+2.4, lm.z));
-  cityServices.filter(s=>s.city===viewCity).forEach(s=> place('sv'+s.key,'land', SERVICE_DEFS[s.key].label, s.x, (s.key==='stock'?18:s.key==='realestate'?15:9), s.z));
+  cityServices.filter(s=>s.city===viewCity).forEach(s=> place('sv'+s.key,'land', SERVICE_DEFS[s.key].label, s.x, (s.key==='ibank'?20:s.key==='stock'?18:s.key==='realestate'?15:9), s.z));
   place('air','land','空港', AIRPORT_POS.x, 8.5, AIRPORT_POS.z);
   lots.forEach((l,i)=>{ if(l.city===viewCity && !l.branch) place('lot'+i,'lease','FOR LEASE', l.x,8.2,l.z); });
   RIVALS.forEach((r,i)=>{ if(r.city===viewCity){ const el=place('riv'+i,'rival',RIVAL_CUP, r.pos[0],8.0,r.pos[1]); if(el) el.style.background='#'+r.color.toString(16).padStart(6,'0'); } });
@@ -2444,15 +2452,24 @@ const OFFICE_ART = officeArt();
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
-  coffee: di(`<ellipse cx="20" cy="32" rx="11" ry="2" fill="#000" opacity=".12"/><path d="M9 16 h18 v6 a9 9 0 0 1 -18 0 Z" fill="#f4efe9"/><path d="M11 18 h14 v3.4 a7 7 0 0 1 -14 0 Z" fill="#7a4a28"/><path d="M27 17 a4.6 4.6 0 0 1 0 8.4" fill="none" stroke="#f4efe9" stroke-width="2.4"/><path d="M16 13 c2 -2 -1 -4 1 -6 M22 13 c2 -2 -1 -4 1 -6" stroke="#cdd3da" stroke-width="1.5" fill="none" stroke-linecap="round"/>`),
-  latte: di(`<path d="M13 9 h14 l-1.5 25 a3 3 0 0 1 -3 2.6 h-5 a3 3 0 0 1 -3 -2.6 Z" fill="#e9eef3" opacity=".55"/><path d="M13.4 19 h13.2 l-1 15 a3 3 0 0 1 -3 2.4 h-5.2 a3 3 0 0 1 -3 -2.4 Z" fill="#c79a6a"/><path d="M13 9 h14 l-.45 8 h-13.1 Z" fill="#f7f3ee"/>`),
-  matcha: di(`<ellipse cx="20" cy="32" rx="10" ry="2" fill="#000" opacity=".12"/><path d="M9 16 h18 v5.5 a9 9 0 0 1 -18 0 Z" fill="#ffffff"/><path d="M11 18 h14 v3 a7 7 0 0 1 -14 0 Z" fill="#86b94a"/><path d="M27 17 a4.5 4.5 0 0 1 0 8" fill="none" stroke="#ffffff" stroke-width="2.3"/>`),
-  boba: di(`<path d="M13 12 h14 l-1.5 22 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#caa07a"/><path d="M13 12 h14 l-.4 6 h-13.2 Z" fill="#ead3bd"/><rect x="18.7" y="5" width="2.6" height="22" rx="1.3" transform="rotate(10 20 16)" fill="#e0685e"/><g fill="#2a1a10"><circle cx="17" cy="31" r="1.5"/><circle cx="21" cy="32" r="1.5"/><circle cx="24" cy="30.5" r="1.5"/><circle cx="19" cy="29" r="1.5"/></g>`),
-  cake: di(`<path d="M6 30 h28" stroke="#caa24a" stroke-width="2" stroke-linecap="round"/><path d="M8 30 l12 -18 l12 18 Z" fill="#f7e2c0"/><path d="M8 30 l12 -18 l3 4.5 l-9 13.5 Z" fill="#e9b07a"/><circle cx="20" cy="12.5" r="2.1" fill="#e0685e"/>`),
-  croissant: di(`<path d="M9 28 C9 14 31 14 31 28 C26 21 14 21 9 28 Z" fill="#d79a4e"/><path d="M13 24 l-2 3 M18 22 v3.5 M22 22 l1 3.5 M27 24 l2 3" stroke="#a9692a" stroke-width="1.4" stroke-linecap="round"/>`),
-  pudding: di(`<ellipse cx="20" cy="32" rx="11" ry="2" fill="#000" opacity=".12"/><path d="M11 19 a9 5 0 0 1 18 0 v7 a3 3 0 0 1 -3 3 h-12 a3 3 0 0 1 -3 -3 Z" fill="#f6d77a"/><path d="M11 18 a9 5 0 0 1 18 0 a9 4 0 0 1 -18 0 Z" fill="#9a5a2a"/>`),
-  sandwich: di(`<path d="M8 28 h24" stroke="#caa24a" stroke-width="2" stroke-linecap="round"/><path d="M8 28 l12 -16 l12 16 Z" fill="#f0cd86"/><path d="M12 23 h16 l-2.5 3.5 h-11 Z" fill="#7fb46a"/><path d="M14 20 h12 l-1.5 2 h-9 Z" fill="#e0685e"/>`),
-  seasonal: di(`<path d="M13 13 h14 l-1.5 21 a2.5 2.5 0 0 1 -2.5 2.2 h-6 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#ff9ec4"/><path d="M13 13 h14 l-.4 6 h-13.2 Z" fill="#ffd0e4"/><rect x="18.8" y="5" width="2.4" height="15" rx="1.2" transform="rotate(10 20 13)" fill="#3ddc97"/><path d="M21 8 q4 -3 5 1 q-4 1 -5 -1 Z" fill="#3ddc97"/>`),
+  // カプチーノ：ソーサー＋取っ手＋ラテアートのハート＋湯気
+  coffee: di(`<ellipse cx="20" cy="34" rx="13" ry="2.4" fill="#000" opacity=".12"/><ellipse cx="20" cy="32.8" rx="12" ry="3" fill="#e7e0d4"/><ellipse cx="20" cy="32.2" rx="9.4" ry="2.1" fill="#d3cabb"/><path d="M9 16.5 h18 v6.5 a9 9 0 0 1 -18 0 Z" fill="#f7f2eb"/><path d="M9 17.5 h18 v2 H9 Z" fill="#e7ddcd"/><ellipse cx="18" cy="18" rx="8" ry="2.5" fill="#c79f72"/><path d="M18 16 c1.7 0 1.7 2.1 0 2.1 c-1.7 0 -1.7 -2.1 0 -2.1 Z" fill="#f3e8d7"/><path d="M27.2 18.6 a4.9 4.9 0 0 1 0 8.8" fill="none" stroke="#efe6d8" stroke-width="2.6"/><path d="M15 13 c2 -2 -1 -4 1 -6 M21 13 c2 -2 -1 -4 1 -6" stroke="#cdd3da" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".8"/>`),
+  // ラテ：背の高いグラスに層（エスプレッソ/ミルク/フォーム）＋リーフアート
+  latte: di(`<ellipse cx="20" cy="37" rx="9" ry="1.8" fill="#000" opacity=".12"/><path d="M12.8 8 h14.4 l-1.4 27 a2.6 2.6 0 0 1 -2.6 2.4 h-4.4 a2.6 2.6 0 0 1 -2.6 -2.4 Z" fill="#eef3f7" opacity=".45"/><path d="M14 20.5 h12 l-.85 14 a2.4 2.4 0 0 1 -2.4 2.2 h-4 a2.4 2.4 0 0 1 -2.4 -2.2 Z" fill="#c79a6a"/><path d="M13.6 14.5 h12.8 l-.3 6 h-12.2 Z" fill="#e6c69c"/><path d="M13.1 9 h13.8 l-.4 5.5 h-13 Z" fill="#f7f3ed"/><path d="M20 10 q-2.2 2.2 0 4.4 q2.2 -2.2 0 -4.4 Z" fill="#caa074"/>`),
+  // 抹茶ラテ：ソーサー＋泡＋取っ手＋湯気
+  matcha: di(`<ellipse cx="20" cy="33" rx="12" ry="2.3" fill="#000" opacity=".12"/><ellipse cx="20" cy="32" rx="11" ry="2.8" fill="#e7e0d4"/><path d="M9 16.5 h18 v6 a9 9 0 0 1 -18 0 Z" fill="#fbfbf8"/><ellipse cx="18" cy="17.4" rx="8" ry="2.4" fill="#8cbd4c"/><ellipse cx="16.6" cy="17" rx="3.6" ry="1" fill="#aada6e"/><path d="M27.2 18 a4.7 4.7 0 0 1 0 8.6" fill="none" stroke="#efe6d8" stroke-width="2.5"/><path d="M15 13 c2 -2 -1 -4 1 -6 M21 13 c2 -2 -1 -4 1 -6" stroke="#cdd3da" stroke-width="1.3" fill="none" stroke-linecap="round" opacity=".7"/>`),
+  // タピオカ：ドームの蓋＋ストロー＋底のタピオカ
+  boba: di(`<ellipse cx="20" cy="37" rx="8.5" ry="1.8" fill="#000" opacity=".12"/><path d="M12.5 13 h15 l-1.4 22.5 a2.5 2.5 0 0 1 -2.5 2.3 h-6.6 a2.5 2.5 0 0 1 -2.5 -2.3 Z" fill="#caa078" opacity=".95"/><path d="M13 24 h14 l-.5 8 h-13 Z" fill="#c0936a" opacity=".5"/><rect x="11.4" y="9.6" width="17.2" height="3.6" rx="1.6" fill="#f2ebe0"/><path d="M12.4 13 h15.2 l-.16 2.4 h-14.9 Z" fill="#efe6da"/><rect x="18.6" y="4" width="3" height="22" rx="1.5" transform="rotate(9 20 14)" fill="#e0685e"/><g fill="#241208"><circle cx="16.4" cy="32" r="1.6"/><circle cx="20" cy="33" r="1.6"/><circle cx="23.6" cy="31.6" r="1.6"/><circle cx="18.4" cy="29.8" r="1.6"/><circle cx="22" cy="29.4" r="1.6"/></g>`),
+  // ショートケーキ：プレート＋スポンジ層＋クリーム＋ジャム＋苺
+  cake: di(`<ellipse cx="20" cy="33" rx="13.5" ry="2.4" fill="#000" opacity=".12"/><ellipse cx="20" cy="32" rx="13.5" ry="2.9" fill="#e7e0d4"/><path d="M8 30 l12 -17 l12 17 Z" fill="#f7e6c8"/><path d="M8 30 l12 -17 l4 5.6 l-9.6 11.4 Z" fill="#eccb98"/><path d="M9.6 26 h20.8" stroke="#e07da0" stroke-width="2.2"/><path d="M10.9 22.2 h18.2" stroke="#fff4e4" stroke-width="1.8"/><circle cx="20" cy="14" r="2.5" fill="#e0564e"/><path d="M20 11.6 l1.2 -1.8 -2.4 0 Z" fill="#3ddc97"/><circle cx="19.2" cy="13.4" r=".4" fill="#fff"/>`),
+  // クロワッサン：プレート＋層のリッジ＋ツヤ
+  croissant: di(`<ellipse cx="20" cy="31" rx="13.5" ry="2.3" fill="#000" opacity=".12"/><ellipse cx="20" cy="30" rx="13.5" ry="2.7" fill="#e7e0d4"/><path d="M7.5 27 C6.5 13.5 33.5 13.5 32.5 27 C26 19.5 14 19.5 7.5 27 Z" fill="#d99a48"/><path d="M12 23.5 l-2 3.4 M16 21 v4.2 M20 20.4 v4.6 M24 21 l1.2 4.2 M28 23.5 l2 3.2" stroke="#a9692a" stroke-width="1.3" stroke-linecap="round" fill="none"/><path d="M11 25 q9 -5.5 18 0" stroke="#eab56e" stroke-width="1.3" fill="none" opacity=".7"/>`),
+  // プリン：プレート＋カラメル＋ハイライト＋さくらんぼ
+  pudding: di(`<ellipse cx="20" cy="34" rx="12.5" ry="2.3" fill="#000" opacity=".12"/><ellipse cx="20" cy="33" rx="12.5" ry="2.7" fill="#e7e0d4"/><path d="M11 29.5 a9 2.6 0 0 0 18 0 Z" fill="#a3611f"/><path d="M11 20 a9 4.6 0 0 1 18 0 v8.5 a9 3.4 0 0 1 -18 0 Z" fill="#f6d77a"/><path d="M11 20 a9 4.6 0 0 1 18 0 a9 4 0 0 1 -18 0 Z" fill="#a35e22"/><ellipse cx="16" cy="19" rx="3" ry="1" fill="#ffe9a8" opacity=".7"/><circle cx="20" cy="15.2" r="1.9" fill="#e0564e"/><circle cx="19.3" cy="14.6" r=".4" fill="#fff"/>`),
+  // サンドイッチ：プレート＋具材の層（卵/トマト/レタス）
+  sandwich: di(`<ellipse cx="20" cy="31" rx="13.5" ry="2.3" fill="#000" opacity=".12"/><ellipse cx="20" cy="30" rx="13.5" ry="2.7" fill="#e7e0d4"/><path d="M8 28 l12 -17 l12 17 Z" fill="#f1d089"/><path d="M8 28 l12 -17 l3.2 4.4 l-10.4 12.6 Z" fill="#e6bd6e"/><path d="M11 23.6 h18 l-1.7 2.5 h-14.6 Z" fill="#7fbf5a"/><path d="M12.7 20.8 h14.6 l-1.4 2 h-11.8 Z" fill="#e0564e"/><path d="M14.4 18.2 h11.2 l-1.2 1.8 h-8.8 Z" fill="#f6e08a"/>`),
+  // 季節限定：ホイップ＋さくらんぼ＋ストロー＋スプリンクル
+  seasonal: di(`<ellipse cx="20" cy="37" rx="8" ry="1.6" fill="#000" opacity=".12"/><path d="M13 15.5 h14 l-1.3 19.5 a2.5 2.5 0 0 1 -2.5 2.2 h-6.4 a2.5 2.5 0 0 1 -2.5 -2.2 Z" fill="#ff9ec4"/><path d="M13 15.5 h14 l-.22 3 h-13.56 Z" fill="#ffd0e4"/><path d="M13.4 15.5 c.4 -4.5 12.8 -4.5 13.2 0 c-1 -2.6 -2.6 .4 -3.4 -1.6 c-.9 2.8 -2.6 -.8 -3.4 1 c-.9 -2.6 -2.6 .2 -3.2 1 c-.7 -2.2 -2.4 -.4 -3.2 -.4 Z" fill="#fff6f9"/><circle cx="20" cy="9.6" r="2" fill="#e0564e"/><rect x="19.4" y="5.6" width="1.1" height="4" rx=".5" fill="#5a3a22"/><rect x="22.6" y="5" width="2.4" height="16" rx="1.2" transform="rotate(12 23 13)" fill="#3ddc97"/><g fill="#7ad3ff"><circle cx="17" cy="24" r="1"/><circle cx="22.4" cy="28" r="1"/><circle cx="18.8" cy="31" r="1"/></g>`),
 };
 const MAT_ART = {
   bean: di(`<ellipse cx="15" cy="20" rx="6" ry="9" transform="rotate(-25 15 20)" fill="#6b4226"/><path d="M15 12 q-2 8 0 16" stroke="#3a2414" stroke-width="1.5" fill="none"/><ellipse cx="25" cy="22" rx="6" ry="9" transform="rotate(20 25 22)" fill="#7a4e2c"/><path d="M25 14 q2 8 0 16" stroke="#3a2414" stroke-width="1.5" fill="none"/>`),
@@ -3099,22 +3116,31 @@ function openOffice(){ renderOffice(); document.getElementById('modal-office').c
 function renderOffice(){
   const el=document.getElementById('office-body');
   const used=Object.keys(office.dept).filter(k=>office.dept[k]).length;
+  const free=office.floors-used;
   let h=`<div class="off-hero">${OFFICE_ART}</div>`;
-  h+=`<div class="off-stats"><div class="off-stat"><div class="v">${office.maxFloors}<span>フロア</span></div><div class="l">MAX FLOORS</div></div>`;
-  h+=`<div class="off-stat"><div class="v">${office.sqft.toLocaleString('en-US')}<span>sqft</span></div><div class="l">FLOOR SIZE</div></div>`;
-  h+=`<div class="off-stat"><div class="v">${used}/${DEPT_DEFS.length}<span>部署</span></div><div class="l">DEPARTMENTS</div></div></div>`;
+  h+=`<div class="off-stats"><div class="off-stat"><div class="v">${office.floors}<span>/${office.maxFloors}F</span></div><div class="l">FLOORS</div></div>`;
+  h+=`<div class="off-stat"><div class="v">${(office.sqft*office.floors).toLocaleString('en-US')}<span>sqft</span></div><div class="l">FLOOR SIZE</div></div>`;
+  h+=`<div class="off-stat"><div class="v">${used}/${office.floors}<span>使用</span></div><div class="l">DEPARTMENTS</div></div></div>`;
+  // フロア増設（部署スロットを増やす）
+  h+=`<div class="dash-h">フロアの増設（改装）</div>`;
+  if(office.floors<office.maxFloors){
+    h+=`<div class="mrow"><div class="nm">${office.floors+1}フロア目を増設<div class="sub2">部署スロット +1（空き ${free}）・¥${floorCost().toLocaleString('ja-JP')}</div></div><button class="mbtn" data-addfloor="1" ${sim.money<floorCost()?'disabled':''}>増設</button></div>`;
+  } else {
+    h+=`<div class="note" style="margin-top:0">最大 ${office.maxFloors} フロアまで増設済み。全部署を設置できます。</div>`;
+  }
   h+=`<div class="dash-h">部署（DEPARTMENTS）</div>`;
-  h+=`<div class="note" style="margin-top:0">部署を設置すると会社機能が解放されます。各部署はフロアのデスクを占有し、毎日の維持費（給与）がかかります。</div>`;
+  h+=`<div class="note" style="margin-top:0">各部署は1フロアを占有します（空きスロット ${free}）。部署を設置すると会社機能が解放され、毎日の維持費（給与）がかかります。</div>`;
   DEPT_DEFS.forEach(d=>{
     const on=!!office.dept[d.key];
+    const blocked=!on && free<=0;   // 空きフロアが無い
     h+=`<div class="deptcard ${on?'on':''}">
         <div class="dept-img">${OFFICE_ART}</div>
         <div class="dept-main">
           <div class="dept-h"><span class="dept-dot" style="background:${d.color}"></span><b>${d.name}</b><span class="dept-en">${d.en}</span></div>
           <div class="dept-desc">${d.desc}</div>
           <div class="dept-foot">
-            <button class="dept-tog ${on?'on':''}" data-dept="${d.key}"><span class="knob"></span></button>
-            <span class="dept-add">${on?'設置済み':'追加する'}</span>
+            <button class="dept-tog ${on?'on':''}" data-dept="${d.key}" ${blocked?'disabled style="opacity:.4"':''}><span class="knob"></span></button>
+            <span class="dept-add">${on?'設置済み':blocked?'フロア不足':'追加する'}</span>
             <span class="dept-cap">CAPACITY ${d.cap} desks</span>
           </div>
         </div></div>`;
@@ -3122,8 +3148,15 @@ function renderOffice(){
   el.innerHTML=h;
 }
 document.getElementById('office-body').addEventListener('click', e=>{
-  const t=e.target.closest('[data-dept]'); if(!t) return;
-  const k=t.dataset.dept; office.dept[k]=!office.dept[k];
+  const fl=e.target.closest('[data-addfloor]');
+  if(fl){ if(office.floors<office.maxFloors && sim.money>=floorCost()){ sim.money-=floorCost(); dayStats.capex+=floorCost(); office.floors++; renderOffice(); saveGame(); updateHUD(); } return; }
+  const t=e.target.closest('[data-dept]'); if(!t || t.disabled) return;
+  const k=t.dataset.dept;
+  if(!office.dept[k]){ // 設置：空きフロアが必要
+    const used=Object.keys(office.dept).filter(x=>office.dept[x]).length;
+    if(used>=office.floors){ flashHint&&flashHint('空きフロアがありません。フロアを増設してください'); return; }
+    office.dept[k]=true;
+  } else office.dept[k]=false;
   renderOffice(); saveGame(); updateHUD();
   if(typeof renderManage==='function' && document.getElementById('modal-manage')?.classList.contains('show')) renderManage();
 });
@@ -3135,7 +3168,8 @@ function genRealty(city){ const areas=['丸の内','新宿','渋谷','本町','�
   return out;
 }
 function openService(key){ svcKey=key; document.getElementById('svc-title').textContent=SERVICE_DEFS[key].label; renderSvc(); document.getElementById('modal-service').classList.add('show'); }
-function renderSvc(){ const el=document.getElementById('svc-body'); el.innerHTML = svcKey==='bank'?renderBank():svcKey==='stock'?renderStock():svcKey==='realestate'?renderRealty():svcKey==='auction'?renderAuction():svcKey==='lobby'?renderLobby():renderAgency(); }
+function renderSvc(){ const el=document.getElementById('svc-body'); el.innerHTML = svcKey==='bank'?renderBank():svcKey==='stock'?renderStock():svcKey==='realestate'?renderRealty():svcKey==='auction'?renderAuction():svcKey==='lobby'?renderLobby():svcKey==='ibank'?renderIBank():renderAgency(); }
+function acquireCost(r){ return Math.round(30000 + r.comp*9000); }
 function refreshAuctionLots(){ const pick=[...COLLECTIBLES].sort(()=>Math.random()-0.5).slice(0,3);
   auctionLots = pick.map(c=>{ const v=Math.round(c.base*(0.85+Math.random()*0.45)); return {name:c.name, value:v, est:Math.round(v*(1.0+Math.random()*0.25)), rate:c.rate}; }); }
 function renderBank(){
@@ -3193,9 +3227,24 @@ function renderLobby(){
     h+=`<div class="mcard ${cur?'sel':''}"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">Lv.${i+1} ${t.name}</div><div class="meta">${t.desc}</div></div><div class="act">${done||cur?`<span class="sub2">${cur?'実施中':'達成済'}</span>`:`<button class="mbtn" data-lobby="${i+1}" ${(!avail||sim.money<t.cost)?'disabled':''}>${avail?'献金<br>¥'+t.cost.toLocaleString('ja-JP'):'要Lv.'+i}</button>`}</div></div>`; });
   return h;
 }
+function renderIBank(){
+  let h=`<div class="note" style="margin-top:6px">M&A（競合の買収）と自社株買いで企業を拡大。投資銀行が案件を仲介します。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v gold">¥${valuation().toLocaleString('ja-JP')}</div><div class="l">企業価値</div></div><div class="kpi"><div class="v">${company.acquired}社</div><div class="l">買収実績</div></div></div>`;
+  h+=`<div class="dash-h">M&A：${(CITIES.find(c=>c.id===viewCity)||{}).name||''}の競合を買収</div>`;
+  const rv=RIVALS.filter(r=>r.city===viewCity);
+  if(!rv.length) h+=`<div class="note" style="margin-top:0">この都市に買収可能な競合はいません。空港から他都市へ。</div>`;
+  rv.forEach((r,i)=>{ const cost=acquireCost(r); h+=`<div class="mcard"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">${r.name}</div><div class="meta">競争力 ${r.comp}・買収でシェア吸収＋ブランド+${Math.min(10,Math.round(r.comp/2))}</div></div><div class="act"><button class="mbtn" data-acquire="${i}" ${sim.money<cost?'disabled':''}>買収<br>¥${cost.toLocaleString('ja-JP')}</button></div></div>`; });
+  h+=`<div class="dash-h">自社株買い（企業価値の向上）</div>`;
+  if(!company.public){ h+=`<div class="note" style="margin-top:0">🔒 自社株買いは上場後に可能です（会社タブ→IPO）。</div>`; }
+  else { h+=`<div class="note" style="margin-top:0">自社株を市場から買い戻すと、株主還元として企業価値が上がります（累計 ¥${company.buyback.toLocaleString('ja-JP')}）。</div>`;
+    [20000,50000].forEach(amt=> h+=`<div class="mrow"><div class="nm">¥${amt.toLocaleString('ja-JP')} 買い戻し<div class="sub2">企業価値+約¥${Math.round(amt*0.45).toLocaleString('ja-JP')}・ブランド+2</div></div><button class="mbtn" data-buyback="${amt}" ${sim.money<amt?'disabled':''}>実行</button></div>`); }
+  return h;
+}
 document.getElementById('svc-body').addEventListener('click', e=>{
   const t=e.target.closest('button'); if(!t) return;
   if(t.dataset.loan){ takeLoan(+t.dataset.loan); }
+  else if(t.dataset.acquire!==undefined){ const rv=RIVALS.filter(r=>r.city===viewCity), r=rv[+t.dataset.acquire]; if(r){ const cost=acquireCost(r); if(sim.money>=cost){ sim.money-=cost; dayStats.capex+=cost; if(r.mesh&&r.mesh.userData.group) overScene.remove(r.mesh.userData.group); const idx=RIVALS.indexOf(r); if(idx>=0) RIVALS.splice(idx,1); company.acquired++; brand=Math.min(100, brand+Math.min(10,Math.round(r.comp/2))); } } }
+  else if(t.dataset.buyback){ const amt=+t.dataset.buyback; if(company.public && sim.money>=amt){ sim.money-=amt; dayStats.capex+=amt; company.buyback+=amt; brand=Math.min(100,brand+2); } }
   else if(t.dataset.bidlot){ const a=auctionLots[+t.dataset.bidlot]; if(a&&sim.money>=a.value){ sim.money-=a.value; dayStats.capex+=a.value; ownedCollectibles.push({name:a.name, value:a.value, paid:a.value, rate:a.rate}); auctionLots.splice(+t.dataset.bidlot,1); } }
   else if(t.dataset.reauction){ refreshAuctionLots(); }
   else if(t.dataset.sellcol){ const i=+t.dataset.sellcol, c=ownedCollectibles[i]; if(c){ sim.money+=c.value; dayStats.revenue+=0; ownedCollectibles.splice(i,1); } }
@@ -3254,11 +3303,11 @@ function gameState(){
     extraUsed, beans:beans.grade, brand,
     execs:Object.fromEntries(Object.entries(execRoles).map(([k,e])=>[k,e.hired])),
     finance:{ debt:finance.debt, invest:finance.invest },
-    company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised },
+    company:{ public:company.public, dividendsPaid:company.dividendsPaid, ipoRaised:company.ipoRaised, acquired:company.acquired, buyback:company.buyback },
     lastProfit, spawnAccum, mgrCandidates,
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
-    FACILITY:{...FACILITY}, office:{leased:office.leased, dept:{...office.dept}},
+    FACILITY:{...FACILITY}, office:{leased:office.leased, floors:office.floors, dept:{...office.dept}},
     campaignOn:{...campaignOn},
     holdings:{...holdings}, ownedRealty, stockPrices:Object.fromEntries(STOCKS.map(s=>[s.sym,s.price])),
     ownedCollectibles, lobby:{level:lobby.level},
@@ -3288,7 +3337,7 @@ function loadGame(slot){
   for(const k in (d.execs||{}))     if(execRoles[k]) execRoles[k].hired=d.execs[k];
   beans.grade=d.beans||1; brand=(d.brand!=null?d.brand:20);
   if(d.finance){ finance.debt=d.finance.debt; finance.invest=d.finance.invest; }
-  if(d.company){ company.public=d.company.public; company.dividendsPaid=d.company.dividendsPaid; company.ipoRaised=d.company.ipoRaised; }
+  if(d.company){ company.public=d.company.public; company.dividendsPaid=d.company.dividendsPaid; company.ipoRaised=d.company.ipoRaised; company.acquired=d.company.acquired||0; company.buyback=d.company.buyback||0; }
   lastProfit=d.lastProfit||0; spawnAccum=d.spawnAccum||0;
   Object.assign(loyalty, d.loyalty||{});
   if(d.totalStats) totalStats=d.totalStats;
@@ -3330,7 +3379,7 @@ function loadGame(slot){
   }
   // 施設（本社・焙煎工房）の復元
   if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
-  if(d.office){ office.leased=!!d.office.leased; office.dept=d.office.dept||{}; } else { office.leased=!!FACILITY.hq; office.dept={}; }
+  if(d.office){ office.leased=!!d.office.leased; office.floors=d.office.floors||2; office.dept=d.office.dept||{}; } else { office.leased=!!FACILITY.hq; office.floors=2; office.dept={}; }
   if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
   if(d.holdings) Object.assign(holdings, d.holdings);
   if(d.ownedRealty) ownedRealty = d.ownedRealty;
