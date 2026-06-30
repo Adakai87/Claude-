@@ -1484,6 +1484,11 @@ function buildOverviewScene(){
   coast.rotation.x=-Math.PI/2; coast.position.y=-0.12; scene.add(coast);
   const pave = new THREE.Mesh(new THREE.PlaneGeometry(224,224), new THREE.MeshStandardMaterial({ color:0x3b3e44, roughness:0.95 }));
   pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);   // アスファルト＝道路面
+  // 背面の湾（街の奥＝水辺。橋がここをまたぐ）
+  const bay = new THREE.Mesh(new THREE.PlaneGeometry(260,60), new THREE.MeshStandardMaterial({ color:0x1fa8c6, roughness:0.3 }));
+  bay.rotation.x=-Math.PI/2; bay.position.set(0,0.02,-120); scene.add(bay);
+  const quay = new THREE.Mesh(new THREE.BoxGeometry(224,0.5,2.4), new THREE.MeshStandardMaterial({ color:0x9fa3a8 }));  // 岸壁
+  quay.position.set(0,0.2,-90); scene.add(quay);
 
   // 街路樹（先に定義：公園・街区で使う）
   function tree(x,z,s=1){
@@ -1716,6 +1721,37 @@ function buildOverviewScene(){
     cityCars.push(car); return car;
   }
   for(let i=0;i<18;i++) makeCar();
+
+  // ゴールデンゲート風の吊り橋（海をまたぐランドマーク）
+  (function bridge(){
+    const g=new THREE.Group(); scene.add(g);
+    const red=new THREE.MeshStandardMaterial({color:0xb04a30, roughness:0.7});
+    const z0=-104, x1=4, x2=124, span=x2-x1, t1=x1+span*0.30, t2=x1+span*0.70, deckY=6, towY=18, topY=deckY+towY-2;
+    const deck=new THREE.Mesh(new THREE.BoxGeometry(span,0.6,6), new THREE.MeshStandardMaterial({color:0x5f6268})); deck.position.set((x1+x2)/2,deckY,z0); deck.castShadow=true; g.add(deck);
+    for(let s=-span/2;s<span/2;s+=6){ const dl=new THREE.Mesh(new THREE.PlaneGeometry(3,0.2),new THREE.MeshStandardMaterial({color:0xe9e6da})); dl.rotation.x=-Math.PI/2; dl.position.set((x1+x2)/2+s+1.5,deckY+0.33,z0); g.add(dl); }
+    for(const tx of [t1,t2]){
+      for(const zz of [z0-2.6,z0+2.6]){ const t=new THREE.Mesh(new THREE.BoxGeometry(1.2,towY,1.2),red); t.position.set(tx,deckY+towY/2-1,zz); t.castShadow=true; g.add(t); }
+      for(const yy of [deckY+4, topY]){ const cb=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.9,6.4),red); cb.position.set(tx,yy,z0); g.add(cb); }
+      const pier=new THREE.Mesh(new THREE.BoxGeometry(2.2,deckY+1.5,5.4),new THREE.MeshStandardMaterial({color:0x8a8f95})); pier.position.set(tx,(deckY-1)/2,z0); g.add(pier);
+    }
+    for(const zz of [z0-2.6,z0+2.6]){
+      const curve=new THREE.CatmullRomCurve3([ new THREE.Vector3(x1,deckY+1,zz), new THREE.Vector3(t1,topY,zz), new THREE.Vector3((t1+t2)/2,deckY+4,zz), new THREE.Vector3(t2,topY,zz), new THREE.Vector3(x2,deckY+1,zz) ]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,44,0.18,6,false),red));
+      for(let i=1;i<26;i++){ const pt=curve.getPoint(i/26); if(pt.y>deckY+0.7){ const hg=new THREE.Mesh(new THREE.BoxGeometry(0.06,pt.y-deckY,0.06),red); hg.position.set(pt.x,(pt.y+deckY)/2,zz); g.add(hg); } }
+    }
+  })();
+
+  // ライトレール（路面電車）：線路＋走行する3連車両
+  (function tram(){
+    const tz=11, railMat=new THREE.MeshStandardMaterial({color:0x9aa0a6, metalness:0.4, roughness:0.5});
+    for(const rz of [tz-0.7,tz+0.7]){ const rail=new THREE.Mesh(new THREE.BoxGeometry(200,0.08,0.14),railMat); rail.position.set(0,0.16,rz); scene.add(rail); }
+    for(let x=-96;x<96;x+=2.2){ const tie=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.06,2.0),new THREE.MeshStandardMaterial({color:0x5a4a3a})); tie.position.set(x,0.12,tz); scene.add(tie); }
+    const g=new THREE.Group(); scene.add(g);
+    for(let i=0;i<3;i++){ const car=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.7,2.0),new THREE.MeshStandardMaterial({color:0xc23a3a})); car.position.set(i*3.8,1.05,0); car.castShadow=true; g.add(car);
+      const win=new THREE.Mesh(new THREE.BoxGeometry(3.0,0.62,2.06),new THREE.MeshStandardMaterial({color:0x223240,emissive:0x0a1822,emissiveIntensity:0.4})); win.position.set(i*3.8,1.35,0); g.add(win);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.18,2.0),new THREE.MeshStandardMaterial({color:0xe8e0d2})); roof.position.set(i*3.8,1.95,0); g.add(roof); }
+    cityCars.push({ g, onX:true, road:tz, dir:1, p:-90, speed:11, lane:0, tram:true });
+  })();
 
   // カフェ（本店・支店・ライバル）と空き物件・空港は init で配置する
   scene._isStore = false;
@@ -3913,6 +3949,7 @@ function animate(){
     for(const c of cityCars){
       c.p += c.dir*c.speed*dt;
       if(c.p>95) c.p=-95; else if(c.p<-95) c.p=95;
+      if(c.tram){ c.g.position.set(c.p,0,c.road); continue; }   // 路面電車：回転なし（車両はx方向に連結）
       if(c.onX){ c.g.position.set(c.p,0,c.road+c.lane); c.g.rotation.y = c.dir>0?Math.PI/2:-Math.PI/2; }
       else     { c.g.position.set(c.road+c.lane,0,c.p); c.g.rotation.y = c.dir>0?0:Math.PI; }
     }
