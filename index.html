@@ -1482,8 +1482,8 @@ function buildOverviewScene(){
   water.rotation.x=-Math.PI/2; water.position.y=-0.5; scene.add(water);
   const coast = new THREE.Mesh(new THREE.PlaneGeometry(244,244), new THREE.MeshStandardMaterial({ color:0x86a35f }));
   coast.rotation.x=-Math.PI/2; coast.position.y=-0.12; scene.add(coast);
-  const pave = new THREE.Mesh(new THREE.PlaneGeometry(220,220), new THREE.MeshStandardMaterial({ color:0x8f9398 }));
-  pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);
+  const pave = new THREE.Mesh(new THREE.PlaneGeometry(224,224), new THREE.MeshStandardMaterial({ color:0x3b3e44, roughness:0.95 }));
+  pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);   // アスファルト＝道路面
 
   // 街路樹（先に定義：公園・街区で使う）
   function tree(x,z,s=1){
@@ -1567,14 +1567,19 @@ function buildOverviewScene(){
   // ---- 街区を芝の区画にして建物を密に充填（グレー舗装＝道路がすき間に見える）----
   const STEP=22, PLOT=16;                 // 区画ピッチ / 区画サイズ（差＝道路幅）
   const GRID=[]; for(let v=-88; v<=88; v+=STEP) GRID.push(v);
-  function plotLawn(cx,cz){ const l=new THREE.Mesh(new THREE.PlaneGeometry(PLOT,PLOT),new THREE.MeshStandardMaterial({color:pick0(0x8caa6a,0x86a35f,0x93ab72)})); l.rotation.x=-Math.PI/2; l.position.set(cx,0.02,cz); scene.add(l); }
+  // 街区の基盤：歩道（明るいコンクリ）＋縁石＋内側（芝 or プラザ）
+  function plotPad(cx,cz,grass){
+    const sw=new THREE.Mesh(new THREE.PlaneGeometry(PLOT+1.6,PLOT+1.6),new THREE.MeshStandardMaterial({color:0xbfc3c8})); sw.rotation.x=-Math.PI/2; sw.position.set(cx,0.03,cz); sw.receiveShadow=true; scene.add(sw);  // 歩道
+    const curb=new THREE.Mesh(new THREE.BoxGeometry(PLOT+0.4,0.12,PLOT+0.4),new THREE.MeshStandardMaterial({color:0x9fa3a8})); curb.position.set(cx,0.06,cz); scene.add(curb);  // 縁石
+    const inner=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.6,PLOT-0.6),new THREE.MeshStandardMaterial({color: grass?pick0(0x7faa5c,0x86a35f,0x93ab72):0x9aa0a6})); inner.rotation.x=-Math.PI/2; inner.position.set(cx,0.13,cz); inner.receiveShadow=true; scene.add(inner);
+  }
   function placeB(x,z,type,w,d){ if(near(x,z,5.5)) return; townBuilding(x,z,type,w,d); }
   function fillPlot(cx,cz){
-    plotLawn(cx,cz);
     const r2=cx*cx+cz*cz;
     let kind = r2<2200 ? (Math.random()<0.55?'tower':'mid')
              : r2<7000 ? pick(['tower','mid','mid','commercial','blockhouse'])
              : pick(['blockhouse','blockhouse','mid','green']);
+    plotPad(cx,cz, kind==='green'||kind==='blockhouse');
     const H=PLOT/2;
     if(kind==='tower'){
       const w=PLOT*0.5+Math.random()*3, d=PLOT*0.5+Math.random()*3;
@@ -1596,13 +1601,21 @@ function buildOverviewScene(){
   }
   for(const cx of GRID) for(const cz of GRID){ if(near(cx,cz,11)) continue; fillPlot(cx,cz); }
 
-  // 道路の白線（区画のすき間に走るレーン）— 破線。メッシュ数を抑えるため間隔広め
-  const dashMat=new THREE.MeshStandardMaterial({color:0xeae4d4});
-  for(let k=-88-STEP/2; k<=88+STEP/2; k+=STEP){
-    for(let s=-94; s<94; s+=7){
-      const dh=new THREE.Mesh(new THREE.PlaneGeometry(2.4,0.22),dashMat); dh.rotation.x=-Math.PI/2; dh.position.set(s+1.2,0.03,k); scene.add(dh);
-      const dv=new THREE.Mesh(new THREE.PlaneGeometry(0.22,2.4),dashMat); dv.rotation.x=-Math.PI/2; dv.position.set(k,0.03,s+1.2); scene.add(dv);
+  // 道路：中央レーンの白破線（道路の中心＝区画の間）＋交差点の横断歩道
+  const laneMat=new THREE.MeshStandardMaterial({color:0xe9e6da});
+  const RC=[]; for(let k=-99; k<=99; k+=STEP) RC.push(k);   // 道路中心線の位置
+  const isXing=(a)=> RC.some(r=>Math.abs(a-r)<4.5);          // 交差点付近は破線を描かない
+  for(const m of RC){
+    for(let s=-96; s<96; s+=8){ const px=s+2;
+      if(!isXing(px)){ const dh=new THREE.Mesh(new THREE.PlaneGeometry(3.6,0.28),laneMat); dh.rotation.x=-Math.PI/2; dh.position.set(px,0.05,m); scene.add(dh); }
+      if(!isXing(px)){ const dv=new THREE.Mesh(new THREE.PlaneGeometry(0.28,3.6),laneMat); dv.rotation.x=-Math.PI/2; dv.position.set(m,0.05,px); scene.add(dv); }
     }
+  }
+  // 横断歩道（ゼブラ）：中央付近の交差点に
+  const cwMat=new THREE.MeshStandardMaterial({color:0xf2efe6});
+  for(const mx of [-33,-11,11,33]) for(const mz of [-33,-11,11,33]){
+    for(const zc of [mz-4.4, mz+4.4]) for(let i=0;i<3;i++){ const s=new THREE.Mesh(new THREE.PlaneGeometry(5.2,0.5),cwMat); s.rotation.x=-Math.PI/2; s.position.set(mx,0.055,zc-1.0+i*1.0); scene.add(s); }
+    for(const xc of [mx-4.4, mx+4.4]) for(let i=0;i<3;i++){ const s=new THREE.Mesh(new THREE.PlaneGeometry(0.5,5.2),cwMat); s.rotation.x=-Math.PI/2; s.position.set(xc-1.0+i*1.0,0.055,mz); scene.add(s); }
   }
 
   // 公園（芝＋池＋木立＋ベンチ）
