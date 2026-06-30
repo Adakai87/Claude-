@@ -739,8 +739,10 @@ const SERVICE_DEFS = {
   stock:      { label:'証券取引所', color:0x9fb0c2 },
   realestate: { label:'不動産',     color:0xc6b9a2 },
   agency:     { label:'広告代理店', color:0x7a6fb0 },
+  auction:    { label:'オークションハウス', color:0x7a3a4a },
+  lobby:      { label:'ロビー会社',          color:0xcabf9a },
 };
-const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34} ];
+const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34}, {key:'auction',x:-58,z:2}, {key:'lobby',x:58,z:2} ];
 const cityServices = [];                // {key,mesh,group,x,z,city}
 // 株式市場（自社=TRB。価格は日次でドリフト）
 const STOCKS = [
@@ -755,6 +757,31 @@ const holdings = {};                    // sym -> 保有株数
 const portfolioValue = () => STOCKS.reduce((a,s)=>a+(holdings[s.sym]||0)*s.price, 0);
 // 不動産投資（収益物件）
 let ownedRealty = [];                   // {addr, dailyRent, paid}
+// オークションハウス（コレクティブル：保有すると毎日少しずつ価値が上がる）
+const COLLECTIBLES = [
+  {name:'1932 ヴィンテージ・エスプレッソ機', base:18000, rate:0.005},
+  {name:'19世紀の銅製サイフォン', base:9000, rate:0.004},
+  {name:'限定アート（珈琲とカップ）', base:14000, rate:0.006},
+  {name:'初版『珈琲の科学』署名本', base:6000, rate:0.0035},
+  {name:'アンティーク豆挽きミル', base:5000, rate:0.003},
+  {name:'名匠の手吹きグラスセット', base:11000, rate:0.0045},
+  {name:'伝説のバリスタ優勝トロフィー', base:22000, rate:0.007},
+  {name:'希少ゲイシャ生豆の原木標本', base:8000, rate:0.004},
+];
+let auctionLots = [];                    // 出品中 {name, value, est, rate}
+let ownedCollectibles = [];              // 保有 {name, value, rate}
+const collectiblesValue = () => ownedCollectibles.reduce((a,c)=>a+c.value, 0);
+// ロビー会社（政治献金で影響力を高め、規制緩和・補助金・減税を獲得）
+const lobby = { level:0 };               // 0..4
+const LOBBY_TIERS = [
+  {cost:8000,  sub:600,  rentCut:0.04, buildCut:0.04, name:'地域協議会への加入',     desc:'毎日 補助金¥600・家賃-4%・出店-4%'},
+  {cost:20000, sub:1500, rentCut:0.08, buildCut:0.08, name:'市政へのロビー活動',     desc:'毎日 補助金¥1,500・家賃-8%・出店-8%'},
+  {cost:45000, sub:3200, rentCut:0.12, buildCut:0.12, name:'業界団体の理事就任',     desc:'毎日 補助金¥3,200・家賃-12%・出店-12%'},
+  {cost:90000, sub:6000, rentCut:0.16, buildCut:0.16, name:'国政レベルの影響力',     desc:'毎日 補助金¥6,000・家賃-16%・出店-16%'},
+];
+const lobbyTier = () => lobby.level>0 ? LOBBY_TIERS[lobby.level-1] : null;
+const lobbyRentCut  = () => lobbyTier()?lobbyTier().rentCut:0;
+const lobbyBuildCut = () => lobbyTier()?lobbyTier().buildCut:0;
 // 広告代理店（都市ブランド施策：一回ごとにブランド上昇）
 const AGENCY = [
   {id:'online',    name:'オンライン広告', cost:3000,  brand:8,  desc:'費用対効果が高い'},
@@ -1032,7 +1059,7 @@ function ensureServices(cityId){ if(cityServices.some(s=>s.city===cityId)) retur
 function makeServiceBuilding(key, x, z, cityId){
   const def=SERVICE_DEFS[key];
   const g=new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
-  const h = key==='stock'?16 : key==='realestate'?13 : 7;
+  const h = key==='stock'?16 : key==='realestate'?13 : key==='auction'?9 : key==='lobby'?8 : 7;
   const body=new THREE.Mesh(new THREE.BoxGeometry(8,h,7), new THREE.MeshStandardMaterial({color:def.color})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
   const roof=new THREE.Mesh(new THREE.BoxGeometry(8.4,0.5,7.4), new THREE.MeshStandardMaterial({color:0x33343d})); roof.position.y=h+0.25; g.add(roof);
   if(key==='bank'){ const ped=new THREE.Mesh(new THREE.BoxGeometry(8.8,0.6,7.7), new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.3; g.add(ped);
@@ -1041,6 +1068,19 @@ function makeServiceBuilding(key, x, z, cityId){
     const tick=new THREE.Mesh(new THREE.BoxGeometry(8.1,0.7,7.1), new THREE.MeshStandardMaterial({color:0x2bd07a,emissive:0x0d5a32,emissiveIntensity:0.6})); tick.position.y=2.0; g.add(tick); }
   else if(key==='realestate'){ for(let r=0;r<Math.floor(h/2.3);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.0,7.1), new THREE.MeshStandardMaterial({color:0xbfe0f2,emissive:0x22425a,emissiveIntensity:0.4})); band.position.y=1.6+r*2.3; g.add(band);}
     const sign=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.2,0.1), new THREE.MeshStandardMaterial({color:0x2f7fc0,emissive:0x103048,emissiveIntensity:0.4})); sign.position.set(0,h*0.5,3.6); g.add(sign); }
+  else if(key==='auction'){   // オークションハウス：赤レンガ＋切妻ペディメント＋柱＋金の旗
+    const ped=new THREE.Mesh(new THREE.BoxGeometry(8.8,0.6,7.7), new THREE.MeshStandardMaterial({color:0x4a3038})); ped.position.y=0.3; g.add(ped);
+    for(let i=0;i<4;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,h*0.62,10), new THREE.MeshStandardMaterial({color:0xe7ddca})); c.position.set(-2.7+i*1.8,h*0.31+0.3,3.7); g.add(c); }
+    const pedi=new THREE.Mesh(new THREE.CylinderGeometry(0.01,4.6,1.7,3), new THREE.MeshStandardMaterial({color:0xe7ddca})); pedi.rotation.y=Math.PI/2; pedi.scale.set(1,1,0.18); pedi.position.set(0,h*0.62+0.9,3.6); g.add(pedi);
+    const flag=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.0,0.08), new THREE.MeshStandardMaterial({color:0xcaa24a,emissive:0x4a3a10,emissiveIntensity:0.4})); flag.position.set(0,h*0.55,3.62); g.add(flag);
+  }
+  else if(key==='lobby'){     // ロビー会社：白い庁舎＋ドーム
+    body.material=new THREE.MeshStandardMaterial({color:0xeae3d2});
+    const ped=new THREE.Mesh(new THREE.BoxGeometry(8.6,0.7,7.6), new THREE.MeshStandardMaterial({color:0xd9d2c0})); ped.position.y=0.35; g.add(ped);
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,10,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0xc9cdd4})); dome.position.y=h+0.2; g.add(dome);
+    const drum=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.4,1.4,16), new THREE.MeshStandardMaterial({color:0xe3ddcd})); drum.position.y=h-0.4; g.add(drum);
+    for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,h*0.6,8), new THREE.MeshStandardMaterial({color:0xf2ecdd})); c.position.set(-3.0+i*1.5,h*0.3+0.35,3.7); g.add(c); }
+  }
   else { const stripe=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.4,7.1), new THREE.MeshStandardMaterial({color:0x9a6fd0,emissive:0x2a1850,emissiveIntensity:0.4})); stripe.position.y=h*0.6; g.add(stripe); }
   body.userData.group=g;
   const entry={ key, mesh:body, group:g, x, z, city:cityId };
@@ -1323,7 +1363,8 @@ function buildOverviewScene(){
   function pick0(...a){ return a[(Math.random()*a.length)|0]; }
 
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
+  const STADIUM_POS = {x:54,z:-54};
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ---- パレット（実在の街っぽい落ち着いた色）----
@@ -1442,6 +1483,24 @@ function buildOverviewScene(){
     pond.rotation.x=-Math.PI/2; pond.position.set(px+2,0.05,pz+2); scene.add(pond);
     for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*6-1, pz+Math.sin(a)*6-1, 1.1); }
     for(const o of [[-5,-4],[-5,4]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.3,pz+o[1]); scene.add(bn); }
+  })();
+
+  // 野球スタジアム（ランドマーク：外周スタンド＋芝＋内野ダイヤモンド＋照明塔）
+  (function stadium(){
+    const sx=STADIUM_POS.x, sz=STADIUM_POS.z;
+    const g=new THREE.Group(); g.position.set(sx,0,sz); scene.add(g);
+    const field=new THREE.Mesh(new THREE.CircleGeometry(8.4,28), new THREE.MeshStandardMaterial({color:0x4f9a48})); field.rotation.x=-Math.PI/2; field.position.y=0.05; g.add(field);
+    // 外周スタンド（リング）
+    const stand=new THREE.Mesh(new THREE.CylinderGeometry(10.4,9.2,2.6,30,1,true), new THREE.MeshStandardMaterial({color:0xd9d2c4, side:THREE.DoubleSide})); stand.position.y=1.3; g.add(stand);
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(10.2,0.5,8,30), new THREE.MeshStandardMaterial({color:0xb8b0a0})); rim.rotation.x=Math.PI/2; rim.position.y=2.6; g.add(rim);
+    const seats=new THREE.Mesh(new THREE.CylinderGeometry(9.2,8.4,1.2,30,1,true), new THREE.MeshStandardMaterial({color:0x3f6f8f, side:THREE.DoubleSide})); seats.position.y=1.1; g.add(seats);
+    // 内野ダイヤモンド（土）＋ベース
+    const dirt=new THREE.Mesh(new THREE.CircleGeometry(3.4,4), new THREE.MeshStandardMaterial({color:0xc08a52})); dirt.rotation.x=-Math.PI/2; dirt.rotation.z=Math.PI/4; dirt.position.set(0,0.07,0.8); g.add(dirt);
+    const inf=new THREE.Mesh(new THREE.CircleGeometry(2.0,4), new THREE.MeshStandardMaterial({color:0x57a64e})); inf.rotation.x=-Math.PI/2; inf.rotation.z=Math.PI/4; inf.position.set(0,0.09,0.8); g.add(inf);
+    // 照明塔（4基）
+    for(const a of [0.6,2.0,4.2,5.6]){ const lx=Math.cos(a)*10.6, lz=Math.sin(a)*10.6;
+      const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.2,5,6), new THREE.MeshStandardMaterial({color:0x9aa0a8})); pole.position.set(lx,2.5,lz); g.add(pole);
+      const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.7,0.3), new THREE.MeshStandardMaterial({color:0xfff6d8, emissive:0xfff0c0, emissiveIntensity:0.7})); lamp.position.set(lx,5,lz); lamp.lookAt(0,1,0.8); g.add(lamp); }
   })();
 
   // 走る車（区画のすき間＝道路を往復）
@@ -2075,7 +2134,7 @@ document.getElementById('btn-close').onclick = ()=>{
   modal.classList.add('show');
 };
 // 日次PL（営業損益）
-function plRent(){ return store.rentDaily || RENT[store.location] || 0; }
+function plRent(){ return Math.round((store.rentDaily || RENT[store.location] || 0) * (1 - lobbyRentCut())); }
 function plInterest(){ return Math.round(finance.debt*loanRateEff()); }
 function plBreakdown(){
   const tips = dayStats.tips;
@@ -2118,6 +2177,8 @@ document.getElementById('m-next').onclick = ()=>{
   sim.money += branchesDailyNet();
   if(campaignOn.catering){ sim.money += 3000 + Math.round(brand*25); }   // ケータリング：法人向けの固定収入
   sim.money += ownedRealty.reduce((a,r)=>a+r.dailyRent,0);               // 不動産の家賃収入
+  ownedCollectibles.forEach(c=>{ c.value=Math.round(c.value*(1+c.rate*(0.6+Math.random()*0.8))); }); // コレクティブルの値上がり
+  if(lobbyTier()) sim.money += lobbyTier().sub;                          // ロビー：補助金収入
   STOCKS.forEach(s=>{ let d=(Math.random()-0.48)*0.06; if(s.self) d += (lastProfit>0?0.012:-0.006); s.price=Math.max(1, +(s.price*(1+d)).toFixed(2)); });  // 株価の変動
   finance.invest = Math.round(finance.invest * (1 + investRateEff()));
   const mgrM = branches[0].manager;
@@ -2708,8 +2769,9 @@ let buildLot=null, buildInt=0, buildEq=0, buildExt=0, buildType='cafe';
 function buildCost(){
   if(!buildLot) return 0;
   const plot=buildLot.tenant.cost;
-  if(buildType==='cafe') return plot + EXTERIORS[buildExt].cost + INTERIORS[buildInt].cost + EQUIP_SETS[buildEq].cost;
-  return plot + (FAC_DEFS[buildType]?FAC_DEFS[buildType].build:0);
+  const cut = 1 - lobbyBuildCut();
+  if(buildType==='cafe') return Math.round((plot + EXTERIORS[buildExt].cost + INTERIORS[buildInt].cost + EQUIP_SETS[buildEq].cost)*cut);
+  return Math.round((plot + (FAC_DEFS[buildType]?FAC_DEFS[buildType].build:0))*cut);
 }
 function openBuildSheet(lot){ buildLot=lot; buildInt=0; buildEq=0; buildExt=0; buildType='cafe'; renderBuild(); document.getElementById('modal-build').classList.add('show'); }
 // 大きめの選択カード（描き込みイラスト＋価格、設備は品質/生産性の★）
@@ -3073,7 +3135,9 @@ function genRealty(city){ const areas=['丸の内','新宿','渋谷','本町','�
   return out;
 }
 function openService(key){ svcKey=key; document.getElementById('svc-title').textContent=SERVICE_DEFS[key].label; renderSvc(); document.getElementById('modal-service').classList.add('show'); }
-function renderSvc(){ const el=document.getElementById('svc-body'); el.innerHTML = svcKey==='bank'?renderBank():svcKey==='stock'?renderStock():svcKey==='realestate'?renderRealty():renderAgency(); }
+function renderSvc(){ const el=document.getElementById('svc-body'); el.innerHTML = svcKey==='bank'?renderBank():svcKey==='stock'?renderStock():svcKey==='realestate'?renderRealty():svcKey==='auction'?renderAuction():svcKey==='lobby'?renderLobby():renderAgency(); }
+function refreshAuctionLots(){ const pick=[...COLLECTIBLES].sort(()=>Math.random()-0.5).slice(0,3);
+  auctionLots = pick.map(c=>{ const v=Math.round(c.base*(0.85+Math.random()*0.45)); return {name:c.name, value:v, est:Math.round(v*(1.0+Math.random()*0.25)), rate:c.rate}; }); }
 function renderBank(){
   let h=`<div class="note" style="margin-top:6px">事業ローンの申込みと返済ができます（オフィスが無くても利用OK）。</div>`;
   h+=`<div class="dash-kpis"><div class="kpi"><div class="v" style="color:var(--red)">¥${finance.debt.toLocaleString('ja-JP')}</div><div class="l">借入残（日利${(loanRateEff()*100).toFixed(1)}%）</div></div><div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div></div>`;
@@ -3107,9 +3171,35 @@ function renderAgency(){
   AGENCY.forEach(a=> h+=`<div class="mcard"><div class="thumb">${ART.pop}</div><div class="info"><div class="ttl">${a.name}</div><div class="meta">${a.desc}・ブランド +${Math.round(a.brand*marketingMult())}</div></div><div class="act"><button class="mbtn" data-agency="${a.id}" ${sim.money<a.cost?'disabled':''}>実施<br>¥${a.cost.toLocaleString('ja-JP')}</button></div></div>`);
   return h;
 }
+function renderAuction(){
+  if(!auctionLots.length) refreshAuctionLots();
+  const gain = collectiblesValue() - ownedCollectibles.reduce((a,c)=>a+(c.paid||c.value),0);
+  let h=`<div class="note" style="margin-top:6px">珍しいコレクティブルを落札。保有すると毎日少しずつ価値が上がり、いつでも売却できます。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v green">¥${collectiblesValue().toLocaleString('ja-JP')}</div><div class="l">コレクション評価額</div></div><div class="kpi"><div class="v" style="color:${gain>=0?'var(--green)':'var(--red)'}">${gain>=0?'+':'−'}¥${Math.abs(gain).toLocaleString('ja-JP')}</div><div class="l">含み損益</div></div></div>`;
+  h+=`<div class="dash-h">本日の出品</div>`;
+  auctionLots.forEach((a,i)=> h+=`<div class="mcard"><div class="thumb">${ART.chic}</div><div class="info"><div class="ttl">${a.name}</div><div class="meta">落札価格 ¥${a.value.toLocaleString('ja-JP')}・推定 ¥${a.est.toLocaleString('ja-JP')}・値上がり 1日+約${(a.rate*100).toFixed(2)}%</div></div><div class="act"><button class="mbtn" data-bidlot="${i}" ${sim.money<a.value?'disabled':''}>落札<br>¥${a.value.toLocaleString('ja-JP')}</button></div></div>`);
+  h+=`<div class="mrow"><div class="nm">出品を入れ替える<div class="sub2">新しい品が並びます</div></div><button class="mbtn" data-reauction="1">更新</button></div>`;
+  if(ownedCollectibles.length){ h+=`<div class="dash-h">保有コレクション</div>`;
+    ownedCollectibles.forEach((c,i)=>{ const pl=c.value-(c.paid||c.value); h+=`<div class="mcard"><div class="thumb">${ART.chic}</div><div class="info"><div class="ttl">${c.name}</div><div class="meta">現在価値 ¥${c.value.toLocaleString('ja-JP')}・取得 ¥${(c.paid||c.value).toLocaleString('ja-JP')}（${pl>=0?'+':'−'}¥${Math.abs(pl).toLocaleString('ja-JP')}）</div></div><div class="act"><button class="mbtn" data-sellcol="${i}">売却</button></div></div>`; }); }
+  return h;
+}
+function renderLobby(){
+  const tier=lobbyTier();
+  let h=`<div class="note" style="margin-top:6px">政治献金で影響力を高め、規制緩和・補助金・減税を獲得します。レベルは累積（上位ほど効果大）。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v gold">Lv.${lobby.level}</div><div class="l">影響力レベル</div></div><div class="kpi"><div class="v green">¥${(tier?tier.sub:0).toLocaleString('ja-JP')}/日</div><div class="l">補助金収入</div></div></div>`;
+  if(tier) h+=`<div class="note" style="margin-top:0;border-left:3px solid var(--green)">現在の特典：${tier.desc}</div>`;
+  h+=`<div class="dash-h">ロビー活動（影響力を上げる）</div>`;
+  LOBBY_TIERS.forEach((t,i)=>{ const cur=lobby.level===i+1, done=lobby.level>i+1, avail=lobby.level===i;
+    h+=`<div class="mcard ${cur?'sel':''}"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">Lv.${i+1} ${t.name}</div><div class="meta">${t.desc}</div></div><div class="act">${done||cur?`<span class="sub2">${cur?'実施中':'達成済'}</span>`:`<button class="mbtn" data-lobby="${i+1}" ${(!avail||sim.money<t.cost)?'disabled':''}>${avail?'献金<br>¥'+t.cost.toLocaleString('ja-JP'):'要Lv.'+i}</button>`}</div></div>`; });
+  return h;
+}
 document.getElementById('svc-body').addEventListener('click', e=>{
   const t=e.target.closest('button'); if(!t) return;
   if(t.dataset.loan){ takeLoan(+t.dataset.loan); }
+  else if(t.dataset.bidlot){ const a=auctionLots[+t.dataset.bidlot]; if(a&&sim.money>=a.value){ sim.money-=a.value; dayStats.capex+=a.value; ownedCollectibles.push({name:a.name, value:a.value, paid:a.value, rate:a.rate}); auctionLots.splice(+t.dataset.bidlot,1); } }
+  else if(t.dataset.reauction){ refreshAuctionLots(); }
+  else if(t.dataset.sellcol){ const i=+t.dataset.sellcol, c=ownedCollectibles[i]; if(c){ sim.money+=c.value; dayStats.revenue+=0; ownedCollectibles.splice(i,1); } }
+  else if(t.dataset.lobby){ const lv=+t.dataset.lobby, ti=LOBBY_TIERS[lv-1]; if(lobby.level===lv-1 && sim.money>=ti.cost){ sim.money-=ti.cost; dayStats.capex+=ti.cost; lobby.level=lv; brand=Math.min(100,brand+3); } }
   else if(t.dataset.repay){ repayLoan(+t.dataset.repay); }
   else if(t.dataset.buystock){ const s=STOCKS.find(x=>x.sym===t.dataset.buystock); if(s){ const c=Math.round(s.price*10); if(sim.money>=c){ sim.money-=c; holdings[s.sym]=(holdings[s.sym]||0)+10; } } }
   else if(t.dataset.sellstock){ const s=STOCKS.find(x=>x.sym===t.dataset.sellstock); if(s){ const own=holdings[s.sym]||0, n=Math.min(10,own); if(n>0){ sim.money+=Math.round(s.price*n); holdings[s.sym]=own-n; } } }
@@ -3171,6 +3261,7 @@ function gameState(){
     FACILITY:{...FACILITY}, office:{leased:office.leased, dept:{...office.dept}},
     campaignOn:{...campaignOn},
     holdings:{...holdings}, ownedRealty, stockPrices:Object.fromEntries(STOCKS.map(s=>[s.sym,s.price])),
+    ownedCollectibles, lobby:{level:lobby.level},
     facilities:landmarks.map(l=>({kind:l.kind, x:l.x, z:l.z, city:l.city})),
     rivals:RIVALS.map(r=>({name:r.name, comp:r.comp, color:r.color, pos:r.pos, city:r.city})),
     lots:lots.map(l=>({city:l.city, x:l.x, z:l.z, tenant:l.tenant, built:!!l.branch})),
@@ -3243,6 +3334,8 @@ function loadGame(slot){
   if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
   if(d.holdings) Object.assign(holdings, d.holdings);
   if(d.ownedRealty) ownedRealty = d.ownedRealty;
+  if(d.ownedCollectibles) ownedCollectibles = d.ownedCollectibles;
+  if(d.lobby) lobby.level = d.lobby.level||0;
   if(d.stockPrices) STOCKS.forEach(s=>{ if(d.stockPrices[s.sym]!=null) s.price=d.stockPrices[s.sym]; });
   const facList=[];
   if(d.facilities) d.facilities.forEach(f=>{ const e=makeFacility(f.kind, f.x, f.z, f.city||viewCity); FACILITY[f.kind]=true; facList.push(e); });
