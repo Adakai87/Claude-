@@ -216,6 +216,30 @@
   .optbig .ostat{display:flex; gap:10px; margin:5px 0 2px; flex-wrap:wrap;}
   .optbig .ostat .lbl{font-size:9.5px; color:var(--sub); letter-spacing:.04em;}
   .optbig .oprice{font-weight:800; font-size:15px; margin-top:4px;}
+  /* オフィス（本社）画面 */
+  .off-hero{width:100%; aspect-ratio:16/8; border-radius:14px; overflow:hidden; margin:2px 0 12px; background:radial-gradient(130% 120% at 50% 25%, #20303a, #0d171d);}
+  .off-hero svg{width:100%; height:100%; display:block;}
+  .off-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px;}
+  .off-stat{background:var(--panel2); border:1px solid var(--line); border-radius:11px; padding:9px 8px;}
+  .off-stat .v{font-size:21px; font-weight:800; color:var(--gold); line-height:1;}
+  .off-stat .v span{font-size:10px; color:var(--sub); font-weight:700; margin-left:3px;}
+  .off-stat .l{font-size:9px; color:var(--sub); letter-spacing:.06em; margin-top:5px;}
+  .deptcard{display:flex; gap:11px; border:1px solid var(--line); background:var(--panel2); border-radius:13px; padding:10px; margin-bottom:9px;}
+  .deptcard.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .deptcard .dept-img{width:92px; height:70px; flex-shrink:0; border-radius:9px; overflow:hidden; background:radial-gradient(120% 120% at 50% 25%, #20303a, #0d171d);}
+  .deptcard .dept-img svg{width:100%; height:100%; display:block;}
+  .dept-main{flex:1; min-width:0;}
+  .dept-h{display:flex; align-items:center; gap:6px; font-size:15px;}
+  .dept-dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+  .dept-en{font-size:10px; color:var(--sub); font-weight:700; letter-spacing:.03em;}
+  .dept-desc{font-size:11px; color:var(--sub); line-height:1.5; margin:5px 0 8px;}
+  .dept-foot{display:flex; align-items:center; gap:8px;}
+  .dept-tog{width:46px; height:27px; border-radius:14px; border:1px solid var(--line); background:#2a2f36; position:relative; cursor:pointer; flex-shrink:0; padding:0;}
+  .dept-tog .knob{position:absolute; top:2px; left:2px; width:21px; height:21px; border-radius:50%; background:#fff; transition:left .15s;}
+  .dept-tog.on{background:var(--accent); border-color:var(--accent);}
+  .dept-tog.on .knob{left:21px;}
+  .dept-add{font-size:13px; font-weight:700;}
+  .dept-cap{margin-left:auto; font-size:10px; color:var(--sub); letter-spacing:.03em;}
   /* 出店シートの画像つき選択タイル */
   .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
   .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
@@ -430,6 +454,16 @@
     <h2 id="svc-title">サービス</h2>
     <div id="svc-body" class="flex-body" style="text-align:left"></div>
     <div class="flex-foot"><button class="btn ghost" id="svc-close" style="width:100%">閉じる</button></div>
+  </div>
+</div>
+
+<!-- オフィス（本社）：フロア＆部署の管理 -->
+<div class="modal" id="modal-office">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-office" aria-label="閉じる">×</button>
+    <h2 id="office-title">オフィス（本社）</h2>
+    <div id="office-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot"><button class="btn ghost" data-close="modal-office" style="width:100%">閉じる</button></div>
   </div>
 </div>
 
@@ -660,7 +694,7 @@ function updateStaff(dtGameMin){
   for(const s of staff){
     s.cool -= dtGameMin;
     if(s.cool <= 0 && queue.length){
-      s.cool = serveOne() ? 24 / s.skill : 4;   // スキルが高いほど速い
+      s.cool = serveOne() ? 24 / (s.skill * (deptOn('hr')?1.12:1)) : 4;   // スキルが高いほど速い・人事部でモラルUP
     }
   }
 }
@@ -684,6 +718,21 @@ const FAC_DEFS = {
   warehouse:{ label:'倉庫',     tab:'supply',  color:0xb0a89a, h:6,  build:20000, desc:'まとめ買いで1回の仕入れ量が2倍に（在庫を多く確保）' },
 };
 const FACILITY = { hq:false, roastery:false, farm:false, warehouse:false };
+// ---- オフィス（本社）：契約後、フロアに「部署」を追加して会社機能を解放 ----
+const office = { leased:false, maxFloors:5, sqft:4320, dept:{} };  // dept[key]=true
+const DEPT_DEFS = [
+  {key:'hr',        name:'人事部',     en:'Human Resources', color:'#5f9e6a', cap:16,
+   desc:'健康保険・退職金などの福利厚生を全スタッフに提供。モラルと定着率が上がり離職を防ぐ。'},
+  {key:'finance',   name:'財務部',     en:'Finance',         color:'#5f7fb9', cap:16,
+   desc:'会計と投資家対応を担当。株式公開（IPO）と資金運用が解放され、上場企業として運営できる。'},
+  {key:'products',  name:'商品開発部', en:'Products',        color:'#caa24a', cap:16,
+   desc:'新商品の開発とカスタム豆ブレンド。生産者から直接仕入れ、メニュー開発費が30%割引に。'},
+  {key:'supply',    name:'サプライ部', en:'Supply Chain',    color:'#b07a4a', cap:16,
+   desc:'自社農園と在庫を一括管理。栽培から在庫まで安定供給し、材料の仕入れコストが15%下がる。'},
+  {key:'marketing', name:'マーケ部',   en:'Marketing',       color:'#c95a8a', cap:16,
+   desc:'広告キャンペーンとブランド戦略を担当。常設マーケ施策とスポット広告が解放される。'},
+];
+const deptOn = k => !!(office.leased && office.dept[k]);
 // ---- 街のサービス施設（最初からある。タップして利用：銀行/証券/不動産/広告代理店）----
 const SERVICE_DEFS = {
   bank:       { label:'銀行',       color:0xe6ddc8 },
@@ -845,7 +894,7 @@ const execSalaries = () => Object.values(execRoles).reduce((a,e)=>a+(e.hired?e.s
 function toggleExec(k){ execRoles[k].hired = !execRoles[k].hired; }
 const investRateEff = () => INVEST_RATE + (hasExec('cfo')?0.01:0);
 const loanRateEff   = () => Math.max(0.006, LOAN_RATE - (hasExec('cfo')?0.008:0));
-const devDiscount   = () => hasExec('cto')?0.7:1;
+const devDiscount   = () => (hasExec('cto')?0.7:1) * (deptOn('products')?0.7:1);  // 商品開発部：開発費−30%
 const brandDecay    = () => hasExec('cmo')?1:3;
 // 会社（企業価値・IPO・配当）
 const company = { public:false, dividendsPaid:0, ipoRaised:0 };
@@ -1699,6 +1748,7 @@ function restock(key){
   const bulk = FACILITY.warehouse ? 2 : 1;                 // 倉庫：まとめ買いで2倍
   let cost = mt.buyCost * bulk;
   if(key==='bean' && FACILITY.farm) cost = Math.round(cost*0.6);   // 農園：豆が安い
+  if(deptOn('supply')) cost = Math.round(cost*0.85);               // サプライ部：仕入れ−15%
   if(sim.money < cost) return false;
   sim.money -= cost; mt.stock += mt.buyAmt*bulk; dayStats.cogs += cost; return true;
 }
@@ -2304,6 +2354,32 @@ const EXT_ART = [ exteriorArt('#d8cdbb','#e0894a','std'), exteriorArt('#9a4f32',
 const INT_ART = [ interiorArt('#caa178','#c9b9a0','#caa86a','#8fae7a'), interiorArt('#6b6f78','#9aa0aa','#3a3f46','#5f7fb9'), interiorArt('#b86a9a','#e6c84a','#caa24a','#5fc0a0') ];
 const EQ_ART  = [ machineArt('#9aa0aa','#c95a4a',2,'drip'), machineArt('#dfe3ea','#c95a4a',2,'espresso'), machineArt('#3f4853','#caa24a',3,'espresso') ];
 const EQ_STARS = [ {q:2,pr:3}, {q:3,pr:3}, {q:5,pr:4} ];   // 品質 / 生産性
+// オフィス内装（ガラス壁の部屋＋デスク島＋緑のプランター＋観葉植物＋プリンター）
+function officeArt(){
+  let s='';
+  s+=ibox(-4,-4,-0.35,8,8,0.35,'#dcc6a2');                       // 木床
+  s+=ibox(-4,-4,0,0.16,8,4.3,'rgba(176,208,234,.40)');          // 左ガラス壁
+  s+=ibox(-4,-4,0,8,0.16,4.3,'rgba(176,208,234,.32)');          // 奥ガラス壁
+  s+=ibox(-4,-4,4.2,0.22,8,0.32,'#eef1f4');                     // 左上枠（白）
+  s+=ibox(-4,-4,4.2,8,0.22,0.32,'#e3e7eb');                     // 奥上枠（白）
+  s+=ibox(-0.06,-4,0,0.12,4.4,3.1,'rgba(176,208,234,.30)');     // 中央ガラス間仕切り
+  s+=ibox(-0.06,-4,3.0,0.16,4.4,0.26,'#eef1f4');
+  // デスク島：木キャビ＋白天板＋緑プランター＋黒チェア×2
+  const desk=(gx,gz)=>{ let d='';
+    d+=ibox(gx,gz,0,2.6,1.0,0.85,'#7a5836');                    // 木キャビ
+    d+=ibox(gx-0.1,gz-0.1,0.85,2.8,1.2,0.16,'#f4f0e9');         // 白天板
+    d+=ibox(gx,gz+1.0,0.85,2.6,0.32,0.42,'#3f7a44');            // 緑プランター
+    d+=ibox(gx+0.25,gz-0.78,0,0.62,0.62,1.0,'#2c2f34');         // 椅子
+    d+=ibox(gx+1.55,gz-0.78,0,0.62,0.62,1.0,'#2c2f34');
+    return d; };
+  s+=desk(-3.3,-2.5)+desk(-3.3,0.7)+desk(0.7,-2.5)+desk(0.7,0.7);
+  s+=ibox(-0.55,-0.5,0,0.55,0.55,0.5,'#c79a64');                // 観葉植物（鉢）
+  s+=ibox(-0.7,-0.65,0.5,0.85,0.85,0.95,'#4f8a4a');             // 葉
+  s+=ibox(2.5,-3.3,0,0.95,0.95,1.0,'#e9edf1');                  // プリンター
+  s+=ibox(2.6,-3.2,1.0,0.75,0.75,0.18,'#cdd3da');
+  return isoArt(s);
+}
+const OFFICE_ART = officeArt();
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
@@ -2489,6 +2565,7 @@ function renderManage(){
       <button class="mbtn" data-withdraw="1" ${finance.invest<=0?'disabled':''}>全額引出</button></div>`;
     h += `<div class="note">毎日の閉店時に家賃と借入利息が引かれ、運用は+1.5%増えます。日次の損益は閉店サマリーで確認できます。</div>`;
   } else if(mtab==='marketing'){
+    if(!deptOn('marketing')){ el.innerHTML = `<div class="note" style="margin-top:0">🔒 マーケティングには本社に<b>マーケ部</b>の設置が必要です。<br><br>会社タブ→「部署を管理」からマーケ部を追加してください。</div>`; return; }
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">${Math.round(brand)}</div><div class="l">ブランド力（0-100）</div></div>
        <div class="kpi"><div class="v green">${Math.round(playerShare()*100)}%</div><div class="l">市場シェア</div></div></div>`;
@@ -2517,6 +2594,8 @@ function renderManage(){
     const val = valuation(), nw = netWorth();
     const assets = sim.money + Math.round(finance.invest) + storeAssets();
     h += mcard(logoBadge(profile.logo,58), profile.brandName, 'オーナー：'+profile.owner+'｜'+sim.day+'日目', '<span class="sub2">あなたの会社</span>');
+    const dcount=DEPT_DEFS.filter(d=>office.dept[d.key]).length;
+    h += `<div class="mcard"><div class="thumb">${OFFICE_ART}</div><div class="info"><div class="ttl">オフィス（本社）</div><div class="meta">${office.maxFloors}フロア・${office.sqft.toLocaleString('en-US')}sqft／部署 ${dcount}/${DEPT_DEFS.length}</div></div><div class="act"><button class="mbtn" data-openoffice="1">部署を管理</button></div></div>`;
     h += `<div class="dash-kpis">
        <div class="kpi"><div class="v gold">¥${val.toLocaleString('ja-JP')}</div><div class="l">企業価値</div></div>
        <div class="kpi"><div class="v">${company.public?'上場済':'未上場'}</div><div class="l">ステータス</div></div>
@@ -2527,19 +2606,22 @@ function renderManage(){
     h += `<div class="mrow"><div class="nm">負債（借入）</div><span class="${finance.debt>0?'low':''}">¥${finance.debt.toLocaleString('ja-JP')}</span></div>`;
     h += `<div class="mrow"><div class="nm"><b>純資産（資本）</b></div><b>¥${nw.toLocaleString('ja-JP')}</b></div>`;
     h += `<div class="dash-h">資本政策</div>`;
-    if(!company.public){
+    if(!deptOn('finance')){
+      h += `<div class="note" style="margin-top:0">🔒 上場（IPO）と資本政策には本社に<b>財務部</b>の設置が必要です。会社タブ上部の「部署を管理」から追加してください。</div>`;
+    } else if(!company.public){
       h += mcard(ART.chic, 'IPO（株式上場）', val>=120000?'投資銀行と上場し企業価値の30%を調達':`企業価値12万以上で実施可（現在 ¥${val.toLocaleString('ja-JP')}）`,
         `<button class="mbtn" data-ipo="1" ${val<120000?'disabled':''}>上場</button>`);
     } else {
       h += mcard(ART.chic, '上場企業', `調達¥${company.ipoRaised.toLocaleString('ja-JP')}・配当累計¥${company.dividendsPaid.toLocaleString('ja-JP')}`, '<span class="sub2">上場済</span>', true);
     }
-    h += mcard(ART.cozy, '配当を出す', '¥1万を株主還元（ブランド+4）', `<button class="mbtn" data-dividend="1" ${sim.money<10000?'disabled':''}>配当</button>`);
+    if(deptOn('finance')) h += mcard(ART.cozy, '配当を出す', '¥1万を株主還元（ブランド+4）', `<button class="mbtn" data-dividend="1" ${sim.money<10000?'disabled':''}>配当</button>`);
     h += `<div class="note">企業価値＝ブランド×シェア×利益×資産。上場で大型調達、配当で市場評価UP。</div>`;
   }
   el.innerHTML = h;
 }
 document.getElementById('manage-body').addEventListener('click', e=>{
   const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.openoffice){ openOffice(); return; }
   if(t.dataset.price){
     const [id,dir] = t.dataset.price.split('|'); const m = MENU.find(x=>x.id===id);
     if(m){ m.price = Math.max(100, m.price + (dir==='+'?50:-50)); recomputePriceLevel(); }
@@ -2693,10 +2775,12 @@ document.getElementById('build-go').onclick = ()=>{
     if(!branches[0].built || FACILITY[buildType]) return;
     sim.money-=cost; dayStats.capex+=cost;
     const f=makeFacility(buildType, lot.x, lot.z, lot.city); FACILITY[buildType]=true; lot.branch=f;
+    if(buildType==='hq') office.leased=true;
     applyCityView();
     document.getElementById('modal-build').classList.remove('show');
     saveGame(); updateHUD();
     flashHint(`${FAC_DEFS[buildType].label}を建設！ ${FAC_DEFS[buildType].desc}`);
+    if(buildType==='hq') openOffice();
     return;
   }
   // --- カフェを出店 ---
@@ -2828,6 +2912,7 @@ function shopProduct(){
 // --- マーケ：シェア＋常設施策（オフィス契約で解放）---
 function shopMarketing(){
   if(!FACILITY.hq) return `<div class="note" style="margin-top:6px">🔒 マーケティングは<b>オフィス（本社）</b>を契約すると使えます。空きテナント→「本社」を建設してください。</div>`;
+  if(!deptOn('marketing')) return `<div class="note" style="margin-top:6px">🔒 マーケ施策には本社に<b>マーケ部</b>の設置が必要です。経営パネル→会社→「部署を管理」から追加してください。</div>`;
   const share=Math.round(playerShare()*100);
   let h=`<div class="dash-h" style="margin-top:6px">エリアの市場シェア</div>`;
   h+=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px"><div>${donut(share,'#5bbd6a','シェア')}</div><div><div class="ttl">${profile.brandName||'自店'}</div><div class="meta">ブランド力 ${Math.round(brand)}／競合 ${RIVALS.filter(r=>r.city===viewCity).length}社</div></div></div>`;
@@ -2947,6 +3032,39 @@ function openLeaseInfo(lot){
 }
 document.getElementById('lease-cancel').onclick = ()=> document.getElementById('modal-lease').classList.remove('show');
 document.getElementById('lease-go').onclick = ()=>{ document.getElementById('modal-lease').classList.remove('show'); if(leaseLot) openBuildSheet(leaseLot); };
+// ===== オフィス（本社）：フロア＆部署 =====
+function openOffice(){ renderOffice(); document.getElementById('modal-office').classList.add('show'); }
+function renderOffice(){
+  const el=document.getElementById('office-body');
+  const used=Object.keys(office.dept).filter(k=>office.dept[k]).length;
+  let h=`<div class="off-hero">${OFFICE_ART}</div>`;
+  h+=`<div class="off-stats"><div class="off-stat"><div class="v">${office.maxFloors}<span>フロア</span></div><div class="l">MAX FLOORS</div></div>`;
+  h+=`<div class="off-stat"><div class="v">${office.sqft.toLocaleString('en-US')}<span>sqft</span></div><div class="l">FLOOR SIZE</div></div>`;
+  h+=`<div class="off-stat"><div class="v">${used}/${DEPT_DEFS.length}<span>部署</span></div><div class="l">DEPARTMENTS</div></div></div>`;
+  h+=`<div class="dash-h">部署（DEPARTMENTS）</div>`;
+  h+=`<div class="note" style="margin-top:0">部署を設置すると会社機能が解放されます。各部署はフロアのデスクを占有し、毎日の維持費（給与）がかかります。</div>`;
+  DEPT_DEFS.forEach(d=>{
+    const on=!!office.dept[d.key];
+    h+=`<div class="deptcard ${on?'on':''}">
+        <div class="dept-img">${OFFICE_ART}</div>
+        <div class="dept-main">
+          <div class="dept-h"><span class="dept-dot" style="background:${d.color}"></span><b>${d.name}</b><span class="dept-en">${d.en}</span></div>
+          <div class="dept-desc">${d.desc}</div>
+          <div class="dept-foot">
+            <button class="dept-tog ${on?'on':''}" data-dept="${d.key}"><span class="knob"></span></button>
+            <span class="dept-add">${on?'設置済み':'追加する'}</span>
+            <span class="dept-cap">CAPACITY ${d.cap} desks</span>
+          </div>
+        </div></div>`;
+  });
+  el.innerHTML=h;
+}
+document.getElementById('office-body').addEventListener('click', e=>{
+  const t=e.target.closest('[data-dept]'); if(!t) return;
+  const k=t.dataset.dept; office.dept[k]=!office.dept[k];
+  renderOffice(); saveGame(); updateHUD();
+  if(typeof renderManage==='function' && document.getElementById('modal-manage')?.classList.contains('show')) renderManage();
+});
 // ===== 街のサービス施設（銀行/証券/不動産/広告代理店）=====
 let svcKey='bank', realtyByCity={};
 function genRealty(city){ const areas=['丸の内','新宿','渋谷','本町','栄','天神','大手町','梅田']; const out=[];
@@ -3050,7 +3168,7 @@ function gameState(){
     lastProfit, spawnAccum, mgrCandidates,
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
-    FACILITY:{...FACILITY},
+    FACILITY:{...FACILITY}, office:{leased:office.leased, dept:{...office.dept}},
     campaignOn:{...campaignOn},
     holdings:{...holdings}, ownedRealty, stockPrices:Object.fromEntries(STOCKS.map(s=>[s.sym,s.price])),
     facilities:landmarks.map(l=>({kind:l.kind, x:l.x, z:l.z, city:l.city})),
@@ -3121,6 +3239,7 @@ function loadGame(slot){
   }
   // 施設（本社・焙煎工房）の復元
   if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
+  if(d.office){ office.leased=!!d.office.leased; office.dept=d.office.dept||{}; } else { office.leased=!!FACILITY.hq; office.dept={}; }
   if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
   if(d.holdings) Object.assign(holdings, d.holdings);
   if(d.ownedRealty) ownedRealty = d.ownedRealty;
