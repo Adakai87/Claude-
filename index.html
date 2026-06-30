@@ -412,6 +412,16 @@
   </div>
 </div>
 
+<!-- 街のサービス施設（銀行/証券/不動産/広告代理店） -->
+<div class="modal" id="modal-service">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-service" aria-label="閉じる">×</button>
+    <h2 id="svc-title">サービス</h2>
+    <div id="svc-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot"><button class="btn ghost" id="svc-close" style="width:100%">閉じる</button></div>
+  </div>
+</div>
+
 <!-- 店舗の改装（外装・内装・設備） -->
 <div class="modal" id="modal-remodel">
   <div class="sheet flex-sheet">
@@ -663,6 +673,34 @@ const FAC_DEFS = {
   warehouse:{ label:'倉庫',     tab:'supply',  color:0xb0a89a, h:6,  build:20000, desc:'まとめ買いで1回の仕入れ量が2倍に（在庫を多く確保）' },
 };
 const FACILITY = { hq:false, roastery:false, farm:false, warehouse:false };
+// ---- 街のサービス施設（最初からある。タップして利用：銀行/証券/不動産/広告代理店）----
+const SERVICE_DEFS = {
+  bank:       { label:'銀行',       color:0xe6ddc8 },
+  stock:      { label:'証券取引所', color:0x9fb0c2 },
+  realestate: { label:'不動産',     color:0xc6b9a2 },
+  agency:     { label:'広告代理店', color:0x7a6fb0 },
+};
+const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34} ];
+const cityServices = [];                // {key,mesh,group,x,z,city}
+// 株式市場（自社=TRB。価格は日次でドリフト）
+const STOCKS = [
+  {sym:'TRB', name:'タリバ（自社）', sector:'珈琲', price:12,  self:true},
+  {sym:'GRC', name:'グリーン珈琲',   sector:'珈琲', price:9},
+  {sym:'BLC', name:'ブルーカフェ',   sector:'珈琲', price:7},
+  {sym:'MTRS',name:'メトロソフト',   sector:'技術', price:36},
+  {sym:'OXO', name:'オクソ自動車',   sector:'自動車', price:21},
+  {sym:'WFB', name:'ワグナー銀行',   sector:'金融', price:15},
+];
+const holdings = {};                    // sym -> 保有株数
+const portfolioValue = () => STOCKS.reduce((a,s)=>a+(holdings[s.sym]||0)*s.price, 0);
+// 不動産投資（収益物件）
+let ownedRealty = [];                   // {addr, dailyRent, paid}
+// 広告代理店（都市ブランド施策：一回ごとにブランド上昇）
+const AGENCY = [
+  {id:'online',    name:'オンライン広告', cost:3000,  brand:8,  desc:'費用対効果が高い'},
+  {id:'billboard', name:'屋外広告',       cost:6000,  brand:14, desc:'街の認知を底上げ'},
+  {id:'tvcm',      name:'テレビCM',       cost:15000, brand:28, desc:'全国区の認知（高い）'},
+];
 const landmarks = [];                   // 建設済み施設 {mesh,group,label,tab,kind,x,z,city,h}
 const lots = [];                        // 空き/建設済みの物件 {city,x,z,tenant,branch,group}
 const RIVALS = [];                      // 全都市のライバル（各 .city を持つ）
@@ -928,11 +966,33 @@ function makeFacility(kind, x, z, cityId){
   return entry;
 }
 
-// 都市を初期化（ライバルと空き物件を一度だけ生成）
+// その都市のサービス施設をまだ作っていなければ作る（ロード/移動どちらでも確実に出す）
+function ensureServices(cityId){ if(cityServices.some(s=>s.city===cityId)) return; for(const sp of SERVICE_POS) makeServiceBuilding(sp.key, sp.x, sp.z, cityId); }
+// 街のサービス施設（銀行/証券/不動産/広告代理店）の建物
+function makeServiceBuilding(key, x, z, cityId){
+  const def=SERVICE_DEFS[key];
+  const g=new THREE.Group(); g.position.set(x,0,z); overScene.add(g);
+  const h = key==='stock'?16 : key==='realestate'?13 : 7;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(8,h,7), new THREE.MeshStandardMaterial({color:def.color})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(8.4,0.5,7.4), new THREE.MeshStandardMaterial({color:0x33343d})); roof.position.y=h+0.25; g.add(roof);
+  if(key==='bank'){ const ped=new THREE.Mesh(new THREE.BoxGeometry(8.8,0.6,7.7), new THREE.MeshStandardMaterial({color:0xefe8d6})); ped.position.y=0.3; g.add(ped);
+    for(let i=0;i<5;i++){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,h*0.7,8), new THREE.MeshStandardMaterial({color:0xf3ecdb})); c.position.set(-3.2+i*1.6,h*0.35+0.3,3.7); g.add(c);} }
+  else if(key==='stock'){ const gl=new THREE.Mesh(new THREE.BoxGeometry(8.05,h*0.92,7.05), new THREE.MeshStandardMaterial({color:0x3a4a57,emissive:0x14222b,emissiveIntensity:0.5})); gl.position.y=h/2; g.add(gl);
+    const tick=new THREE.Mesh(new THREE.BoxGeometry(8.1,0.7,7.1), new THREE.MeshStandardMaterial({color:0x2bd07a,emissive:0x0d5a32,emissiveIntensity:0.6})); tick.position.y=2.0; g.add(tick); }
+  else if(key==='realestate'){ for(let r=0;r<Math.floor(h/2.3);r++){ const band=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.0,7.1), new THREE.MeshStandardMaterial({color:0xbfe0f2,emissive:0x22425a,emissiveIntensity:0.4})); band.position.y=1.6+r*2.3; g.add(band);}
+    const sign=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.2,0.1), new THREE.MeshStandardMaterial({color:0x2f7fc0,emissive:0x103048,emissiveIntensity:0.4})); sign.position.set(0,h*0.5,3.6); g.add(sign); }
+  else { const stripe=new THREE.Mesh(new THREE.BoxGeometry(8.1,1.4,7.1), new THREE.MeshStandardMaterial({color:0x9a6fd0,emissive:0x2a1850,emissiveIntensity:0.4})); stripe.position.y=h*0.6; g.add(stripe); }
+  body.userData.group=g;
+  const entry={ key, mesh:body, group:g, x, z, city:cityId };
+  cityServices.push(entry); g.visible=(cityId===viewCity);
+  return entry;
+}
+// 都市を初期化（ライバルと空き物件・サービス施設を一度だけ生成）
 function initCity(cityId){
   if(cityInited[cityId]) return;
   cityInited[cityId] = true;
   const city = CITIES.find(c=>c.id===cityId) || CITIES[0];
+  ensureServices(cityId);
   const nR = 2 + (Math.random()*2|0);
   for(let i=0;i<nR && i<RIVAL_POSITIONS.length;i++){
     const p = RIVAL_POSITIONS[i];
@@ -952,10 +1012,12 @@ function initCity(cityId){
 }
 // 表示中の都市に合わせてメッシュの表示/非表示を切り替える
 function applyCityView(){
+  ensureServices(viewCity);     // 表示する都市のサービス施設を保証
   for(const b of branches){ if(b.built && b.mesh) b.mesh.userData.group.visible = (b.city===viewCity); }
   for(const r of RIVALS){ if(r.mesh) r.mesh.userData.group.visible = (r.city===viewCity); }
   for(const l of lots){ if(l.group) l.group.visible = (l.city===viewCity && !l.branch); }
   for(const f of landmarks){ if(f.group) f.group.visible = (f.city===viewCity); }
+  for(const s of cityServices){ if(s.group) s.group.visible = (s.city===viewCity); }
   const banner = document.getElementById('city-banner');
   if(banner){ const c=CITIES.find(c=>c.id===viewCity); banner.textContent = c?c.name:''; }
 }
@@ -987,6 +1049,7 @@ function updateMapMarkers(){
   };
   // ランドマーク（全都市共通）＋空港のラベル
   landmarks.filter(l=>l.city===viewCity).forEach(lm=> place('lm'+lm.kind,'land', lm.label, lm.x, lm.h+2.4, lm.z));
+  cityServices.filter(s=>s.city===viewCity).forEach(s=> place('sv'+s.key,'land', SERVICE_DEFS[s.key].label, s.x, (s.key==='stock'?18:s.key==='realestate'?15:9), s.z));
   place('air','land','空港', AIRPORT_POS.x, 8.5, AIRPORT_POS.z);
   lots.forEach((l,i)=>{ if(l.city===viewCity && !l.branch) place('lot'+i,'lease','FOR LEASE', l.x,8.2,l.z); });
   RIVALS.forEach((r,i)=>{ if(r.city===viewCity){ const el=place('riv'+i,'rival',RIVAL_CUP, r.pos[0],8.0,r.pos[1]); if(el) el.style.background='#'+r.color.toString(16).padStart(6,'0'); } });
@@ -1200,7 +1263,7 @@ function buildOverviewScene(){
   function pick0(...a){ return a[(Math.random()*a.length)|0]; }
 
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, {x:0,z:0}, {x:-9,z:-27}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ---- パレット（実在の街っぽい落ち着いた色）----
@@ -1406,6 +1469,7 @@ function overviewPick(e){
   lots.filter(l=>l.city===viewCity && !l.branch).forEach(l=>targets.push({o:l.group.userData.lotPad, type:'lot', ref:l}));
   if(airportMesh) targets.push({o:airportMesh, type:'air'});
   landmarks.filter(l=>l.city===viewCity).forEach(l=>targets.push({o:l.mesh, type:'lm', ref:l}));
+  cityServices.filter(s=>s.city===viewCity).forEach(s=>targets.push({o:s.mesh, type:'svc', ref:s}));
   branches.filter(b=>b.built && b.mesh && b.city===viewCity).forEach(b=>targets.push({o:b.mesh, type:'cafe', ref:b}));
   RIVALS.filter(r=>r.mesh && r.city===viewCity).forEach(r=>targets.push({o:r.mesh, type:'rival', ref:r}));
   const hit = raycaster.intersectObjects(targets.map(t=>t.o), false)[0];
@@ -1414,6 +1478,7 @@ function overviewPick(e){
   if(t.type==='lot') openLeaseInfo(t.ref);
   else if(t.type==='air') openAirport();
   else if(t.type==='lm'){ if(t.ref.kind==='office') openManageTab('company'); else openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
+  else if(t.type==='svc'){ openService(t.ref.key); }
   else if(t.type==='cafe'){ if(t.ref===branches[0]) openShop(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
   else if(t.type==='rival') flashHint(`${t.ref.name}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`);
 }
@@ -1991,6 +2056,8 @@ document.getElementById('m-next').onclick = ()=>{
   sim.money -= plRent() + plInterest() + staffWage() + managerSalaries() + execSalaries() + campaignDailyCost();
   sim.money += branchesDailyNet();
   if(campaignOn.catering){ sim.money += 3000 + Math.round(brand*25); }   // ケータリング：法人向けの固定収入
+  sim.money += ownedRealty.reduce((a,r)=>a+r.dailyRent,0);               // 不動産の家賃収入
+  STOCKS.forEach(s=>{ let d=(Math.random()-0.48)*0.06; if(s.self) d += (lastProfit>0?0.012:-0.006); s.price=Math.max(1, +(s.price*(1+d)).toFixed(2)); });  // 株価の変動
   finance.invest = Math.round(finance.invest * (1 + investRateEff()));
   const mgrM = branches[0].manager;
   const decay = Math.max(0, brandDecay() - ((mgrM&&mgrM.del&&mgrM.del.marketing)?1:0));   // マーケ委任で減衰を緩和
@@ -2789,6 +2856,59 @@ function openLeaseInfo(lot){
 }
 document.getElementById('lease-cancel').onclick = ()=> document.getElementById('modal-lease').classList.remove('show');
 document.getElementById('lease-go').onclick = ()=>{ document.getElementById('modal-lease').classList.remove('show'); if(leaseLot) openBuildSheet(leaseLot); };
+// ===== 街のサービス施設（銀行/証券/不動産/広告代理店）=====
+let svcKey='bank', realtyByCity={};
+function genRealty(city){ const areas=['丸の内','新宿','渋谷','本町','栄','天神','大手町','梅田']; const out=[];
+  for(let i=0;i<3;i++){ const val=40000+Math.round(Math.random()*120000), ask=Math.round(val*(1.05+Math.random()*0.15)), weekly=Math.round(ask*(0.06+Math.random()*0.045)/52*7);
+    out.push({ id:city+'_'+i, addr:areas[(Math.random()*areas.length)|0]+' '+(1+(Math.random()*5|0))+'-'+(1+(Math.random()*9|0)), val, ask, weekly, roi:weekly/7*365/ask*100, owned:false }); }
+  return out;
+}
+function openService(key){ svcKey=key; document.getElementById('svc-title').textContent=SERVICE_DEFS[key].label; renderSvc(); document.getElementById('modal-service').classList.add('show'); }
+function renderSvc(){ const el=document.getElementById('svc-body'); el.innerHTML = svcKey==='bank'?renderBank():svcKey==='stock'?renderStock():svcKey==='realestate'?renderRealty():renderAgency(); }
+function renderBank(){
+  let h=`<div class="note" style="margin-top:6px">事業ローンの申込みと返済ができます（オフィスが無くても利用OK）。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v" style="color:var(--red)">¥${finance.debt.toLocaleString('ja-JP')}</div><div class="l">借入残（日利${(loanRateEff()*100).toFixed(1)}%）</div></div><div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div></div>`;
+  h+=`<div class="dash-h">事業ローン</div>`;
+  [{amt:30000,r:loanRateEff(),mt:'12ヶ月'},{amt:80000,r:loanRateEff()*1.1,mt:'24ヶ月'},{amt:150000,r:loanRateEff()*1.25,mt:'36ヶ月'}].forEach(o=>{
+    h+=`<div class="mcard"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">¥${o.amt.toLocaleString('ja-JP')}</div><div class="meta">日利 ${(o.r*100).toFixed(2)}%・${o.mt}・閉店時に利息</div></div><div class="act"><button class="mbtn" data-loan="${o.amt}">借りる</button></div></div>`; });
+  h+=`<div class="dash-h">返済</div><div class="mrow"><div class="nm">返済する<div class="sub2">借入残・現金の範囲で</div></div><button class="mbtn" data-repay="10000" ${finance.debt<=0||sim.money<=0?'disabled':''}>¥1万</button><button class="mbtn" data-repay="50000" ${finance.debt<=0||sim.money<5000?'disabled':''}>¥5万</button></div>`;
+  return h;
+}
+function renderStock(){
+  let h=`<div class="note" style="margin-top:6px">株の売買で資産運用。自社株(TRB)も買えます。価格は毎日変動。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v green">¥${Math.round(portfolioValue()).toLocaleString('ja-JP')}</div><div class="l">保有株評価額</div></div><div class="kpi"><div class="v gold">¥${sim.money.toLocaleString('ja-JP')}</div><div class="l">現金</div></div></div>`;
+  h+=`<div class="dash-h">銘柄</div>`;
+  STOCKS.forEach(s=>{ const own=holdings[s.sym]||0, c=Math.round(s.price*10);
+    h+=`<div class="mcard"><div class="info"><div class="ttl">${s.name} <span class="sub2">${s.sym}・${s.sector}</span></div><div class="meta">¥${s.price.toFixed(2)}／株${own?`・保有 ${own}株（¥${Math.round(own*s.price).toLocaleString('ja-JP')}）`:''}</div></div><div class="act"><button class="mbtn" data-buystock="${s.sym}" ${sim.money<c?'disabled':''}>10株買</button><button class="mbtn" data-sellstock="${s.sym}" ${!own?'disabled':''}>売</button></div></div>`; });
+  return h;
+}
+function renderRealty(){
+  if(!realtyByCity[viewCity]) realtyByCity[viewCity]=genRealty(viewCity);
+  let h=`<div class="note" style="margin-top:6px">収益不動産を購入すると、毎日 家賃収入が入ります。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v green">¥${ownedRealty.reduce((a,r)=>a+r.dailyRent,0).toLocaleString('ja-JP')}/日</div><div class="l">家賃収入</div></div><div class="kpi"><div class="v">${ownedRealty.length}件</div><div class="l">保有物件</div></div></div>`;
+  h+=`<div class="dash-h">売り物件（${(CITIES.find(c=>c.id===viewCity)||{}).name||''}）</div>`;
+  realtyByCity[viewCity].filter(r=>!r.owned).forEach(r=>{ h+=`<div class="mcard"><div class="thumb">${ART.downtown}</div><div class="info"><div class="ttl">${r.addr}</div><div class="meta">想定 ¥${r.val.toLocaleString('ja-JP')}・家賃 ¥${Math.round(r.weekly/7).toLocaleString('ja-JP')}/日・ROI ${r.roi.toFixed(1)}%</div></div><div class="act"><button class="mbtn" data-buyrealty="${r.id}" ${sim.money<r.ask?'disabled':''}>購入<br>¥${r.ask.toLocaleString('ja-JP')}</button></div></div>`; });
+  if(ownedRealty.length){ h+=`<div class="dash-h">保有中</div>`; ownedRealty.forEach(r=> h+=`<div class="mcard"><div class="thumb">${ART.residential}</div><div class="info"><div class="ttl">${r.addr}</div><div class="meta">家賃 ¥${r.dailyRent.toLocaleString('ja-JP')}/日</div></div></div>`); }
+  return h;
+}
+function renderAgency(){
+  let h=`<div class="note" style="margin-top:6px">都市でのブランド認知を一気に高めます（スポット広告）。</div>`;
+  h+=`<div class="dash-kpis"><div class="kpi"><div class="v gold">${Math.round(brand)}</div><div class="l">ブランド力</div></div><div class="kpi"><div class="v green">${Math.round(playerShare()*100)}%</div><div class="l">市場シェア</div></div></div>`;
+  h+=`<div class="dash-h">広告キャンペーン</div>`;
+  AGENCY.forEach(a=> h+=`<div class="mcard"><div class="thumb">${ART.pop}</div><div class="info"><div class="ttl">${a.name}</div><div class="meta">${a.desc}・ブランド +${Math.round(a.brand*marketingMult())}</div></div><div class="act"><button class="mbtn" data-agency="${a.id}" ${sim.money<a.cost?'disabled':''}>実施<br>¥${a.cost.toLocaleString('ja-JP')}</button></div></div>`);
+  return h;
+}
+document.getElementById('svc-body').addEventListener('click', e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.loan){ takeLoan(+t.dataset.loan); }
+  else if(t.dataset.repay){ repayLoan(+t.dataset.repay); }
+  else if(t.dataset.buystock){ const s=STOCKS.find(x=>x.sym===t.dataset.buystock); if(s){ const c=Math.round(s.price*10); if(sim.money>=c){ sim.money-=c; holdings[s.sym]=(holdings[s.sym]||0)+10; } } }
+  else if(t.dataset.sellstock){ const s=STOCKS.find(x=>x.sym===t.dataset.sellstock); if(s){ const own=holdings[s.sym]||0, n=Math.min(10,own); if(n>0){ sim.money+=Math.round(s.price*n); holdings[s.sym]=own-n; } } }
+  else if(t.dataset.buyrealty){ const r=(realtyByCity[viewCity]||[]).find(x=>x.id===t.dataset.buyrealty); if(r&&!r.owned&&sim.money>=r.ask){ sim.money-=r.ask; dayStats.capex+=r.ask; r.owned=true; ownedRealty.push({addr:r.addr, dailyRent:Math.round(r.weekly/7), paid:r.ask}); } }
+  else if(t.dataset.agency){ const a=AGENCY.find(x=>x.id===t.dataset.agency); if(a&&sim.money>=a.cost){ sim.money-=a.cost; dayStats.capex+=a.cost; brand=Math.min(100,brand+a.brand*marketingMult()); } }
+  renderSvc(); updateHUD();
+});
+document.getElementById('svc-close').onclick = ()=> document.getElementById('modal-service').classList.remove('show');
 // 空港：都市移動
 function openAirport(){ renderAirport(); document.getElementById('modal-airport').classList.add('show'); }
 function renderAirport(){
@@ -2841,6 +2961,7 @@ function gameState(){
     viewCity,
     FACILITY:{...FACILITY},
     campaignOn:{...campaignOn},
+    holdings:{...holdings}, ownedRealty, stockPrices:Object.fromEntries(STOCKS.map(s=>[s.sym,s.price])),
     facilities:landmarks.map(l=>({kind:l.kind, x:l.x, z:l.z, city:l.city})),
     rivals:RIVALS.map(r=>({name:r.name, comp:r.comp, color:r.color, pos:r.pos, city:r.city})),
     lots:lots.map(l=>({city:l.city, x:l.x, z:l.z, tenant:l.tenant, built:!!l.branch})),
@@ -2910,6 +3031,9 @@ function loadGame(slot){
   // 施設（本社・焙煎工房）の復元
   if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
   if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
+  if(d.holdings) Object.assign(holdings, d.holdings);
+  if(d.ownedRealty) ownedRealty = d.ownedRealty;
+  if(d.stockPrices) STOCKS.forEach(s=>{ if(d.stockPrices[s.sym]!=null) s.price=d.stockPrices[s.sym]; });
   const facList=[];
   if(d.facilities) d.facilities.forEach(f=>{ const e=makeFacility(f.kind, f.x, f.z, f.city||viewCity); FACILITY[f.kind]=true; facList.push(e); });
   // 空き物件（建設済みは対応する店舗/施設に紐付け）
