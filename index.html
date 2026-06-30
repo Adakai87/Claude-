@@ -1515,6 +1515,16 @@ function buildOverviewScene(){
       const l=new THREE.Mesh(new THREE.BoxGeometry(0.05,1.2,d*0.82),mat); l.position.set(w/2+0.02,wy,0); g.add(l);
     }
   }
+  // 窓グリッドのファサード：柱・梁＋窓ガラスを1セルに焼き、repeatでタイル（色は建物ごとに material.color）
+  const FACADE_BASE = (()=>{ const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d');
+    x.fillStyle='#7c8086'; x.fillRect(0,0,16,16);       // フレーム（柱・梁）
+    x.fillStyle='#eef4f9'; x.fillRect(2,3,12,10);       // 窓ガラス
+    return c; })();
+  function facadeMat(col,w,h){
+    const t=new THREE.CanvasTexture(FACADE_BASE); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.magFilter=THREE.NearestFilter;
+    t.repeat.set(Math.max(2,Math.round(w/2.2)), Math.max(2,Math.round(h/2.5)));
+    return new THREE.MeshStandardMaterial({ color:col, map:t, roughness:0.8 });
+  }
   // 屋上ディテール（ソーラー/ヘリポート/屋上庭園/AC/貯水タンク）
   function rooftop(g,w,h,d){
     const top=h, r=Math.random();
@@ -1531,16 +1541,16 @@ function buildOverviewScene(){
   function townBuilding(x,z,type,w,d){
     const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);   // 回転なし（窓を確実にカメラ向きに）
     if(type==='office'){
-      const h=10+Math.random()*18, dark=Math.random()<0.45;
-      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:dark?pick(GLASS_DARK):pick(WALL_OFFICE)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
-      winGrid(g,w,h,d, dark?0x6f8ba0:0xcfe2ef, dark?0x1a2730:0x24414f);
-      const cap=new THREE.Mesh(new THREE.BoxGeometry(w*1.02,0.4,d*1.02),new THREE.MeshStandardMaterial({color:0x40464e})); cap.position.y=h+0.1; g.add(cap);
+      const h=10+Math.random()*18, dark=Math.random()<0.5;
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), facadeMat(dark?pick(GLASS_DARK):pick(WALL_OFFICE), w, h)); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const cap=new THREE.Mesh(new THREE.BoxGeometry(w*1.02,0.5,d*1.02),new THREE.MeshStandardMaterial({color:0x40464e})); cap.position.y=h+0.12; g.add(cap);
+      // 上層のセットバック（高層ビルに段差）
+      if(h>20 && Math.random()<0.6){ const sb=new THREE.Mesh(new THREE.BoxGeometry(w*0.6,3.2,d*0.6), facadeMat(dark?pick(GLASS_DARK):pick(WALL_OFFICE), w*0.6, 3.2)); sb.position.y=h+1.7; sb.castShadow=true; g.add(sb); }
       rooftop(g,w,h,d);
     } else if(type==='apartment'){
       const h=5+Math.random()*7;
-      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:pick(WALL_APT)})); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
+      const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), facadeMat(pick(WALL_APT), w, h)); body.position.y=h/2; body.castShadow=body.receiveShadow=true; g.add(body);
       const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,0.4,d*1.05),new THREE.MeshStandardMaterial({color:pick(ROOFCOL)})); roof.position.y=h+0.15; roof.castShadow=true; g.add(roof);
-      winGrid(g,w,h,d,0xbfe0f2,0x22425a);
       rooftop(g,w,h,d);
     } else if(type==='shop'){
       const h=3+Math.random()*1.6;
