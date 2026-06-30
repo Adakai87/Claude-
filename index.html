@@ -240,6 +240,25 @@
   .dept-tog.on .knob{left:21px;}
   .dept-add{font-size:13px; font-weight:700;}
   .dept-cap{margin-left:auto; font-size:10px; color:var(--sub); letter-spacing:.03em;}
+  /* メニュー開発ツリーのティア見出し */
+  .tier-h{display:flex; align-items:center; gap:8px; margin:14px 2px 7px; font-size:13px;}
+  .tier-h .tier-no{background:var(--accent); color:#1a140e; font-weight:800; font-size:11px; padding:2px 7px; border-radius:7px;}
+  .tier-h.locked{opacity:.5;}
+  .tier-h.locked .tier-no{background:#555;}
+  .tier-h .tier-prog{margin-left:auto; color:var(--sub); font-size:11px;}
+  /* 支店レポートカード */
+  .brep{border:1px solid var(--line); background:var(--panel2); border-radius:12px; padding:10px 12px; margin-bottom:9px;}
+  .brep .bhead{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .brep .bname{font-weight:800; font-size:14.5px;}
+  .brep .btag{font-size:10px; color:var(--sub); background:#0003; border:1px solid var(--line); padding:1px 6px; border-radius:6px;}
+  .brep .bmgr{margin-left:auto; font-size:11px;}
+  .brep .brows{display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; margin:4px 0 2px;}
+  .brep .brow{display:flex; justify-content:space-between; font-size:11.5px; border-bottom:1px dashed var(--line); padding:2px 0;}
+  .brep .brow span:first-child{color:var(--sub);}
+  .brep .bact{margin-top:7px;}
+  /* 施設（焙煎/農園/倉庫）画面のヒーロー */
+  .fac-hero{width:100%; aspect-ratio:16/8; border-radius:14px; overflow:hidden; margin:2px 0 12px; background:radial-gradient(130% 120% at 50% 25%, #2a2218, #140e08);}
+  .fac-hero svg{width:100%; height:100%; display:block;}
   /* 出店シートの画像つき選択タイル */
   .opt-row{display:flex; gap:8px; margin:4px 0 10px;}
   .opt{flex:1 1 0; min-width:0; border:1px solid var(--line); background:var(--panel2); border-radius:11px; padding:7px 6px; cursor:pointer; text-align:center;}
@@ -464,6 +483,16 @@
     <h2 id="office-title">オフィス（本社）</h2>
     <div id="office-body" class="flex-body" style="text-align:left"></div>
     <div class="flex-foot"><button class="btn ghost" data-close="modal-office" style="width:100%">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 施設（焙煎工房・農園・倉庫）の内部画面 -->
+<div class="modal" id="modal-facility">
+  <div class="sheet flex-sheet">
+    <button class="sheet-x" data-close="modal-facility" aria-label="閉じる">×</button>
+    <h2 id="facility-title">施設</h2>
+    <div id="facility-body" class="flex-body" style="text-align:left"></div>
+    <div class="flex-foot"><button class="btn ghost" data-close="modal-facility" style="width:100%">閉じる</button></div>
   </div>
 </div>
 
@@ -721,6 +750,12 @@ const FACILITY = { hq:false, roastery:false, farm:false, warehouse:false };
 // ---- オフィス（本社）：契約後、フロアに「部署」を追加して会社機能を解放 ----
 const office = { leased:false, floors:2, maxFloors:5, sqft:4320, dept:{} };  // floors=契約済みフロア数（=部署スロット数）
 const floorCost = () => Math.round(16000 + office.floors*9000);  // 次のフロアの増設費
+// 施設（焙煎工房=豆グレード／農園・倉庫=レベルで効果UP）
+const facLv = { farm:1, warehouse:1 };
+const FAC_MAXLV = 4;
+const farmDiscount = () => Math.max(0.36, 0.6 - (facLv.farm-1)*0.07);   // 豆の仕入れ倍率（低いほど安い）
+const whBulk = () => 1 + facLv.warehouse;                               // まとめ買い倍率（lv1→2倍）
+const facUpCost = kind => Math.round(14000 * (facLv[kind]||1));
 const DEPT_DEFS = [
   {key:'hr',        name:'人事部',     en:'Human Resources', color:'#5f9e6a', cap:16,
    desc:'健康保険・退職金などの福利厚生を全スタッフに提供。モラルと定着率が上がり離職を防ぐ。'},
@@ -1604,7 +1639,11 @@ function overviewPick(e){
   const t = targets.find(x=>x.o===hit.object); if(!t) return;
   if(t.type==='lot') openLeaseInfo(t.ref);
   else if(t.type==='air') openAirport();
-  else if(t.type==='lm'){ if(t.ref.kind==='office') openManageTab('company'); else openManageTab(t.ref.tab); flashHint(`${t.ref.label}を開きました`); }
+  else if(t.type==='lm'){ const k=t.ref.kind;
+    if(k==='hq'||k==='office') openOffice();
+    else if(k==='roastery'||k==='farm'||k==='warehouse') openFacility(k);
+    else openManageTab(t.ref.tab);
+    flashHint(`${t.ref.label}を開きました`); }
   else if(t.type==='svc'){ openService(t.ref.key); }
   else if(t.type==='cafe'){ if(t.ref===branches[0]) openShop(); else flashHint(`${t.ref.name}（委任運営）— 1日純益 約¥${branchDailyNet(t.ref).toLocaleString('ja-JP')}`); }
   else if(t.type==='rival') flashHint(`${t.ref.name}（競合）— あなたのシェア ${Math.round(playerShare()*100)}%`);
@@ -1795,12 +1834,28 @@ const MENU = [
   {id:'cake',      name:'ケーキ',       basePrice:520, price:520, enabled:true, recipe:{flour:1}},
   {id:'croissant', name:'クロワッサン', basePrice:380, price:380, enabled:true, recipe:{flour:1}},
 ];
-// 開発候補（メニュー制作で解放）
+// 開発候補（研究ツリー：tier1=基本／tier2=応用／tier3=プレミアム）
 const DEV_CATALOG = [
-  {id:'pudding',  name:'プリン',     basePrice:480, recipe:{milk:100, flour:1}, devCost:2500},
-  {id:'sandwich', name:'サンド',     basePrice:650, recipe:{flour:2}, devCost:3500},
-  {id:'seasonal', name:'季節ドリンク', basePrice:640, recipe:{matcha:3, milk:120, cup:1}, devCost:3000},
+  // Tier 1（いつでも開発可）
+  {id:'pudding',  name:'プリン',         basePrice:480, recipe:{milk:100, flour:1}, devCost:2500, tier:1},
+  {id:'sandwich', name:'サンド',         basePrice:650, recipe:{flour:2},          devCost:3500, tier:1},
+  // Tier 2（Tier1を1つ開発で解放）
+  {id:'seasonal', name:'季節ドリンク',     basePrice:640, recipe:{matcha:3, milk:120, cup:1}, devCost:3000, tier:2},
+  {id:'cake',     name:'フルーツタルト',   basePrice:720, recipe:{flour:2, milk:80},        devCost:4800, tier:2},
+  {id:'matcha',   name:'抹茶パフェ',       basePrice:780, recipe:{matcha:6, milk:120, cup:1},devCost:5200, tier:2},
+  // Tier 3（要 商品開発部 ＋ Tier2を2つ開発）
+  {id:'coffee',   name:'スペシャルティ・ブレンド', basePrice:820, recipe:{bean:24, cup:1},       devCost:7500, tier:3, needDept:true},
+  {id:'latte',    name:'完熟ラテ',         basePrice:880, recipe:{bean:20, milk:170, cup:1}, devCost:8200, tier:3, needDept:true},
+  {id:'boba',     name:'クラフトタピオカ',  basePrice:840, recipe:{milk:140, flour:1, cup:1}, devCost:8000, tier:3, needDept:true},
 ];
+const TIER_INFO = {1:{name:'基本メニュー',need:'いつでも開発可'},2:{name:'応用メニュー',need:'基本を1品開発で解放'},3:{name:'プレミアム',need:'要 商品開発部 ＋ 応用を2品開発'}};
+const tierDevCount = tier => DEV_CATALOG.filter(d=>d.tier===tier && MENU.some(m=>m.name===d.name)).length;
+function tierUnlocked(tier){
+  if(tier<=1) return true;
+  if(tier===2) return tierDevCount(1) >= 1;
+  if(tier===3) return deptOn('products') && tierDevCount(2) >= 2;
+  return false;
+}
 
 // ---- メニュー/在庫のヘルパー ----
 const materialCost = item => Object.entries(item.recipe).reduce((a,[m,q])=>a + q*(materials[m]?.cost||0), 0);
@@ -1812,9 +1867,9 @@ function recomputePriceLevel(){
 }
 function restock(key){
   const mt = materials[key]; if(!mt) return false;
-  const bulk = FACILITY.warehouse ? 2 : 1;                 // 倉庫：まとめ買いで2倍
+  const bulk = FACILITY.warehouse ? whBulk() : 1;          // 倉庫：まとめ買い（レベルで倍率UP）
   let cost = mt.buyCost * bulk;
-  if(key==='bean' && FACILITY.farm) cost = Math.round(cost*0.6);   // 農園：豆が安い
+  if(key==='bean' && FACILITY.farm) cost = Math.round(cost*farmDiscount());   // 農園：豆が安い（レベルで深まる）
   if(deptOn('supply')) cost = Math.round(cost*0.85);               // サプライ部：仕入れ−15%
   if(sim.money < cost) return false;
   sim.money -= cost; mt.stock += mt.buyAmt*bulk; dayStats.cogs += cost; return true;
@@ -2449,6 +2504,58 @@ function officeArt(){
   return isoArt(s);
 }
 const OFFICE_ART = officeArt();
+// 焙煎工房：ロースター本体＋ホッパー＋煙突＋麻袋＋瓶棚
+function roasteryArt(){
+  let s='';
+  s+=ibox(-4,-4,-0.35,8,8,0.35,'#9a7a52');
+  s+=ibox(-4,-4,0,0.16,8,4.3,'#6b5238'); s+=ibox(-4,-4,0,8,0.16,4.3,_shade('#6b5238',0.92));
+  s+=ibox(-1.6,-1.2,0.9,3.6,2.6,2.4,'#3a3f46');            // 本体
+  s+=ibox(-1.6,1.18,0.9,3.6,0.12,2.4,'#caa24a');           // 前面プレート
+  s+=ibox(-0.4,1.0,1.4,1.2,0.4,1.2,'#1c1f24');             // ドラム扉
+  s+=ibox(-0.1,1.05,1.7,0.6,0.3,0.6,'#e9b54a');            // のぞき窓(火)
+  s+=ibox(-0.6,-1.0,3.3,1.0,1.0,0.7,'#8b9098');            // ホッパー
+  s+=ibox(1.2,-1.0,3.3,0.5,0.5,3.0,'#6b5638');             // 煙突
+  s+=ibox(-1.4,-1.0,0,0.4,0.4,0.9,'#23262b'); s+=ibox(1.0,-1.0,0,0.4,0.4,0.9,'#23262b'); // 脚
+  for(const[gx,gz] of [[-3.2,1.0],[-3.2,2.3],[-2.0,2.5]]){ s+=ibox(gx,gz,0,1.0,1.0,1.1,'#b89a64'); s+=ibox(gx+0.15,gz+0.15,1.1,0.7,0.7,0.25,'#6b4a28'); }
+  s+=ibox(2.4,-3.4,0,1.2,1.0,3.0,'#5a4632');               // 棚
+  for(let r=0;r<3;r++){ s+=ibox(2.5,-3.3,0.6+r*0.9,1.0,0.8,0.1,'#3a2c1c'); s+=ibox(2.7,-3.1,0.7+r*0.9,0.3,0.3,0.4,'#caa24a'); s+=ibox(3.1,-3.1,0.7+r*0.9,0.3,0.3,0.4,'#9a5b3a'); }
+  return isoArt(s);
+}
+// 農園：ガラス温室の枠＋畝＋コーヒーの木（緑＋赤い実）
+function farmArt(){
+  let s='';
+  s+=ibox(-4,-4,-0.35,8,8,0.35,'#6b4f30');
+  for(let r=0;r<3;r++){ const z=-2.6+r*2.4;
+    s+=ibox(-3.6,z,0,7.2,0.9,0.45,'#5a4228');               // 畝
+    for(let c=0;c<3;c++){ const x=-2.7+c*2.5;
+      s+=ibox(x,z+0.2,0,0.32,0.32,1.2,'#5a4228');           // 幹
+      s+=ibox(x-0.45,z-0.25,1.0,1.15,1.15,1.0,'#3f8a44');   // 葉
+      s+=ibox(x-0.2,z+0.0,1.35,0.22,0.22,0.22,'#d6452f');   // 実
+      s+=ibox(x+0.35,z+0.3,1.25,0.22,0.22,0.22,'#d6452f');
+    }
+  }
+  s+=ibox(-4,-4,0,0.12,8,4.0,'rgba(180,210,235,.30)'); s+=ibox(-4,-4,0,8,0.12,4.0,'rgba(180,210,235,.22)');
+  s+=ibox(-4,-4,3.9,0.18,8,0.26,'#dfe6ea'); s+=ibox(-4,-4,3.9,8,0.18,0.26,'#d3dade');
+  return isoArt(s);
+}
+// 倉庫：ラック（支柱＋棚板＋段ボール箱）＋パレット
+function warehouseArt(){
+  let s='';
+  s+=ibox(-4,-4,-0.35,8,8,0.35,'#8a8f96');
+  s+=ibox(-4,-4,0,0.16,8,4.3,'#b0b5bc'); s+=ibox(-4,-4,0,8,0.16,4.3,_shade('#b0b5bc',0.92));
+  const rack=(gx)=>{ let d='';
+    d+=ibox(gx,-3.6,0,0.25,5.2,4.0,'#d98a3a'); d+=ibox(gx+1.7,-3.6,0,0.25,5.2,4.0,'#d98a3a');
+    for(let lv=0;lv<3;lv++){ const y=0.9+lv*1.3;
+      d+=ibox(gx,-3.6,y,2.0,5.2,0.12,'#9aa0a8');
+      for(let bz=0;bz<2;bz++){ const z=-3.0+bz*2.4;
+        d+=ibox(gx+0.25,z,y+0.12,0.75,0.9,0.75,'#caa06a'); d+=ibox(gx+1.05,z+0.2,y+0.12,0.75,0.9,0.75,'#b8915a'); }
+    }
+    return d; };
+  s+=rack(-3.4)+rack(0.7);
+  s+=ibox(-1.4,2.7,0,2.0,1.0,0.3,'#6b5638'); s+=ibox(-1.2,2.8,0.3,0.8,0.8,0.8,'#caa06a'); s+=ibox(-0.2,2.8,0.3,0.8,0.8,0.8,'#b8915a');
+  return isoArt(s);
+}
+const FAC_ART = { roastery:roasteryArt(), farm:farmArt(), warehouse:warehouseArt() };
 // ---- 商品・材料のイラスト（絵文字を使わずSVGで描画）----
 const di = inner => `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
 const DRINK_ART = {
@@ -2505,12 +2612,18 @@ function renderManage(){
         <button class="mbtn ${m.enabled?'on':''}" data-toggle="${m.id}">${m.enabled?'提供中':'停止'}</button>`;
       h += mcard(menuThumb(m.id), m.name, meta, act);
     }
-    h += `<div class="dash-h">メニュー開発</div>`;
-    DEV_CATALOG.forEach((d,i)=>{
-      const exists = MENU.some(m=>m.name===d.name);
-      const cost = Math.round(d.devCost*devDiscount());
-      const act = `<button class="mbtn" data-dev="${i}" ${exists||sim.money<cost?'disabled':''}>${exists?'開発済':'開発'}</button>`;
-      h += mcard(menuThumb(d.id), d.name, `想定価格¥${d.basePrice}・開発費¥${cost.toLocaleString('ja-JP')}`, act);
+    h += `<div class="dash-h">メニュー開発ツリー（研究）</div>`;
+    [1,2,3].forEach(tier=>{
+      const unlocked=tierUnlocked(tier), ti=TIER_INFO[tier];
+      const done=tierDevCount(tier), total=DEV_CATALOG.filter(d=>d.tier===tier).length;
+      h += `<div class="tier-h ${unlocked?'':'locked'}"><span class="tier-no">T${tier}</span><b>${ti.name}</b><span class="tier-prog">${done}/${total}</span></div>`;
+      if(!unlocked){ h += `<div class="note" style="margin-top:0">🔒 ${ti.need}</div>`; return; }
+      DEV_CATALOG.forEach((d,i)=>{ if(d.tier!==tier) return;
+        const exists = MENU.some(m=>m.name===d.name);
+        const cost = Math.round(d.devCost*devDiscount());
+        const act = `<button class="mbtn" data-dev="${i}" ${exists||sim.money<cost?'disabled':''}>${exists?'開発済':'開発'}</button>`;
+        h += mcard(menuThumb(d.id), d.name, `想定価格¥${d.basePrice}・開発費¥${cost.toLocaleString('ja-JP')}${exists?'・<span style="color:var(--green)">メニュー化済</span>':''}`, act);
+      });
     });
     h += `<div class="note">価格を上げると粗利↑だが客足・客層が変わる。価格帯指数 <b>${store.priceLevel.toFixed(2)}</b>（1.0=標準）</div>`;
   } else if(mtab==='supply'){
@@ -2611,14 +2724,24 @@ function renderManage(){
     const max = Math.max(...rows.map(r=>r.value));
     h += `<div class="dash-h">市場シェア（競争力）</div>`;
     h += rows.map(r=>`<div class="barrow"><span class="nm" style="${r.me?'color:var(--gold)':''}">${r.label}</span><span class="bar"><i style="width:${r.value/max*100}%;${r.me?'background:linear-gradient(90deg,var(--gold),#ff9d4d)':''}"></i></span><span class="vv">${Math.round(r.value/tot*100)}%</span></div>`).join('');
-    h += `<div class="dash-h">あなたの店舗</div>`;
+    h += `<div class="dash-h">店長レポート（支店の自動運営）</div>`;
     branches.forEach((b,i)=>{
       const main = i===0;
-      const net = branchDailyNet(b);
-      const meta = main ? `本店（実プレイで営業）・競争力 ${branchComp(b).toFixed(0)}`
-                        : `${LOC_JP[b.loc]}・Lv.${b.level}・日次純益 <b style="color:${net>=0?'var(--green)':'var(--red)'}">${net<0?'−':''}¥${Math.abs(net).toLocaleString('ja-JP')}</b>`;
-      const act = main ? '' : `<button class="mbtn" data-upbranch="${i}" ${sim.money<branchUpCost(b)?'disabled':''}>強化<br>¥${branchUpCost(b).toLocaleString('ja-JP')}</button>`;
-      h += mcard(ART.downtown, b.name, meta, act || '<span class="sub2">操作可</span>');
+      const cityN = (CITIES.find(c=>c.id===b.city)||{}).name||'';
+      const comp = branchComp(b);
+      const mgr = b.manager ? `店長 <b>${b.manager.name}</b> ★${mgrRating(b.manager)}` : '<span class="low">店長不在（効率半減）</span>';
+      let rows;
+      if(main){
+        rows = `<div class="brow"><span>役割</span><span>本店（実プレイ）</span></div><div class="brow"><span>競争力</span><span>${comp.toFixed(0)}</span></div>`;
+      } else {
+        const net = branchDailyNet(b), rent = RENT[b.loc]||2500, rev = net+rent;
+        rows = `<div class="brow"><span>日次売上</span><span>¥${rev.toLocaleString('ja-JP')}</span></div>`+
+               `<div class="brow"><span>家賃</span><span style="color:var(--red)">−¥${rent.toLocaleString('ja-JP')}</span></div>`+
+               `<div class="brow"><span>競争力</span><span>${comp.toFixed(0)}</span></div>`+
+               `<div class="brow"><span>純益/日</span><span style="color:${net>=0?'var(--green)':'var(--red)'}">${net<0?'−':''}¥${Math.abs(net).toLocaleString('ja-JP')}</span></div>`;
+      }
+      const act = main ? '' : `<button class="mbtn" data-upbranch="${i}" ${sim.money<branchUpCost(b)?'disabled':''}>強化 Lv.${b.level}→${b.level+1}<br>¥${branchUpCost(b).toLocaleString('ja-JP')}</button>`;
+      h += `<div class="brep"><div class="bhead"><span class="bname">${b.name}</span><span class="btag">${cityN}・${LOC_JP[b.loc]}</span><span class="btag">Lv.${b.level}</span><span class="bmgr">${mgr}</span></div><div class="brows">${rows}</div>${act?`<div class="bact">${act}</div>`:''}</div>`;
     });
     // 新規出店は俯瞰マップから（空き物件タップ／空港で都市移動）
     h += `<div class="dash-h">新規出店</div>`;
@@ -2708,7 +2831,7 @@ document.getElementById('manage-body').addEventListener('click', e=>{
   } else if(t.dataset.dev!==undefined){
     const d = DEV_CATALOG[+t.dataset.dev];
     const cost = Math.round(d.devCost*devDiscount());
-    if(d && sim.money>=cost && !MENU.some(m=>m.name===d.name)){
+    if(d && tierUnlocked(d.tier) && sim.money>=cost && !MENU.some(m=>m.name===d.name)){
       sim.money -= cost; dayStats.capex += cost;
       MENU.push({ id:d.id, name:d.name, basePrice:d.basePrice, price:d.basePrice, enabled:true, recipe:d.recipe });
       recomputePriceLevel();
@@ -3147,6 +3270,39 @@ function renderOffice(){
   });
   el.innerHTML=h;
 }
+// ===== 施設（焙煎工房・農園・倉庫）の内部画面 =====
+function openFacility(kind){ facKind=kind; document.getElementById('facility-title').textContent=FAC_DEFS[kind].label; renderFacility(); document.getElementById('modal-facility').classList.add('show'); }
+let facKind='roastery';
+function renderFacility(){
+  const el=document.getElementById('facility-body'); const k=facKind;
+  let h=`<div class="fac-hero">${FAC_ART[k]||''}</div>`;
+  if(k==='roastery'){
+    const bmax=beans.grade>=beans.max;
+    h+=`<div class="off-stats"><div class="off-stat"><div class="v">Lv.${beans.grade}<span>/${beans.max}</span></div><div class="l">豆グレード</div></div><div class="off-stat"><div class="v">${qualityLevel().toFixed(2)}</div><div class="l">品質指数</div></div></div>`;
+    h+=`<div class="note" style="margin-top:0">焙煎を極めると豆のグレードが上がり、品質指数（チップ・常連・シェアに効く）が向上します。</div>`;
+    h+=`<div class="dash-h">焙煎グレードの格上げ</div>`;
+    h+=`<div class="mcard"><div class="thumb">${matThumb('bean')}</div><div class="info"><div class="ttl">${BEAN_NAMES[beans.grade-1]} <b>Lv.${beans.grade}</b></div><div class="meta">${bmax?'最高級グレードに到達':'次のグレードで品質+'}</div></div><div class="act"><button class="mbtn" data-facbean="1" ${bmax||sim.money<beanUpCost()?'disabled':''}>${bmax?'最高級':'格上げ<br>¥'+beanUpCost().toLocaleString('ja-JP')}</button></div></div>`;
+  } else if(k==='farm'){
+    const lv=facLv.farm, mx=lv>=FAC_MAXLV;
+    h+=`<div class="off-stats"><div class="off-stat"><div class="v">Lv.${lv}<span>/${FAC_MAXLV}</span></div><div class="l">収穫レベル</div></div><div class="off-stat"><div class="v">−${Math.round((1-farmDiscount())*100)}<span>%</span></div><div class="l">豆の仕入れ</div></div></div>`;
+    h+=`<div class="note" style="margin-top:0">自家栽培でコーヒー豆を安く供給。収穫レベルを上げると仕入れコストがさらに下がります。</div>`;
+    h+=`<div class="dash-h">農園の拡張</div>`;
+    h+=`<div class="mrow"><div class="nm">栽培設備をLv.${lv}→${Math.min(FAC_MAXLV,lv+1)}<div class="sub2">豆の仕入れ倍率 ${farmDiscount().toFixed(2)} → ${mx?farmDiscount().toFixed(2):Math.max(0.36,0.6-lv*0.07).toFixed(2)}</div></div><button class="mbtn" data-facup="farm" ${mx||sim.money<facUpCost('farm')?'disabled':''}>${mx?'最大':'拡張<br>¥'+facUpCost('farm').toLocaleString('ja-JP')}</button></div>`;
+  } else if(k==='warehouse'){
+    const lv=facLv.warehouse, mx=lv>=FAC_MAXLV;
+    h+=`<div class="off-stats"><div class="off-stat"><div class="v">Lv.${lv}<span>/${FAC_MAXLV}</span></div><div class="l">保管レベル</div></div><div class="off-stat"><div class="v">×${whBulk()}<span>量</span></div><div class="l">まとめ買い</div></div></div>`;
+    h+=`<div class="note" style="margin-top:0">1回の仕入れでまとめ買いし在庫を多く確保。保管レベルを上げると一度の仕入れ量が増えます。</div>`;
+    h+=`<div class="dash-h">倉庫の拡張</div>`;
+    h+=`<div class="mrow"><div class="nm">保管容量をLv.${lv}→${Math.min(FAC_MAXLV,lv+1)}<div class="sub2">まとめ買い ×${whBulk()} → ×${mx?whBulk():(2+lv)}</div></div><button class="mbtn" data-facup="warehouse" ${mx||sim.money<facUpCost('warehouse')?'disabled':''}>${mx?'最大':'拡張<br>¥'+facUpCost('warehouse').toLocaleString('ja-JP')}</button></div>`;
+  }
+  el.innerHTML=h;
+}
+document.getElementById('facility-body').addEventListener('click', e=>{
+  const t=e.target.closest('button'); if(!t) return;
+  if(t.dataset.facbean){ upgradeBeans(); }
+  else if(t.dataset.facup){ const kind=t.dataset.facup; if(facLv[kind]<FAC_MAXLV && sim.money>=facUpCost(kind)){ sim.money-=facUpCost(kind); dayStats.capex+=facUpCost(kind); facLv[kind]++; } }
+  renderFacility(); saveGame(); updateHUD();
+});
 document.getElementById('office-body').addEventListener('click', e=>{
   const fl=e.target.closest('[data-addfloor]');
   if(fl){ if(office.floors<office.maxFloors && sim.money>=floorCost()){ sim.money-=floorCost(); dayStats.capex+=floorCost(); office.floors++; renderOffice(); saveGame(); updateHUD(); } return; }
@@ -3307,7 +3463,7 @@ function gameState(){
     lastProfit, spawnAccum, mgrCandidates,
     weekNo, weekAccum, weekStartShare, weekStartBrand, lastJournal,
     viewCity,
-    FACILITY:{...FACILITY}, office:{leased:office.leased, floors:office.floors, dept:{...office.dept}},
+    FACILITY:{...FACILITY}, office:{leased:office.leased, floors:office.floors, dept:{...office.dept}}, facLv:{...facLv},
     campaignOn:{...campaignOn},
     holdings:{...holdings}, ownedRealty, stockPrices:Object.fromEntries(STOCKS.map(s=>[s.sym,s.price])),
     ownedCollectibles, lobby:{level:lobby.level},
@@ -3380,6 +3536,7 @@ function loadGame(slot){
   // 施設（本社・焙煎工房）の復元
   if(d.FACILITY) Object.assign(FACILITY, d.FACILITY);
   if(d.office){ office.leased=!!d.office.leased; office.floors=d.office.floors||2; office.dept=d.office.dept||{}; } else { office.leased=!!FACILITY.hq; office.floors=2; office.dept={}; }
+  if(d.facLv){ facLv.farm=d.facLv.farm||1; facLv.warehouse=d.facLv.warehouse||1; } else { facLv.farm=1; facLv.warehouse=1; }
   if(d.campaignOn) Object.assign(campaignOn, d.campaignOn);
   if(d.holdings) Object.assign(holdings, d.holdings);
   if(d.ownedRealty) ownedRealty = d.ownedRealty;
