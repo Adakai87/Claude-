@@ -1126,8 +1126,8 @@ function makeAirport(){
   roof.position.y=3.3; g.add(roof);
   // 滑走路（空港とすぐ分かる目印）
   const run = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.06,9), new THREE.MeshStandardMaterial({ color:0x44474f }));
-  run.position.set(-7,0.05,1); run.receiveShadow=true; g.add(run);
-  for(let i=0;i<4;i++){ const dash=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.07,1.0), new THREE.MeshStandardMaterial({color:0xf3ede2})); dash.position.set(-7,0.06,-2.4+i*1.7); g.add(dash); }
+  run.position.set(-5.3,0.05,1); run.receiveShadow=true; g.add(run);   // 区画内に収める（道路にはみ出さない）
+  for(let i=0;i<4;i++){ const dash=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.07,1.0), new THREE.MeshStandardMaterial({color:0xf3ede2})); dash.position.set(-5.3,0.06,-2.4+i*1.7); g.add(dash); }
   airportMesh = body; body.userData.group = g;
   return g;
 }
