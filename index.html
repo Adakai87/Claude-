@@ -770,12 +770,13 @@ const CITY_DEMAND = 60000;     // 街全体の1日のカフェ需要（円指標
 // ---- ハブ（俯瞰マップ）：都市ごとに空き物件・ライバルを展開 ----
 let viewCity = 'tokyo';                 // 現在表示中の都市id
 const cityInited = {};                  // 初期化済みの都市id→true
-const LOT_POSITIONS   = [ {x:-12,z:14}, {x:16,z:12}, {x:-16,z:-12}, {x:14,z:-15}, {x:-30,z:28}, {x:34,z:-8}, {x:-8,z:38}, {x:40,z:30} ];
-const RIVAL_POSITIONS = [ {x:-30,z:18}, {x:26,z:-28}, {x:-24,z:-24}, {x:30,z:6} ];
+// すべて区画グリッド（GRID={0,±22,±44,±66,±88}）の中心に配置＝道路上に建物が乗らない
+const LOT_POSITIONS   = [ {x:-22,z:0}, {x:22,z:0}, {x:0,z:22}, {x:0,z:-22}, {x:-22,z:22}, {x:22,z:22}, {x:-22,z:-22}, {x:22,z:-22} ];
+const RIVAL_POSITIONS = [ {x:-44,z:0}, {x:44,z:0}, {x:-44,z:22}, {x:44,z:-22} ];
 const RIVAL_NAMES  = ['グリーン珈琲','ブルーカフェ','まちの喫茶店','ロースト堂','カフェ・ルミエール','大東珈琲','スワン珈琲'];
 const RIVAL_COLORS = [0x2f9e63,0x4a78c9,0x9a5b3a,0xb5552f,0x7a5cc0,0x2f8f9e];
 // ランドマーク（全都市共通。タップで対応する経営パネルを開く）
-const AIRPORT_POS = {x:24,z:21};
+const AIRPORT_POS = {x:0,z:44};
 // プレイヤーが自分で建てる施設（最初は街に存在しない）。建てると機能が解放される
 const FAC_DEFS = {
   hq:       { label:'本社',     tab:'company', color:0x9fb0c2, h:18, build:40000, desc:'会社（企業価値・IPO・配当）と幹部（C-level）が解放されます' },
@@ -816,7 +817,7 @@ const SERVICE_DEFS = {
   lobby:      { label:'ロビー会社',          color:0xcabf9a },
   ibank:      { label:'投資銀行',            color:0x2f3a48 },
 };
-const SERVICE_POS = [ {key:'bank',x:-44,z:-30}, {key:'stock',x:44,z:-30}, {key:'realestate',x:-44,z:34}, {key:'agency',x:44,z:34}, {key:'auction',x:-58,z:2}, {key:'lobby',x:58,z:2}, {key:'ibank',x:0,z:-52} ];
+const SERVICE_POS = [ {key:'bank',x:-44,z:-22}, {key:'stock',x:44,z:22}, {key:'realestate',x:-66,z:0}, {key:'agency',x:66,z:0}, {key:'auction',x:-44,z:44}, {key:'lobby',x:44,z:44}, {key:'ibank',x:0,z:-44} ];
 const cityServices = [];                // {key,mesh,group,x,z,city}
 // 株式市場（自社=TRB。価格は日次でドリフト）
 const STOCKS = [
@@ -1548,7 +1549,7 @@ function buildOverviewScene(){
   function pick0(...a){ return a[(Math.random()*a.length)|0]; }
 
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
-  const STADIUM_POS = {x:54,z:-54};
+  const STADIUM_POS = {x:66,z:-66};
   const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, {x:-9,z:-27}, {x:-66,z:-44}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
@@ -1757,17 +1758,18 @@ function buildOverviewScene(){
   const GRID=[]; for(let v=-88; v<=88; v+=STEP) GRID.push(v);
   // 街区の基盤：歩道（明るいコンクリ）＋縁石＋内側（芝 or プラザ）
   function plotPad(cx,cz,grass){
-    const sw=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.6,PLOT-0.6),new THREE.MeshStandardMaterial({color:0xcacdd2})); sw.rotation.x=-Math.PI/2; sw.position.set(cx,0.04,cz); sw.receiveShadow=true; scene.add(sw);  // 歩道（明るい街区＝道路との明暗差）
-    const curb=new THREE.Mesh(new THREE.BoxGeometry(PLOT-0.2,0.16,PLOT-0.2),new THREE.MeshStandardMaterial({color:0xb4b8bd})); curb.position.set(cx,0.08,cz); scene.add(curb);  // 縁石（道路との段差）
-    const inner=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-2.4,PLOT-2.4),new THREE.MeshStandardMaterial({color: grass?pick0(0x7faa5c,0x86a35f,0x93ab72):0xb0b4ba})); inner.rotation.x=-Math.PI/2; inner.position.set(cx,0.14,cz); inner.receiveShadow=true; scene.add(inner);
+    const sw=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.6,PLOT-0.6),new THREE.MeshStandardMaterial({color:0xbcc0c6})); sw.rotation.x=-Math.PI/2; sw.position.set(cx,0.04,cz); sw.receiveShadow=true; scene.add(sw);  // 歩道（明るい街区＝道路との明暗差）
+    const curb=new THREE.Mesh(new THREE.BoxGeometry(PLOT-0.2,0.16,PLOT-0.2),new THREE.MeshStandardMaterial({color:0xacb0b5})); curb.position.set(cx,0.08,cz); scene.add(curb);  // 縁石（道路との段差）
+    // 街区の内側（露出部）は芝＝“庭”に見せて空き地感を消す
+    const inner=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-2.0,PLOT-2.0),new THREE.MeshStandardMaterial({color: grass?pick0(0x6f9e52,0x7aa85a,0x86a35f):0x9aa0a6})); inner.rotation.x=-Math.PI/2; inner.position.set(cx,0.14,cz); inner.receiveShadow=true; scene.add(inner);
   }
   function placeB(x,z,type,w,d){ if(near(x,z,5.5)) return; townBuilding(x,z,type,w,d); }
   function fillPlot(cx,cz){
     const r2=cx*cx+cz*cz;
     let kind = r2<2200 ? (Math.random()<0.55?'tower':'mid')
              : r2<7000 ? pick(['tower','mid','mid','commercial','blockhouse'])
-             : pick(['blockhouse','blockhouse','mid','green']);
-    plotPad(cx,cz, kind==='green'||kind==='blockhouse');
+             : pick(['blockhouse','blockhouse','mid','mid','commercial']);   // 緑地(空き地)を削減して密度UP
+    plotPad(cx,cz, kind==='mid'||kind==='blockhouse');   // 中低層/住宅街は芝の庭で埋める
     const H=PLOT/2;
     if(kind==='tower'){
       const w=PLOT*0.5+Math.random()*3, d=PLOT*0.5+Math.random()*3;
@@ -1775,21 +1777,24 @@ function buildOverviewScene(){
       const sig = r2<1400 && Math.random()<0.4;
       const main = sig ? (Math.random()<0.5?'tapered':'diagrid') : pick(['office','office','office','bank','brick']);
       placeB(cx+(Math.random()-0.5)*1.5, cz+(Math.random()-0.5)*1.5, main, w, d);
-      if(Math.random()<0.6) placeB(cx+H*0.55, cz-H*0.55, pick(['apartment','shop','brick']), PLOT*0.32, PLOT*0.32);
+      if(Math.random()<0.85) placeB(cx+H*0.55, cz-H*0.55, pick(['apartment','shop','brick']), PLOT*0.32, PLOT*0.32);
     } else if(kind==='mid'){
       // 2x2 の中低層（レンガも混ぜる）
-      for(const o of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(Math.random()<0.85) placeB(cx+o[0]*H*0.5, cz+o[1]*H*0.5, pick(['apartment','apartment','office','shop','brick','brick','church']), PLOT*0.42, PLOT*0.42); }
+      for(const o of [[-1,-1],[1,-1],[-1,1],[1,1]]){ if(Math.random()<0.95) placeB(cx+o[0]*H*0.5, cz+o[1]*H*0.5, pick(['apartment','apartment','office','shop','brick','brick','church']), PLOT*0.42, PLOT*0.42); }
     } else if(kind==='commercial'){
       placeB(cx, cz-H*0.5, 'shop', PLOT*0.86, PLOT*0.36);
       placeB(cx, cz+H*0.45, pick(['apartment','office','brick']), PLOT*0.86, PLOT*0.42);
     } else if(kind==='blockhouse'){
       // 3x3 の住宅をぎっしり（ビクトリアン連棟住宅を多めに）
-      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.84) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment','church']), PLOT*0.27, PLOT*0.27); }
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.94) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment','church']), PLOT*0.27, PLOT*0.27); }
     } else { // green：小公園
       for(let i=0;i<6;i++){ const a=Math.random()*Math.PI*2, rr=Math.random()*H*0.7; tree(cx+Math.cos(a)*rr, cz+Math.sin(a)*rr, 0.9+Math.random()*0.4); }
     }
   }
-  for(const cx of GRID) for(const cz of GRID){ if(near(cx,cz,11)) continue; fillPlot(cx,cz); }
+  for(const cx of GRID) for(const cz of GRID){
+    if(near(cx,cz,11)){ plotPad(cx,cz,true); continue; }   // 予約区画(空き物件/施設)も歩道＋芝を敷く（道路に浮かない・空き地に見えない）
+    fillPlot(cx,cz);
+  }
   // 市庁舎（ドーム建築ランドマーク：外周左・既存サービスと非干渉）
   const CIVIC_POS={x:-66,z:-44};
   plotPad(CIVIC_POS.x, CIVIC_POS.z, false);
@@ -1829,20 +1834,15 @@ function buildOverviewScene(){
     // 横断歩道(ゼブラ)＋停止線：各交差点の4辺。縞は道路幅いっぱい（道路の縦/横コリドーは建物が無いので絶対にはみ出さない）
     const ZRC = RC.filter(v=>Math.abs(v)<=34);   // {±11,±33}（中央寄り）
     const CWH = HALF - 0.4;                       // ゼブラ横断半幅(=2.6) → 道路[±3]内
-    const NSTR = 4, sPitch = 0.6, sThick = 0.42, mouth = HALF + 0.25;   // mouth=3.25（交差点の口）
+    const NSTR = 3, sPitch = 0.72, sThick = 0.5, mouth = HALF + 0.45;   // 縞3本・すっきり
     const cwX = new THREE.PlaneGeometry(CWH*2, sThick);  // 南北道路を横断（x方向に長い縞・z方向へ並ぶ）
     const cwZ = new THREE.PlaneGeometry(sThick, CWH*2);  // 東西道路を横断
-    const stopX = new THREE.PlaneGeometry(CWH*2, 0.5);
-    const stopZ = new THREE.PlaneGeometry(0.5, CWH*2);
     function crosswalk(cx,cz){
       for(const sgn of [1,-1]){
         for(let i=0;i<NSTR;i++){ const off=mouth+i*sPitch;
           add(cwX, white, cx, yZebra, cz+sgn*off);   // 北/南口（縦道路を横断）
           add(cwZ, white, cx+sgn*off, yZebra, cz);   // 東/西口（横道路を横断）
         }
-        const so=mouth+NSTR*sPitch+0.2;
-        add(stopX, white, cx, yStop, cz+sgn*so);     // 停止線
-        add(stopZ, white, cx+sgn*so, yStop, cz);
       }
     }
     for(const cx of ZRC) for(const cz of ZRC) crosswalk(cx,cz);
