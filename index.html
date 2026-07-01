@@ -1113,7 +1113,7 @@ function makeCafeStore(x,z,accent){ const r=makeBlockBuilding(x,z,'cafe',accent)
 // 空港（全都市共通の旅行ハブ）：タップで都市移動
 let airportMesh;
 function makeAirport(){
-  const g = new THREE.Group(); g.position.set(24,0,21); overScene.add(g);
+  const g = new THREE.Group(); g.position.set(AIRPORT_POS.x,0,AIRPORT_POS.z); overScene.add(g);
   const body = new THREE.Mesh(new THREE.BoxGeometry(9,3.2,6), new THREE.MeshStandardMaterial({ color:0xdfe4ec }));
   body.position.y=1.6; body.castShadow=body.receiveShadow=true; g.add(body);
   const glass = new THREE.Mesh(new THREE.BoxGeometry(9.1,1.4,6.1), new THREE.MeshStandardMaterial({ color:0x8fb8d8, emissive:0x18303f }));
@@ -1550,7 +1550,8 @@ function buildOverviewScene(){
 
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
   const STADIUM_POS = {x:66,z:-66};
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, {x:-9,z:-27}, {x:-66,z:-44}];
+  const PARK_POS = {x:-22,z:-44};
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, PARK_POS, {x:-66,z:-44}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ---- パレット（実在の街っぽい落ち着いた色）----
@@ -1891,13 +1892,13 @@ function buildOverviewScene(){
 
   // 公園（芝＋池＋木立＋ベンチ）
   (function park(){
-    const px=-9, pz=-27;
-    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(16,16), new THREE.MeshStandardMaterial({color:0x6fae5a}));
-    lawn.rotation.x=-Math.PI/2; lawn.position.set(px,0.03,pz); scene.add(lawn);
-    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.6,20), new THREE.MeshStandardMaterial({color:0x2fa6c4}));
-    pond.rotation.x=-Math.PI/2; pond.position.set(px+2,0.05,pz+2); scene.add(pond);
-    for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*6-1, pz+Math.sin(a)*6-1, 1.1); }
-    for(const o of [[-5,-4],[-5,4]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.3,pz+o[1]); scene.add(bn); }
+    const px=PARK_POS.x, pz=PARK_POS.z;   // グリッド区画中心に整列（道路にはみ出さない）
+    const lawn=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.8,PLOT-0.8), new THREE.MeshStandardMaterial({color:0x6fae5a}));
+    lawn.rotation.x=-Math.PI/2; lawn.position.set(px,0.17,pz); scene.add(lawn);   // 予約プロットパッドの上に
+    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.0,20), new THREE.MeshStandardMaterial({color:0x2fa6c4}));
+    pond.rotation.x=-Math.PI/2; pond.position.set(px+1.5,0.19,pz+1.5); scene.add(pond);
+    for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*5.2, pz+Math.sin(a)*5.2, 1.0); }
+    for(const o of [[-4.5,-3.5],[-4.5,3.5]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.42,pz+o[1]); scene.add(bn); }
   })();
 
   // 野球スタジアム（ランドマーク：外周スタンド＋芝＋内野ダイヤモンド＋照明塔）
