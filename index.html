@@ -1531,8 +1531,8 @@ function buildOverviewScene(){
   water.rotation.x=-Math.PI/2; water.position.y=-0.5; scene.add(water);
   const coast = new THREE.Mesh(new THREE.PlaneGeometry(244,244), new THREE.MeshStandardMaterial({ color:0x86a35f }));
   coast.rotation.x=-Math.PI/2; coast.position.y=-0.12; scene.add(coast);
-  const pave = new THREE.Mesh(new THREE.PlaneGeometry(224,224), new THREE.MeshStandardMaterial({ color:0x8e9296, roughness:0.95 }));
-  pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);   // アスファルト＝道路面（本家の中明度グレー）
+  const pave = new THREE.Mesh(new THREE.PlaneGeometry(224,224), new THREE.MeshStandardMaterial({ color:0x51555c, roughness:0.97 }));
+  pave.rotation.x=-Math.PI/2; pave.receiveShadow=true; scene.add(pave);   // アスファルト＝道路面。明るい街区(歩道)との明暗差で道路が読める
   // 背面の湾（街の奥＝水辺。橋がここをまたぐ）
   const bay = new THREE.Mesh(new THREE.PlaneGeometry(260,60), new THREE.MeshStandardMaterial({ color:0x1fa8c6, roughness:0.3 }));
   bay.rotation.x=-Math.PI/2; bay.position.set(0,0.02,-120); scene.add(bay);
@@ -1757,9 +1757,9 @@ function buildOverviewScene(){
   const GRID=[]; for(let v=-88; v<=88; v+=STEP) GRID.push(v);
   // 街区の基盤：歩道（明るいコンクリ）＋縁石＋内側（芝 or プラザ）
   function plotPad(cx,cz,grass){
-    const sw=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-1.2,PLOT-1.2),new THREE.MeshStandardMaterial({color:0xc4c8cd})); sw.rotation.x=-Math.PI/2; sw.position.set(cx,0.03,cz); sw.receiveShadow=true; scene.add(sw);  // 歩道（道路に食い込まないよう縮小）
-    const curb=new THREE.Mesh(new THREE.BoxGeometry(PLOT-1.6,0.12,PLOT-1.6),new THREE.MeshStandardMaterial({color:0x9fa3a8})); curb.position.set(cx,0.06,cz); scene.add(curb);  // 縁石
-    const inner=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-2.4,PLOT-2.4),new THREE.MeshStandardMaterial({color: grass?pick0(0x7faa5c,0x86a35f,0x93ab72):0x9aa0a6})); inner.rotation.x=-Math.PI/2; inner.position.set(cx,0.13,cz); inner.receiveShadow=true; scene.add(inner);
+    const sw=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.6,PLOT-0.6),new THREE.MeshStandardMaterial({color:0xcacdd2})); sw.rotation.x=-Math.PI/2; sw.position.set(cx,0.04,cz); sw.receiveShadow=true; scene.add(sw);  // 歩道（明るい街区＝道路との明暗差）
+    const curb=new THREE.Mesh(new THREE.BoxGeometry(PLOT-0.2,0.16,PLOT-0.2),new THREE.MeshStandardMaterial({color:0xb4b8bd})); curb.position.set(cx,0.08,cz); scene.add(curb);  // 縁石（道路との段差）
+    const inner=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-2.4,PLOT-2.4),new THREE.MeshStandardMaterial({color: grass?pick0(0x7faa5c,0x86a35f,0x93ab72):0xb0b4ba})); inner.rotation.x=-Math.PI/2; inner.position.set(cx,0.14,cz); inner.receiveShadow=true; scene.add(inner);
   }
   function placeB(x,z,type,w,d){ if(near(x,z,5.5)) return; townBuilding(x,z,type,w,d); }
   function fillPlot(cx,cz){
@@ -1802,16 +1802,10 @@ function buildOverviewScene(){
     const RW   = HALF*2;                                    // 道路幅 = 6（隙間と一致）
     const LIM  = 99;
     const yRoad=0.015, yPatch=0.018, yMark=0.05, yZebra=0.055, yStop=0.056;
-    const asphalt  = new THREE.MeshStandardMaterial({color:0x8e9296, roughness:0.96});
-    const asphalt2 = new THREE.MeshStandardMaterial({color:0x888c91, roughness:0.96});
-    const white    = new THREE.MeshStandardMaterial({color:0xeeece2, roughness:0.7});
-    const whiteD   = new THREE.MeshStandardMaterial({color:0xe4e1d4, roughness:0.7});
-    const geoHbar = new THREE.PlaneGeometry(LIM*2+RW, RW);
-    const geoVbar = new THREE.PlaneGeometry(RW, LIM*2+RW);
-    const geoPatch= new THREE.PlaneGeometry(RW, RW);
+    // 道路面は地面ベース(暗いアスファルト)がそのまま見える＝街区(明るい歩道)との明暗差で道路がはっきり読める。
+    const white    = new THREE.MeshStandardMaterial({color:0xf2f0e8, roughness:0.6});
+    const whiteD   = new THREE.MeshStandardMaterial({color:0xeae7da, roughness:0.6});
     const add=(geo,mat,x,y,z)=>{ const m=new THREE.Mesh(geo,mat); m.rotation.x=-Math.PI/2; m.position.set(x,y,z); m.receiveShadow=true; scene.add(m); return m; };
-    for(const c of RC){ add(geoHbar, asphalt, 0, yRoad, c); add(geoVbar, asphalt, c, yRoad, 0); }
-    for(const cx of RC) for(const cz of RC) add(geoPatch, asphalt2, cx, yPatch, cz);
     const markRange = 55;
     const inMark = (v)=> Math.abs(v) <= markRange + 0.1;
     const interGap = HALF + 1.2;
@@ -1823,6 +1817,14 @@ function buildOverviewScene(){
       if(!inMark(c)) continue;
       for(let x=-markRange; x<markRange; x+=DASH+GAP){ const px=x+DASH/2; if(isNearInter(px)) continue; add(geoDashH, whiteD, px, yMark, c); }
       for(let z=-markRange; z<markRange; z+=DASH+GAP){ const pz=z+DASH/2; if(isNearInter(pz)) continue; add(geoDashV, whiteD, c, yMark, pz); }
+    }
+    // 路肩エッジライン（連続・道路の輪郭）：これで「開けた暗い空間」が“通り”として読める
+    const EDGE = HALF - 0.35;                         // 道路端の白線オフセット(=2.65)
+    const geoEdgeH = new THREE.PlaneGeometry(markRange*2+RW, 0.15);
+    const geoEdgeV = new THREE.PlaneGeometry(0.15, markRange*2+RW);
+    for(const c of RC){ if(!inMark(c)) continue;
+      add(geoEdgeH, whiteD, 0, yMark, c-EDGE); add(geoEdgeH, whiteD, 0, yMark, c+EDGE);
+      add(geoEdgeV, whiteD, c-EDGE, yMark, 0); add(geoEdgeV, whiteD, c+EDGE, yMark, 0);
     }
     // 横断歩道(ゼブラ)＋停止線：各交差点の4辺。縞は道路幅いっぱい（道路の縦/横コリドーは建物が無いので絶対にはみ出さない）
     const ZRC = RC.filter(v=>Math.abs(v)<=34);   // {±11,±33}（中央寄り）
