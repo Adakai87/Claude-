@@ -1208,7 +1208,7 @@ function initCity(cityId){
   cityInited[cityId] = true;
   const city = CITIES.find(c=>c.id===cityId) || CITIES[0];
   ensureServices(cityId);
-  const nR = 2 + (Math.random()*2|0);
+  const nR = RIVAL_POSITIONS.length;   // 予約したライバル区画は全て埋める（空き区画を出さない）
   for(let i=0;i<nR && i<RIVAL_POSITIONS.length;i++){
     const p = RIVAL_POSITIONS[i];
     const r = { name:RIVAL_NAMES[(Math.random()*RIVAL_NAMES.length)|0], comp:6+(Math.random()*9|0),
@@ -1551,7 +1551,7 @@ function buildOverviewScene(){
   // 予約地点（カフェ/空き物件/ライバル/空港）の近くには街区を作らない
   const STADIUM_POS = {x:66,z:-66};
   const PARK_POS = {x:-22,z:-44};
-  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, {x:0,z:0}, PARK_POS, {x:-66,z:-44}];
+  const reserved = [...LOT_POSITIONS, ...RIVAL_POSITIONS, ...SERVICE_POS, AIRPORT_POS, STADIUM_POS, PARK_POS, {x:-66,z:-44}];
   const near = (x,z,r)=> reserved.some(p=>Math.abs(p.x-x)<r && Math.abs(p.z-z)<r);
 
   // ---- パレット（実在の街っぽい落ち着いた色）----
