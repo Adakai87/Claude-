@@ -1787,7 +1787,7 @@ function buildOverviewScene(){
       placeB(cx, cz+H*0.45, pick(['apartment','office','brick']), PLOT*0.86, PLOT*0.42);
     } else if(kind==='blockhouse'){
       // 3x3 の住宅をぎっしり（ビクトリアン連棟住宅を多めに）
-      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if(Math.random()<0.94) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment','church']), PLOT*0.27, PLOT*0.27); }
+      for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){ if((i===0&&j===0) || Math.random()<0.94) placeB(cx+i*H*0.62, cz+j*H*0.62, pick(['victorian','victorian','house','apartment','church']), PLOT*0.27, PLOT*0.27); }   // 中央棟は必ず配置（区画中心に穴を作らない）
     } else { // green：小公園
       for(let i=0;i<6;i++){ const a=Math.random()*Math.PI*2, rr=Math.random()*H*0.7; tree(cx+Math.cos(a)*rr, cz+Math.sin(a)*rr, 0.9+Math.random()*0.4); }
     }
@@ -1895,10 +1895,15 @@ function buildOverviewScene(){
     const px=PARK_POS.x, pz=PARK_POS.z;   // グリッド区画中心に整列（道路にはみ出さない）
     const lawn=new THREE.Mesh(new THREE.PlaneGeometry(PLOT-0.8,PLOT-0.8), new THREE.MeshStandardMaterial({color:0x6fae5a}));
     lawn.rotation.x=-Math.PI/2; lawn.position.set(px,0.17,pz); scene.add(lawn);   // 予約プロットパッドの上に
-    const pond=new THREE.Mesh(new THREE.CircleGeometry(3.0,20), new THREE.MeshStandardMaterial({color:0x2fa6c4}));
-    pond.rotation.x=-Math.PI/2; pond.position.set(px+1.5,0.19,pz+1.5); scene.add(pond);
-    for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*5.2, pz+Math.sin(a)*5.2, 1.0); }
-    for(const o of [[-4.5,-3.5],[-4.5,3.5]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.42,pz+o[1]); scene.add(bn); }
+    const pond=new THREE.Mesh(new THREE.CircleGeometry(2.6,20), new THREE.MeshStandardMaterial({color:0x2fa6c4}));
+    pond.rotation.x=-Math.PI/2; pond.position.set(px-3.2,0.19,pz+3.2); scene.add(pond);
+    // 中央のガゼボ（東屋）：区画中心のランドマーク＝“空き地”に見せない
+    const gz=new THREE.Group(); gz.position.set(px,0,pz); scene.add(gz);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(1.7,1.9,0.3,10), new THREE.MeshStandardMaterial({color:0xcdbfa4})); base.position.y=0.32; base.receiveShadow=true; gz.add(base);
+    for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; const post=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,1.5,6), new THREE.MeshStandardMaterial({color:0xf2ecdd})); post.position.set(Math.cos(a)*1.4,1.2,Math.sin(a)*1.4); gz.add(post); }
+    const roof=new THREE.Mesh(new THREE.ConeGeometry(2.0,1.2,6), new THREE.MeshStandardMaterial({color:0x8a5a3a})); roof.position.y=2.5; roof.castShadow=true; gz.add(roof);
+    for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; tree(px+Math.cos(a)*5.4, pz+Math.sin(a)*5.4, 1.0); }
+    for(const o of [[4.4,-3.2],[4.4,3.2]]){ const bn=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.5), new THREE.MeshStandardMaterial({color:0x8a6a44})); bn.position.set(px+o[0],0.42,pz+o[1]); scene.add(bn); }
   })();
 
   // 野球スタジアム（ランドマーク：外周スタンド＋芝＋内野ダイヤモンド＋照明塔）
