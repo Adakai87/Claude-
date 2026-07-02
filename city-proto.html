@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>東京 骨格プロト L0+L1（地形＋道路のみ）</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#20242b;font-family:system-ui,'Hiragino Sans',sans-serif}
+  #app{position:fixed;inset:0}
+  .tag{position:absolute;transform:translate(-50%,-50%);background:rgba(20,24,30,.78);color:#ffd987;
+       padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap;
+       border:1px solid rgba(255,217,135,.35)}
+  .tag.b{color:#9fd4ff;border-color:rgba(159,212,255,.35)}
+  #note{position:fixed;left:12px;bottom:12px;color:#cfd4dc;font-size:12px;background:rgba(20,24,30,.7);
+        padding:8px 12px;border-radius:10px;max-width:420px;line-height:1.6}
+</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="note"><b>東京・骨格プロト（L0地形＋L1道路）</b><br>
+建物ゼロ。幹線（太・白センターライン）＞大通り＞路地 の3階層。<br>
+湾・蛇行する川・埋立地・橋。中心ほど区画が細かい。</div>
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a3038);
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+app.appendChild(renderer.domElement);
+
+let cam;
+function makeCam(){
+  const a = innerWidth/innerHeight, H = 118;
+  cam = new THREE.OrthographicCamera(-H*a, H*a, H, -H, 1, 1000);
+  cam.position.set(150, 170, 150); cam.lookAt(0,0,0);
+}
+makeCam();
+addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); makeCam(); placeTags(); render(); });
+
+const hemi = new THREE.HemisphereLight(0xfff2dd, 0x54606e, 0.95); scene.add(hemi);
+const dir  = new THREE.DirectionalLight(0xffe2b0, 1.0); dir.position.set(60,90,40); scene.add(dir);
+
+// ================= L0 地形（東京：湾＋蛇行する川＋埋立地） =================
+const W = 300;                                     // マップ一辺
+// 海岸線: zごとの陸の東端x。南へ行くほど湾が食い込む＋入り江でギザギザ
+const coastX = z => 62 - 0.22*z + 13*Math.sin(z*0.031) + 5*Math.sin(z*0.11+2);
+// 川: 北端から南下し、東へ流れて湾に注ぐ（隅田川イメージ）
+const riverX = z => -22 + 15*Math.sin((z+150)*0.021) + 0.42*Math.max(0, z+42);
+const RIVER_W = 9;
+const inRiver = (x,z) => z < 105 && Math.abs(x - riverX(z)) < RIVER_W/2;
+// 埋立地（湾内の人工島）
+const ISLANDS = [ {x:84, z:16, w:30, d:20, r:0.18}, {x:66, z:72, w:26, d:18, r:-0.12} ];
+function onIsland(x,z){
+  return ISLANDS.some(s=>{ const c=Math.cos(-s.r), si=Math.sin(-s.r);
+    const lx=(x-s.x)*c-(z-s.z)*si, lz=(x-s.x)*si+(z-s.z)*c;
+    return Math.abs(lx)<s.w/2 && Math.abs(lz)<s.d/2; });
+}
+const inWater = (x,z) => (x > coastX(z) || inRiver(x,z)) && !onIsland(x,z);
+
+// 陸（ベース）
+{
+  const land = new THREE.Mesh(new THREE.PlaneGeometry(W,W), new THREE.MeshStandardMaterial({color:0x93a07e}));
+  land.rotation.x = -Math.PI/2; land.position.y = 0; scene.add(land);
+}
+// 湾（海岸線ポリゴン）
+{
+  const sh = new THREE.Shape();
+  sh.moveTo(coastX(-W/2), W/2);                     // Shape座標: (x, -z) で作って回転
+  for(let z=-W/2; z<=W/2; z+=4) sh.lineTo(coastX(z), -z);
+  sh.lineTo(W/2, -W/2); sh.lineTo(W/2, W/2); sh.closePath();
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({color:0x3d7ca8}));
+  m.rotation.x = -Math.PI/2; m.position.y = 0.05; scene.add(m);
+}
+// 砂浜ライン（海岸のフチ）
+{
+  const pts=[]; for(let z=-W/2; z<=W/2; z+=4) pts.push([coastX(z), z]);
+  ribbon(pts, 2.4, 0.06, 0xd6cba2);
+}
+// 川
+{
+  const pts=[]; for(let z=-W/2; z<=106; z+=4) pts.push([riverX(z), z]);
+  ribbon(pts, RIVER_W, 0.055, 0x3d7ca8);
+  const l=[], r=[];
+  for(let z=-W/2; z<=104; z+=4){ l.push([riverX(z)-RIVER_W/2, z]); r.push([riverX(z)+RIVER_W/2, z]); }
+  ribbon(l, 1.0, 0.06, 0xb9c2a8); ribbon(r, 1.0, 0.06, 0xb9c2a8);   // 護岸
+}
+// 埋立地
+for(const s of ISLANDS){
+  const g = new THREE.Mesh(new THREE.BoxGeometry(s.w, 0.3, s.d), new THREE.MeshStandardMaterial({color:0x9aa48b}));
+  g.position.set(s.x, 0.12, s.z); g.rotation.y = s.r; scene.add(g);
+}
+
+// ================= 描画ヘルパ =================
+function ribbon(pts, w, y, color, mat){
+  if(pts.length<2) return null;
+  const pos=[]; const n=pts.length;
+  const nx=[], nz=[];
+  for(let i=0;i<n;i++){
+    const a=pts[Math.max(0,i-1)], b=pts[Math.min(n-1,i+1)];
+    let dx=b[0]-a[0], dz=b[1]-a[1]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
+    nx.push(-dz); nz.push(dx);
+  }
+  for(let i=0;i<n-1;i++){
+    const h=w/2;
+    const ax=pts[i][0]+nx[i]*h,   az=pts[i][1]+nz[i]*h,   bx=pts[i][0]-nx[i]*h,   bz=pts[i][1]-nz[i]*h;
+    const cx=pts[i+1][0]+nx[i+1]*h, cz=pts[i+1][1]+nz[i+1]*h, dx2=pts[i+1][0]-nx[i+1]*h, dz2=pts[i+1][1]-nz[i+1]*h;
+    pos.push(ax,y,az, bx,y,bz, cx,y,cz,  bx,y,bz, dx2,y,dz2, cx,y,cz);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo, mat || new THREE.MeshStandardMaterial({color, side:THREE.DoubleSide}));
+  scene.add(mesh); return mesh;
+}
+function resample(pts, step){
+  const out=[pts[0]]; let acc=0;
+  for(let i=1;i<pts.length;i++){
+    let [px,pz]=out[out.length-1]; const [qx,qz]=pts[i];
+    let d=Math.hypot(qx-px,qz-pz);
+    while(acc+d>=step){ const t=(step-acc)/d; const mx=px+(qx-px)*t, mz=pz+(qz-pz)*t; out.push([mx,mz]); px=mx; pz=mz; d=Math.hypot(qx-px,qz-pz); acc=0; }
+    acc+=d;
+  }
+  out.push(pts[pts.length-1]); return out;
+}
+
+// ================= L1 道路（3階層＋自動橋） =================
+const RING = {cx:-30, cz:-14, rx:52, rz:58};        // 環状幹線（山手イメージ）
+const inRing = (x,z,k=1) => ((x-RING.cx)/(RING.rx*k))**2 + ((z-RING.cz)/(RING.rz*k))**2 <= 1;
+
+const COL = { art:0x43474e, ave:0x51555c, aly:0x5d6066, bridge:0x767e88, dash:0xf2efe4 };
+const bridgePillar = new THREE.MeshStandardMaterial({color:0x8a929c});
+
+// road: 水域は自動で「橋」(短い水域) か「途切れ」(長い水域/対象外)
+function road(pts, kind, opt={}){
+  const w = kind==='art'?8.2 : kind==='ave'?4.8 : 2.6;
+  const maxSpan = opt.bridgeSpan!==undefined ? opt.bridgeSpan : (kind==='art'? 34 : 0);
+  const yR = kind==='art'?0.10 : kind==='ave'?0.09 : 0.08;
+  const P = resample(pts, 3);
+  const cls = P.map(([x,z])=>{
+    if(opt.clipRing && !inRing(x,z,1.04)) return 2;              // リング外=描かない
+    if(opt.clipRingOut && inRing(x,z,0.98)) return 2;            // リング内=描かない
+    return inWater(x,z) ? 1 : 0;
+  });
+  let i=0;
+  while(i<P.length){
+    const c=cls[i];
+    let j=i; while(j<P.length && cls[j]===c) j++;
+    const seg=P.slice(Math.max(0,i-1), Math.min(P.length,j+1));
+    if(c===0 && seg.length>1) drawRoad(seg,w,yR,kind);
+    else if(c===1 && seg.length>1){
+      const len=(seg.length-1)*3;
+      if(len<=maxSpan || opt.forceBridge) drawBridge(seg,w,kind);
+    }
+    i=j;
+  }
+}
+function drawRoad(seg,w,y,kind){
+  ribbon(seg,w,y,COL[kind]);
+  if(kind==='art'){                                              // 幹線: 白センターライン(破線)
+    const R=resample(seg,7);
+    for(let k=0;k+1<R.length;k+=2) ribbon([R[k],R[k+1]],0.5,y+0.015,COL.dash);
+    ribbon(seg,w+1.8,y-0.02,0x777d68);                            // 幹線の歩道帯
+  }
+}
+function drawBridge(seg,w,kind){
+  ribbon(seg,w*0.9,1.25,COL.bridge);
+  ribbon(seg,w*0.9+1.2,1.05,0x5a626e);                            // 桁
+  const R=resample(seg,10);
+  for(const [x,z] of R){ const p=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,1.2),bridgePillar); p.position.set(x,0.55,z); scene.add(p); }
+  // 取り付け部スロープ表現（端を路面色で繋ぐ）
+  ribbon(seg.slice(0,2), w*0.9, 0.6, COL.bridge);
+  ribbon(seg.slice(-2), w*0.9, 0.6, COL.bridge);
+}
+
+// --- 幹線 ---
+// 環状
+{ const pts=[]; for(let a=0;a<=Math.PI*2+0.01;a+=Math.PI/40) pts.push([RING.cx+Math.cos(a)*RING.rx, RING.cz+Math.sin(a)*RING.rz]); road(pts,'art'); }
+// 放射（ダウンタウンを貫通して郊外へ。内側の起点をずらして1点集中を避ける）
+road([[-24,-40],[-38,-70],[-44,-150]],'art');
+road([[-52,-16],[-80,-30],[-150,-38]],'art');
+road([[-40,22],[-70,60],[-104,150]],'art');
+road([[-18,26],[-16,70],[-4,150]],'art');
+road([[-8,-18],[16,-32],[44,-44],[coastX(-46)-6,-46]],'art');   // 東へ→川を橋で渡る
+// 湾岸幹線（海沿い。川の河口は自動で橋）
+{ const pts=[]; for(let z=-150; z<=150; z+=5) pts.push([coastX(z)-6.5,z]); road(pts,'art'); }
+// ベイブリッジ（本土→島1→島2→本土南）: 常に橋
+road([[coastX(2)-6,2],[ISLANDS[0].x-4,ISLANDS[0].z-2]],'art',{forceBridge:false,bridgeSpan:80});
+road([[ISLANDS[0].x-2,ISLANDS[0].z+6],[ISLANDS[1].x+4,ISLANDS[1].z-4]],'art',{bridgeSpan:80});
+road([[ISLANDS[1].x-6,ISLANDS[1].z+4],[coastX(86)-6,86]],'art',{bridgeSpan:80});
+
+// --- 大通り（内側: 8°回転グリッド / 外側: 粗い正グリッド） ---
+const TH=8*Math.PI/180, CU=Math.cos(TH), SU=Math.sin(TH);
+function rotLine(off, a0, a1, vert){ // 中心周りθ回転ローカル座標の直線（vert=縦線）
+  const pts=[]; for(let t=a0;t<=a1;t+=4){
+    const lx = vert? off : t, lz = vert? t : off;
+    pts.push([RING.cx + CU*lx - SU*lz, RING.cz + SU*lx + CU*lz]);
+  } return pts;
+}
+for(let off=-48; off<=48; off+=16){
+  road(rotLine(off,-58,58,false),'ave',{clipRing:true});
+  road(rotLine(off,-64,64,true ),'ave',{clipRing:true});
+}
+for(let k=-150; k<=150; k+=30){
+  road([[k,-150],[k,150]],'ave',{clipRingOut:true});
+  road([[-150,k],[150,k]],'ave',{clipRingOut:true});
+}
+// --- 路地（内側=密 8px間隔 / 外側=大通りの中間に1本） ---
+for(let off=-52; off<=52; off+=8){
+  if(off%16===0) continue;
+  road(rotLine(off,-56,56,false),'aly',{clipRing:true});
+  road(rotLine(off,-60,60,true ),'aly',{clipRing:true});
+}
+for(let k=-135; k<=135; k+=30){
+  road([[k,-150],[k,150]],'aly',{clipRingOut:true});
+  road([[-150,k],[150,k]],'aly',{clipRingOut:true});
+}
+// 島内の街路
+for(const s of ISLANDS){
+  for(let o=-s.w/2+5;o<s.w/2;o+=8){ const c=Math.cos(s.r),si=Math.sin(s.r);
+    road([[s.x+c*o-si*(-s.d/2+2), s.z+si*o+c*(-s.d/2+2)],[s.x+c*o-si*(s.d/2-2), s.z+si*o+c*(s.d/2-2)]],'aly',{bridgeSpan:0});
+  }
+}
+
+// ================= ラベル =================
+const TAGS=[
+  ['東京湾',96,66,'b'], ['川（隅田川イメージ）',riverX(-70),-70,'b'], ['埋立地',ISLANDS[0].x,ISLANDS[0].z,''],
+  ['環状幹線',RING.cx,RING.cz-RING.rz,''], ['ダウンタウン（区画が細かい）',RING.cx,RING.cz,''],
+  ['湾岸幹線',coastX(-100)-7,-100,''], ['ベイブリッジ',(coastX(2)+ISLANDS[0].x)/2-4,(2+ISLANDS[0].z)/2,''],
+  ['郊外（区画が粗い）',-110,-110,''],
+];
+const tagEls = TAGS.map(([t,,,c])=>{ const d=document.createElement('div'); d.className='tag '+c; d.textContent=t; document.body.appendChild(d); return d; });
+const _v=new THREE.Vector3();
+function placeTags(){
+  TAGS.forEach(([t,x,z],i)=>{ _v.set(x,2,z).project(cam);
+    tagEls[i].style.left=((_v.x*0.5+0.5)*innerWidth)+'px';
+    tagEls[i].style.top=((-_v.y*0.5+0.5)*innerHeight)+'px';
+  });
+}
+function render(){ renderer.render(scene,cam); }
+render(); placeTags();   // 投影はカメラ行列確定後（初回レンダー後）に行う
+</script>
+</body>
+</html>
