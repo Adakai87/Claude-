@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>東京 骨格プロト v2.2（地区境界=実際の道路）</title>
+<title>東京 v3 タイルベース — L0地形のみ</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#20242b;font-family:system-ui,'Hiragino Sans',sans-serif}
   #app{position:fixed;inset:0}
@@ -18,21 +18,19 @@
 </head>
 <body>
 <div id="app"></div>
-<div id="note"><b>東京・骨格プロト v2.2</b><br>
-地区の境界を「実際に描いた幹線ポリライン」に一致させた版。<br>
-街路は必ず幹線に接続して終わる。短い断片道路は生成しない。</div>
+<div id="note"><b>東京 v3（タイルベース）— L0 地形のみ</b><br>
+100×100セル。湾・蛇行する川・埋立地2つ。道路はまだ無し。<br>
+ここから幹線→街路→街区の順にセル上へ設置していく。</div>
 <script type="module">
 import * as THREE from 'three';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2a3038);
-const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-app.appendChild(renderer.domElement);
+document.getElementById('app').appendChild(renderer.domElement);
 
-// ?h=45&x=-80&z=-14 でズーム検証できる
 const q = new URLSearchParams(location.search);
 const VH = +q.get('h') || 118, VX = +q.get('x') || 0, VZ = +q.get('z') || 0;
 let cam;
@@ -44,300 +42,99 @@ function makeCam(){
 makeCam();
 addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); makeCam(); render(); placeTags(); });
 
-const hemi = new THREE.HemisphereLight(0xfff2dd, 0x54606e, 0.95); scene.add(hemi);
-const dir  = new THREE.DirectionalLight(0xffe2b0, 1.0); dir.position.set(60,90,40); scene.add(dir);
+scene.add(new THREE.HemisphereLight(0xfff2dd, 0x54606e, 0.95));
+const dl = new THREE.DirectionalLight(0xffe2b0, 1.0); dl.position.set(60,90,40); scene.add(dl);
 
-// ================= L0 地形 =================
-const W = 300;
+// ================= セルグリッド（全ての土台） =================
+// type: 0=陸 1=湾 2=川 3=埋立地
+const N=100, CS=3, HALF=N*CS/2;
+const T = { LAND:0, BAY:1, RIVER:2, FILL:3 };
+const grid = new Uint8Array(N*N);
+const gi = (i,j)=> j*N+i;
+const cellX = i => -HALF + i*CS + CS/2;          // セル中心のワールド座標
+const cellZ = j => -HALF + j*CS + CS/2;
+
+// --- 地形の source of truth（連続関数）→ セルに焼き込む ---
 const coastX = z => 62 - 0.22*z + 13*Math.sin(z*0.031) + 5*Math.sin(z*0.11+2);
 const riverX = z => -22 + 15*Math.sin((z+150)*0.021) + 0.42*Math.max(0, z+42);
-const RIVER_W = 9;
-const inRiver = (x,z) => z < 120 && Math.abs(x - riverX(z)) < RIVER_W/2;
-const ISLANDS = [ {x:84, z:16, w:30, d:20, r:0.18}, {x:66, z:72, w:26, d:18, r:-0.12} ];
-function onIsland(x,z){
-  return ISLANDS.some(s=>{ const c=Math.cos(-s.r), si=Math.sin(-s.r);
-    const lx=(x-s.x)*c-(z-s.z)*si, lz=(x-s.x)*si+(z-s.z)*c;
-    return Math.abs(lx)<s.w/2 && Math.abs(lz)<s.d/2; });
-}
-const inWater = (x,z) => (x > coastX(z) || inRiver(x,z)) && !onIsland(x,z);
+const RIVER_HALF = 4.5;
+const ISLANDS = [ {x:84, z:16, w:30, d:21}, {x:63, z:75, w:27, d:18} ];   // タイル世界では軸整列が正義
 
-{
-  const land = new THREE.Mesh(new THREE.PlaneGeometry(W,W), new THREE.MeshStandardMaterial({color:0x93a07e}));
-  land.rotation.x = -Math.PI/2; scene.add(land);
+for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const x=cellX(i), z=cellZ(j);
+  let t = T.LAND;
+  if(x > coastX(z)) t = T.BAY;
+  if(z < 121 && Math.abs(x - riverX(z)) < RIVER_HALF && t===T.LAND) t = T.RIVER;
+  if(t===T.BAY && ISLANDS.some(s=> Math.abs(x-s.x)<s.w/2 && Math.abs(z-s.z)<s.d/2)) t = T.FILL;
+  grid[gi(i,j)] = t;
 }
-{
-  const sh = new THREE.Shape();
-  sh.moveTo(coastX(-W/2), W/2);
-  for(let z=-W/2; z<=W/2; z+=4) sh.lineTo(coastX(z), -z);
-  sh.lineTo(W/2, -W/2); sh.lineTo(W/2, W/2); sh.closePath();
-  const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({color:0x3d7ca8}));
-  m.rotation.x = -Math.PI/2; m.position.y = 0.05; scene.add(m);
-}
+// 川が湾に合流する所: 川セルが湾に触れたらそこから先は湾
+// （連続関数で既に湾側は BAY 判定なので追加処理不要）
 
-// ================= 描画ヘルパ =================
-let yEps = 0;
-function ribbon(pts, w, y, color){
-  if(pts.length<2) return null;
-  const pos=[]; const n=pts.length; const nx=[], nz=[];
-  for(let i=0;i<n;i++){
-    const a=pts[Math.max(0,i-1)], b=pts[Math.min(n-1,i+1)];
-    let dx=b[0]-a[0], dz=b[1]-a[1]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
-    nx.push(-dz); nz.push(dx);
-  }
-  for(let i=0;i<n-1;i++){
-    const h=w/2;
-    const ax=pts[i][0]+nx[i]*h,   az=pts[i][1]+nz[i]*h,   bx=pts[i][0]-nx[i]*h,   bz=pts[i][1]-nz[i]*h;
-    const cx=pts[i+1][0]+nx[i+1]*h, cz=pts[i+1][1]+nz[i+1]*h, dx2=pts[i+1][0]-nx[i+1]*h, dz2=pts[i+1][1]-nz[i+1]*h;
-    pos.push(ax,y,az, bx,y,bz, cx,y,cz,  bx,y,bz, dx2,y,dz2, cx,y,cz);
+const isWater = t => t===T.BAY || t===T.RIVER;
+
+// ================= 描画（マージ済みジオメトリ＝1タイプ1メッシュ） =================
+function buildLayer(cells, y, baseColor, jitter=0.035){
+  // cells: [i,j] の配列。1枚のBufferGeometryにまとめ、頂点色で微妙な揺らぎ
+  const pos=[], col=[], c=new THREE.Color();
+  for(const [i,j] of cells){
+    const x0=-HALF+i*CS, z0=-HALF+j*CS, x1=x0+CS, z1=z0+CS;
+    c.setHex(baseColor);
+    const f = 1 + (((i*73856093 ^ j*19349663)>>>0)%1000/1000 - 0.5)*2*jitter;   // 決定的ジッター
+    const r=Math.min(1,c.r*f), g=Math.min(1,c.g*f), b=Math.min(1,c.b*f);
+    pos.push(x0,y,z0, x0,y,z1, x1,y,z1,  x0,y,z0, x1,y,z1, x1,y,z0);
+    for(let k=0;k<6;k++) col.push(r,g,b);
   }
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col,3));
   geo.computeVertexNormals();
-  const mesh=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color, side:THREE.DoubleSide}));
-  scene.add(mesh); return mesh;
-}
-function resample(pts, step){
-  const out=[pts[0]]; let acc=0;
-  for(let i=1;i<pts.length;i++){
-    let [px,pz]=out[out.length-1]; const [qx,qz]=pts[i];
-    let d=Math.hypot(qx-px,qz-pz);
-    while(acc+d>=step){ const t=(step-acc)/d; const mx=px+(qx-px)*t, mz=pz+(qz-pz)*t; out.push([mx,mz]); px=mx; pz=mz; d=Math.hypot(qx-px,qz-pz); acc=0; }
-    acc+=d;
-  }
-  out.push(pts[pts.length-1]); return out;
+  const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, side:THREE.DoubleSide}));
+  scene.add(m); return m;
 }
 
-// 川と護岸（川は湾の中まで延長して合流させる＝途中で終わらせない）
+// 底面（湾の色。継ぎ目隠し）
 {
-  const pts=[];
-  for(let z=-W/2; z<=W/2; z+=4){ pts.push([riverX(z), z]); if(riverX(z) > coastX(z)+14) break; }
-  ribbon(pts, RIVER_W, 0.055, 0x3d7ca8);
-  const l=[], r=[];
-  for(const [x,z] of pts){ if(x < coastX(z)-2){ l.push([x-RIVER_W/2, z]); r.push([x+RIVER_W/2, z]); } }
-  if(l.length>1){ ribbon(l, 1.0, 0.06, 0xb9c2a8); ribbon(r, 1.0, 0.06, 0xb9c2a8); }
-}
-{ const pts=[]; for(let z=-W/2; z<=W/2; z+=4) pts.push([coastX(z), z]); ribbon(pts, 2.4, 0.06, 0xd6cba2); }
-for(const s of ISLANDS){
-  // 平面（道路y=0.08〜より低い0.062）: 島上の道路・橋の着地が埋まらず見える
-  const geo = new THREE.PlaneGeometry(s.w, s.d); geo.rotateX(-Math.PI/2);
-  const g = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x9aa48b}));
-  g.position.set(s.x, 0.062, s.z); g.rotation.y = -s.r; scene.add(g);   // rotation.yは2D回転と符号が逆（道路側の座標系に合わせる）
+  const base=new THREE.Mesh(new THREE.PlaneGeometry(N*CS, N*CS), new THREE.MeshStandardMaterial({color:0x35688c}));
+  base.rotation.x=-Math.PI/2; base.position.y=0; scene.add(base);
 }
 
-// ================= L1 幹線ネットワーク =================
-const RING = {cx:-30, cz:-14, rx:52, rz:58};
-const inRing = (x,z,k=1) => ((x-RING.cx)/(RING.rx*k))**2 + ((z-RING.cz)/(RING.rz*k))**2 <= 1;
+const landCells=[], bayCells=[], riverCells=[], fillCells=[], sandCells=[], bankCells=[];
+const at=(i,j)=> (i<0||j<0||i>=N||j>=N)? T.LAND : grid[gi(i,j)];   // 範囲外は陸扱い（マップ縁に偽砂浜を作らない）
+for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const t=grid[gi(i,j)];
+  if(t===T.BAY) bayCells.push([i,j]);
+  else if(t===T.RIVER) riverCells.push([i,j]);
+  else {
+    const n4=[at(i+1,j),at(i-1,j),at(i,j+1),at(i,j-1)];
+    if(t===T.LAND && n4.includes(T.BAY)) sandCells.push([i,j]);            // 湾に面した陸＝砂浜
+    else if(n4.includes(T.RIVER)) bankCells.push([i,j]);                    // 川に面した陸＝護岸
+    else if(t===T.FILL) fillCells.push([i,j]);
+    else landCells.push([i,j]);
+  }
+}
+buildLayer(bayCells,   0.04, 0x3d7ca8, 0.02);
+buildLayer(riverCells, 0.05, 0x4185ae, 0.02);
+buildLayer(landCells,  0.14, 0x93a07e);
+buildLayer(fillCells,  0.12, 0x9aa48b, 0.02);
+buildLayer(sandCells,  0.11, 0xd6cba2, 0.02);
+buildLayer(bankCells,  0.13, 0xa8b096, 0.02);
 
-const ringPts=[]; for(let a=0;a<=Math.PI*2+0.01;a+=Math.PI/48) ringPts.push([RING.cx+Math.cos(a)*RING.rx, RING.cz+Math.sin(a)*RING.rz]);
-const RAD_OUT = [ [-44,-150], [-150,-38], [-104,150], [-4,150], [coastX(-46)-6,-46] ];
-const radialPts = [
-  [[-24,-40],[-38,-70],RAD_OUT[0]],
-  [[-52,-16],[-80,-30],RAD_OUT[1]],
-  [[-40,22],[-70,60],RAD_OUT[2]],
-  [[-18,26],[-16,70],RAD_OUT[3]],
-  [[-8,-18],[16,-32],[44,-44],RAD_OUT[4]],
-];
-const coastPts=[]; for(let z=-150; z<=150; z+=5) coastPts.push([coastX(z)-6.5,z]);
-const bayLinks = [
-  [[coastX(2)-6,2],[ISLANDS[0].x-4,ISLANDS[0].z-2]],
-  [[ISLANDS[0].x-2,ISLANDS[0].z+6],[ISLANDS[1].x+4,ISLANDS[1].z-4]],
-  [[ISLANDS[1].x-6,ISLANDS[1].z+4],[coastX(86)-6,86]],
-];
-const ARTERIALS = [ {pts:ringPts}, ...radialPts.map(p=>({pts:p})), {pts:coastPts}, ...bayLinks.map(p=>({pts:p,span:80})) ];
-
-// ===== 距離場（街路は幹線アスファルトの下に潜って止まる） =====
-const CELL=1.5, NC=Math.ceil(W/CELL)+4, HALF_W=W/2;
-function makeFieldF(){ return new Float32Array(NC*NC).fill(99); }
-function stamp(field, pts, R){
-  const r=Math.ceil(R/CELL);
-  for(const [px,pz] of pts){
-    const ci=Math.floor((px+HALF_W)/CELL)+1, cj=Math.floor((pz+HALF_W)/CELL)+1;
-    for(let i=ci-r;i<=ci+r;i++)for(let j=cj-r;j<=cj+r;j++){
-      if(i<0||j<0||i>=NC||j>=NC) continue;
-      const x=(i-1)*CELL-HALF_W+CELL/2, z=(j-1)*CELL-HALF_W+CELL/2;
-      const d=Math.hypot(x-px,z-pz), k=j*NC+i;
-      if(d<field[k]) field[k]=d;
-    }
-  }
-}
-function fieldAt(field,x,z){ const i=Math.floor((x+HALF_W)/CELL)+1, j=Math.floor((z+HALF_W)/CELL)+1;
-  return (i<0||j<0||i>=NC||j>=NC)?99:field[j*NC+i]; }
-const dArt = makeFieldF();
-for(const a of ARTERIALS) stamp(dArt, resample(a.pts,2), 8);
-const dAve = makeFieldF();
-const stopHere=(x,z)=> fieldAt(dArt,x,z)<2.9 || fieldAt(dAve,x,z)<1.7;
-
-// ===== 地区マップ（境界=実際に描いた放射ポリライン。角度ではなく道そのもの） =====
-// 放射を「中心まで内挿＋外へ外挿」して延長し、各セルがどの放射の間にあるかを左右判定で決める
-const RADS = radialPts.map((pl,i)=>{
-  const pts=[[RING.cx,RING.cz], ...pl];
-  const [ax,az]=pts[pts.length-2], [bx,bz]=pts[pts.length-1];
-  const dx=bx-ax, dz=bz-az, L=Math.hypot(dx,dz)||1;
-  pts.push([bx+dx/L*260, bz+dz/L*260]);
-  return { pts: resample(pts,5), ang: Math.atan2(RAD_OUT[i][1]-RING.cz, RAD_OUT[i][0]-RING.cx) };
-}).sort((a,b)=>a.ang-b.ang);
-const TAU=Math.PI*2;
-function sideOf(rad, x, z){                       // 放射の左(+1)/右(-1)
-  let best=1e9, m=0;
-  for(let i=0;i<rad.pts.length;i++){ const d=(rad.pts[i][0]-x)**2+(rad.pts[i][1]-z)**2; if(d<best){best=d;m=i;} }
-  const a=rad.pts[Math.max(0,m-1)], b=rad.pts[Math.min(rad.pts.length-1,m+1)];
-  const dx=b[0]-a[0], dz=b[1]-a[1];
-  return (dx*(z-a[1]) - dz*(x-a[0])) >= 0 ? 1 : -1;
-}
-const distMap = new Int8Array(NC*NC).fill(-1);
-for(let j=0;j<NC;j++)for(let i=0;i<NC;i++){
-  const x=(i-1)*CELL-HALF_W+CELL/2, z=(j-1)*CELL-HALF_W+CELL/2;
-  if(Math.abs(x)>150||Math.abs(z)>150) continue;
-  // 角度で初期推定 → 実ポリラインの左右判定で確定（1回補正）
-  const a=Math.atan2(z-RING.cz, x-RING.cx);
-  let g=0;
-  for(let k=0;k<RADS.length;k++){
-    const a0=RADS[k].ang, span=((RADS[(k+1)%RADS.length].ang-a0)+TAU)%TAU;
-    if(((a-a0)+TAU)%TAU < span){ g=k; break; }
-  }
-  for(let it=0;it<2;it++){
-    if(sideOf(RADS[g], x, z) < 0){ g=(g-1+RADS.length)%RADS.length; continue; }
-    if(sideOf(RADS[(g+1)%RADS.length], x, z) > 0){ g=(g+1)%RADS.length; continue; }
-    break;
-  }
-  distMap[j*NC+i]=g;
-}
-const districtAt=(x,z)=>{ const i=Math.floor((x+HALF_W)/CELL)+1, j=Math.floor((z+HALF_W)/CELL)+1;
-  return (i<0||j<0||i>=NC||j>=NC)?-1:distMap[j*NC+i]; };
-
-// ================= 道路描画 =================
-const COL = { art:0x43474e, ave:0x51555c, aly:0x5d6066, bridge:0x767e88, dash:0xf2efe4 };
-const bridgePillar = new THREE.MeshStandardMaterial({color:0x8a929c});
-
-function road(pts, kind, opt={}){
-  const w = kind==='art'?8.2 : kind==='ave'?4.8 : 2.6;
-  const maxSpan = opt.span!==undefined ? opt.span : (kind==='art'? 34 : 0);
-  const yBase = kind==='art'?0.10 : kind==='ave'?0.088 : 0.080;
-  const P = resample(pts, 3);
-  const cls = P.map(([x,z])=>{
-    if(opt.clip){ const c=opt.clip(x,z); if(c!==0) return c; }
-    return inWater(x,z) ? 1 : 0;
-  });
-  let i=0;
-  while(i<P.length){
-    const c=cls[i]; let j=i;
-    while(j<P.length && cls[j]===c) j++;
-    const seg=P.slice(Math.max(0,i-1), Math.min(P.length,j+1));
-    if(c===0 && seg.length>1){
-      const len=(seg.length-1)*3;
-      if(kind==='art' || len>=8) drawRoad(seg,w,yBase,kind);   // 8未満の断片街路は作らない（confetti除去）
-    }
-    else if(c===1 && seg.length>1){ const len=(seg.length-1)*3; if(len<=maxSpan) drawBridge(seg,w); }
-    i=j;
-  }
-}
-function drawRoad(seg,w,yBase,kind){
-  const y = yBase + (yEps++ % 9)*0.0008;
-  ribbon(seg,w,y,COL[kind]);
-  if(kind==='art'){
-    const R=resample(seg,7);
-    for(let k=0;k+1<R.length;k+=2) ribbon([R[k],R[k+1]],0.5,y+0.012,COL.dash);
-  }
-}
-function drawBridge(seg,w){
-  ribbon(seg,w*0.9,1.25,COL.bridge);
-  ribbon(seg,w*0.9+1.2,1.05,0x5a626e);
-  for(const [x,z] of resample(seg,10)){ const p=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,1.2),bridgePillar); p.position.set(x,0.55,z); scene.add(p); }
-  const n=seg.length;                              // 着地ランプ（端に向かって下がる2段）
-  if(n>=3){
-    ribbon(seg.slice(0,2), w*0.9, 0.45, COL.bridge); ribbon(seg.slice(1,3), w*0.9, 0.85, COL.bridge);
-    ribbon(seg.slice(n-2), w*0.9, 0.45, COL.bridge); ribbon(seg.slice(n-3,n-1), w*0.9, 0.85, COL.bridge);
-  } else {
-    ribbon(seg.slice(0,2), w*0.9, 0.6, COL.bridge); ribbon(seg.slice(-2), w*0.9, 0.6, COL.bridge);
-  }
-}
-
-// 幹線
-for(const a of ARTERIALS) road(a.pts,'art',{span:a.span});
-
-// 川沿い護岸道路（街路の受け皿）
-{
-  const bankPts=[];
-  for(const side of [-1,1]){
-    let run=[];
-    for(let z=-146; z<=100; z+=4){
-      const x=riverX(z)+side*(RIVER_W/2+2.6);
-      if(!inWater(x,z)) run.push([x,z]);
-      else { if(run.length>1) bankPts.push(run); run=[]; }
-    }
-    if(run.length>1) bankPts.push(run);
-  }
-  for(const pts of bankPts){
-    road(pts,'ave',{clip:(x,z)=> fieldAt(dArt,x,z)<2.9 ? 2 : (inWater(x,z)?1:0)});
-    stamp(dAve, resample(pts,2), 6);
-  }
-}
-
-// ================= 地区グリッド =================
-function districtGrid(secIdx){
-  const a0=RADS[secIdx].ang, span=((RADS[(secIdx+1)%RADS.length].ang-a0)+TAU)%TAU;
-  const phi=a0+span/2, cu=Math.cos(phi), su=Math.sin(phi);
-  const clip=(x,z)=>{
-    if(Math.abs(x)>146 || Math.abs(z)>146) return 2;
-    if(inRing(x,z,1.0)) return 2;
-    if(districtAt(x,z)!==secIdx) return 2;         // 境界=実際の放射道路
-    if(stopHere(x,z)) return 2;                    // 幹線の下に潜って止まる
-    if(onIsland(x,z)) return 2;
-    return inWater(x,z)?1:0;
-  };
-  for(let off=-240; off<=240; off+=16){
-    const kind=(off%32===0)?'ave':'aly';
-    const a=[], b=[];
-    for(let t=-240;t<=240;t+=4){
-      a.push([RING.cx+cu*t-su*off, RING.cz+su*t+cu*off]);
-      b.push([RING.cx+cu*off-su*t, RING.cz+su*off+cu*t]);
-    }
-    road(a,kind,{clip}); road(b,kind,{clip});
-  }
-}
-for(let s=0;s<RADS.length;s++) districtGrid(s);
-
-// ダウンタウン（環状の内側・8°回転・高密度）— 範囲は楕円を完全カバー
-{
-  const TH=8*Math.PI/180, CU=Math.cos(TH), SU=Math.sin(TH);
-  const clip=(x,z)=>{
-    if(!inRing(x,z,1.0)) return 2;
-    if(stopHere(x,z)) return 2;
-    return inWater(x,z)?1:0;
-  };
-  for(let off=-64; off<=64; off+=8){
-    const kind=(off%16===0)?'ave':'aly';
-    const a=[], b=[];
-    for(let t=-64;t<=64;t+=4){
-      a.push([RING.cx+CU*t-SU*off, RING.cz+SU*t+CU*off]);
-      b.push([RING.cx+CU*off-SU*t, RING.cz+SU*off+CU*t]);
-    }
-    road(a,kind,{clip}); road(b,kind,{clip});
-  }
-}
-// 埋立地の街路
-for(const s of ISLANDS){
-  const c=Math.cos(s.r), si=Math.sin(s.r);
-  const clip=(x,z)=> onIsland(x,z) ? (fieldAt(dArt,x,z)<2.9?2:0) : 2;
-  for(let o=-s.w/2+5; o<s.w/2; o+=8){
-    road([[s.x+c*o-si*(-s.d/2+2), s.z+si*o+c*(-s.d/2+2)],[s.x+c*o-si*(s.d/2-2), s.z+si*o+c*(s.d/2-2)]],'aly',{clip});
-  }
-  for(let o=-s.d/2+5; o<s.d/2; o+=8){
-    road([[s.x+c*(-s.w/2+2)-si*o, s.z+si*(-s.w/2+2)+c*o],[s.x+c*(s.w/2-2)-si*o, s.z+si*(s.w/2-2)+c*o]],'aly',{clip});
-  }
-}
+// 次フェーズ（道路設置）用に公開
+window.CITY = { N, CS, HALF, T, grid, cellX, cellZ };
 
 // ================= ラベル =================
 const TAGS=[
-  ['東京湾',96,66,'b'], ['川（隅田川イメージ）',riverX(-70),-70,'b'], ['埋立地',ISLANDS[0].x,ISLANDS[0].z,''],
-  ['環状幹線',RING.cx,RING.cz-RING.rz,''], ['ダウンタウン（8°回転・高密度）',RING.cx,RING.cz,''],
-  ['湾岸幹線',coastX(-100)-7,-100,''], ['ベイブリッジ',(coastX(2)+ISLANDS[0].x)/2-4,(2+ISLANDS[0].z)/2,''],
-  ['地区ごとに街路の向きが変わる',-100,-100,''],
+  ['東京湾', 100, 80, 'b'],
+  ['川（隅田川イメージ）', riverX(-70), -70, 'b'],
+  ['河口', riverX(112), 112, 'b'],
+  ['埋立地A', ISLANDS[0].x, ISLANDS[0].z, ''],
+  ['埋立地B', ISLANDS[1].x, ISLANDS[1].z, ''],
 ];
 const tagEls = TAGS.map(([t,,,c])=>{ const d=document.createElement('div'); d.className='tag '+c; d.textContent=t; document.body.appendChild(d); return d; });
 const _v=new THREE.Vector3();
 function placeTags(){
-  if(q.get('h')){ tagEls.forEach(e=>e.style.display='none'); return; }   // ズーム検証時は非表示
+  if(q.get('h')){ tagEls.forEach(e=>e.style.display='none'); return; }
   TAGS.forEach(([t,x,z],i)=>{ _v.set(x,2,z).project(cam);
     tagEls[i].style.left=((_v.x*0.5+0.5)*innerWidth)+'px';
     tagEls[i].style.top=((-_v.y*0.5+0.5)*innerHeight)+'px';
