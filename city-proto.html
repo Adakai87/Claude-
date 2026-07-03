@@ -141,20 +141,28 @@ const bayLinks = [
 ];
 const ARTERIALS = [ {pts:ringPts}, ...radialPts.map(p=>({pts:p})), {pts:coastPts}, ...bayLinks.map(p=>({pts:p,span:80})) ];
 
-// 幹線近傍マップ（街路はこの近傍に入ったら必ず止まる＝T字接続・重なりゼロ）
-const CELL=3, NC=Math.ceil(W/CELL)+4, HALF_W=W/2;
-const nearArt = new Uint8Array(NC*NC);
-const cIdx=(x,z)=>{ const i=Math.floor((x+HALF_W)/CELL)+1, j=Math.floor((z+HALF_W)/CELL)+1;
-  return (i<0||j<0||i>=NC||j>=NC)?-1:j*NC+i; };
-for(const a of ARTERIALS){
-  for(const [px,pz] of resample(a.pts,2)){
-    for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++){
-      if(Math.hypot(dx*CELL,dz*CELL)>6.4) continue;
-      const k=cIdx(px+dx*CELL, pz+dz*CELL); if(k>=0) nearArt[k]=1;
+// 幹線への距離場（細かいグリッドで正確に）。街路は幹線アスファルトの「下に潜って」止まる＝T字接続
+const CELL=2, NC=Math.ceil(W/CELL)+4, HALF_W=W/2;
+function makeField(){ return new Float32Array(NC*NC).fill(99); }
+function stamp(field, pts, R){
+  const r=Math.ceil(R/CELL);
+  for(const [px,pz] of pts){
+    const ci=Math.floor((px+HALF_W)/CELL)+1, cj=Math.floor((pz+HALF_W)/CELL)+1;
+    for(let i=ci-r;i<=ci+r;i++)for(let j=cj-r;j<=cj+r;j++){
+      if(i<0||j<0||i>=NC||j>=NC) continue;
+      const x=(i-1)*CELL-HALF_W+CELL/2, z=(j-1)*CELL-HALF_W+CELL/2;
+      const d=Math.hypot(x-px,z-pz), k=j*NC+i;
+      if(d<field[k]) field[k]=d;
     }
   }
 }
-const isNearArt=(x,z)=>{ const k=cIdx(x,z); return k>=0 && nearArt[k]===1; };
+function fieldAt(field,x,z){ const i=Math.floor((x+HALF_W)/CELL)+1, j=Math.floor((z+HALF_W)/CELL)+1;
+  return (i<0||j<0||i>=NC||j>=NC)?99:field[j*NC+i]; }
+const dArt = makeField();
+for(const a of ARTERIALS) stamp(dArt, resample(a.pts,2), 8);
+const dAve = makeField();                                  // 川沿い道路など準幹線（後で登録）
+// 街路の停止判定: 幹線中心線から2.8(半幅4.1の内側=アスファルト下)、準幹線から1.7
+const stopHere=(x,z)=> fieldAt(dArt,x,z)<2.8 || fieldAt(dAve,x,z)<1.7;
 
 // ================= 道路描画（水域は自動で橋 or 途切れ） =================
 const COL = { art:0x43474e, ave:0x51555c, aly:0x5d6066, bridge:0x767e88, dash:0xf2efe4 };
@@ -163,7 +171,7 @@ const bridgePillar = new THREE.MeshStandardMaterial({color:0x8a929c});
 function road(pts, kind, opt={}){
   const w = kind==='art'?8.2 : kind==='ave'?4.8 : 2.6;
   const maxSpan = opt.span!==undefined ? opt.span : (kind==='art'? 34 : 0);
-  const yBase = kind==='art'?0.10 : kind==='ave'?0.088 : 0.082;
+  const yBase = kind==='art'?0.10 : kind==='ave'?0.088 : 0.080;   // 階層で必ず art>ave>aly（潜り込んだ端は上位に隠れる）
   const P = resample(pts, 3);
   const cls = P.map(([x,z])=>{
     if(opt.clip){ const c=opt.clip(x,z); if(c!==0) return c; }   // 2=描かない 1=水 0=陸
@@ -180,7 +188,7 @@ function road(pts, kind, opt={}){
   }
 }
 function drawRoad(seg,w,yBase,kind){
-  const y = yBase + (yEps++ % 9)*0.0016;
+  const y = yBase + (yEps++ % 9)*0.0008;   // 同階層内の交差チラつき防止（階層間の順序は壊さない振幅）
   ribbon(seg,w,y,COL[kind]);
   if(kind==='art'){
     const R=resample(seg,7);
@@ -197,6 +205,24 @@ function drawBridge(seg,w){
 
 // --- 幹線を描く ---
 for(const a of ARTERIALS) road(a.pts,'art',{span:a.span});
+
+// --- 川沿いの護岸道路（街路の受け皿。川へのブツ切りを無くす）---
+{
+  const bankPts=[];
+  for(const side of [-1,1]){
+    let run=[];
+    for(let z=-146; z<=100; z+=4){
+      const x=riverX(z)+side*(RIVER_W/2+2.6);
+      if(!inWater(x,z)) run.push([x,z]);
+      else { if(run.length>1) bankPts.push(run); run=[]; }
+    }
+    if(run.length>1) bankPts.push(run);
+  }
+  for(const pts of bankPts){
+    road(pts,'ave',{clip:(x,z)=> fieldAt(dArt,x,z)<2.8 ? 2 : (inWater(x,z)?1:0)});
+    stamp(dAve, resample(pts,2), 6);
+  }
+}
 
 // ================= 地区分割 → 地区ごとに1枚のグリッド =================
 // 外周は放射5本で5地区に分かれる。各地区の街路は「放射の向き」に揃う（=幹線でグリッドの向きが変わる）
@@ -221,7 +247,7 @@ function districtGrid(secIdx){
     if(Math.abs(x)>146 || Math.abs(z)>146) return 2;
     if(inRing(x,z,1.0)) return 2;                  // ダウンタウンは別地区
     if(sectorOf(x,z)!==secIdx) return 2;           // 隣の地区に踏み込まない
-    if(isNearArt(x,z)) return 2;                   // 幹線の手前で止まる（T字接続）
+    if(stopHere(x,z)) return 2;                    // 幹線アスファルトの下に潜って止まる（T字接続）
     if(onIsland(x,z)) return 2;                    // 島は独自街路
     return inWater(x,z)?1:0;
   };
@@ -241,8 +267,8 @@ for(let s=0;s<radAng.length;s++) districtGrid(s);
 {
   const TH=8*Math.PI/180, CU=Math.cos(TH), SU=Math.sin(TH);
   const clip=(x,z)=>{
-    if(!inRing(x,z,0.97)) return 2;
-    if(isNearArt(x,z)) return 2;
+    if(!inRing(x,z,1.0)) return 2;                 // 環状の中心線まで届く→端は環状のアスファルトに隠れる
+    if(stopHere(x,z)) return 2;
     return inWater(x,z)?1:0;
   };
   for(let off=-56; off<=56; off+=8){
@@ -258,7 +284,7 @@ for(let s=0;s<radAng.length;s++) districtGrid(s);
 // 埋立地の街路（島のフレームに揃える）
 for(const s of ISLANDS){
   const c=Math.cos(s.r), si=Math.sin(s.r);
-  const clip=(x,z)=> onIsland(x,z) ? (isNearArt(x,z)?2:0) : 2;
+  const clip=(x,z)=> onIsland(x,z) ? (fieldAt(dArt,x,z)<2.8?2:0) : 2;
   for(let o=-s.w/2+5; o<s.w/2; o+=8){
     road([[s.x+c*o-si*(-s.d/2+2), s.z+si*o+c*(-s.d/2+2)],[s.x+c*o-si*(s.d/2-2), s.z+si*o+c*(s.d/2-2)]],'aly',{clip});
   }
