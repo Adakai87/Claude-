@@ -3,29 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>東京 v3 タイルベース — L0地形のみ</title>
+<title>東京 v3.1 — BuildIt質感の地形（L0）</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#20242b;font-family:system-ui,'Hiragino Sans',sans-serif}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2c5f88;font-family:system-ui,'Hiragino Sans',sans-serif}
   #app{position:fixed;inset:0}
   .tag{position:absolute;transform:translate(-50%,-50%);background:rgba(20,24,30,.78);color:#ffd987;
        padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap;
        border:1px solid rgba(255,217,135,.35)}
   .tag.b{color:#9fd4ff;border-color:rgba(159,212,255,.35)}
-  #note{position:fixed;left:12px;bottom:12px;color:#cfd4dc;font-size:12px;background:rgba(20,24,30,.7);
+  #note{position:fixed;left:12px;bottom:12px;color:#eaf2f8;font-size:12px;background:rgba(20,30,40,.72);
         padding:8px 12px;border-radius:10px;max-width:440px;line-height:1.6}
 </style>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
 <div id="app"></div>
-<div id="note"><b>東京 v3（タイルベース）— L0 地形のみ</b><br>
-100×100セル。湾・蛇行する川・埋立地2つ。道路はまだ無し。<br>
-ここから幹線→街路→街区の順にセル上へ設置していく。</div>
+<div id="note"><b>東京 v3.1 — BuildIt質感の地形（L0のみ・道路なし）</b><br>
+なめらか海岸線／水の深度グラデ＋波打ち際／街フラット＋海辺だけ坂／外は海。<br>
+内部データは100×100タイルのまま（道路計画に影響なし）。</div>
 <script type="module">
 import * as THREE from 'three';
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a3038);
+scene.background = new THREE.Color(0x2c5f88);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -36,92 +36,140 @@ const VH = +q.get('h') || 118, VX = +q.get('x') || 0, VZ = +q.get('z') || 0;
 let cam;
 function makeCam(){
   const a = innerWidth/innerHeight;
-  cam = new THREE.OrthographicCamera(-VH*a, VH*a, VH, -VH, 1, 1000);
+  cam = new THREE.OrthographicCamera(-VH*a, VH*a, VH, -VH, 1, 2000);
   cam.position.set(VX+150, 170, VZ+150); cam.lookAt(VX,0,VZ);
 }
 makeCam();
 addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); makeCam(); render(); placeTags(); });
 
-scene.add(new THREE.HemisphereLight(0xfff2dd, 0x54606e, 0.95));
-const dl = new THREE.DirectionalLight(0xffe2b0, 1.0); dl.position.set(60,90,40); scene.add(dl);
+scene.add(new THREE.HemisphereLight(0xfffaf0, 0x7a9a68, 1.1));
+const dl = new THREE.DirectionalLight(0xffedc4, 1.05); dl.position.set(80,120,50); scene.add(dl);
 
-// ================= セルグリッド（全ての土台） =================
-// type: 0=陸 1=湾 2=川 3=埋立地
+// ================= 地形の定義（連続関数＝なめらかさの源泉） =================
 const N=100, CS=3, HALF=N*CS/2;
+const EXT=22, Ne=N+EXT*2;
 const T = { LAND:0, BAY:1, RIVER:2, FILL:3 };
-const grid = new Uint8Array(N*N);
-const gi = (i,j)=> j*N+i;
-const cellX = i => -HALF + i*CS + CS/2;          // セル中心のワールド座標
-const cellZ = j => -HALF + j*CS + CS/2;
 
-// --- 地形の source of truth（連続関数）→ セルに焼き込む ---
 const coastX = z => 62 - 0.22*z + 13*Math.sin(z*0.031) + 5*Math.sin(z*0.11+2);
 const riverX = z => -22 + 15*Math.sin((z+150)*0.021) + 0.42*Math.max(0, z+42);
 const RIVER_HALF = 4.5;
-const ISLANDS = [ {x:84, z:16, w:30, d:21}, {x:63, z:75, w:27, d:18} ];   // タイル世界では軸整列が正義
+const ISLANDS = [ {x:84, z:16, w:30, d:21}, {x:63, z:75, w:27, d:18} ];
 
-for(let j=0;j<N;j++)for(let i=0;i<N;i++){
-  const x=cellX(i), z=cellZ(j);
-  let t = T.LAND;
-  if(x > coastX(z)) t = T.BAY;
-  if(z < 121 && Math.abs(x - riverX(z)) < RIVER_HALF && t===T.LAND) t = T.RIVER;
-  if(t===T.BAY && ISLANDS.some(s=> Math.abs(x-s.x)<s.w/2 && Math.abs(z-s.z)<s.d/2)) t = T.FILL;
-  grid[gi(i,j)] = t;
+// 陸への「符号つき距離」: 正=陸side / 負=水side。全てが連続量→海岸線が滑らかな曲線になる
+function sdParts(x,z){
+  const sBay = coastX(z) - x;                                        // 湾
+  const sRiv = (z<121) ? Math.abs(x - riverX(z)) - RIVER_HALF : 1e9; // 川
+  let sIsl = -1e9;                                                   // 埋立地（内側で正）
+  for(const s of ISLANDS){
+    const v = Math.min(s.w/2 - Math.abs(x-s.x), s.d/2 - Math.abs(z-s.z));
+    if(v > sIsl) sIsl = v;
+  }
+  let sd = Math.min(sBay, sRiv);
+  if(sIsl > sd) sd = sIsl;
+  return { sd, sBay, sRiv, sIsl };
 }
-// 川が湾に合流する所: 川セルが湾に触れたらそこから先は湾
-// （連続関数で既に湾側は BAY 判定なので追加処理不要）
 
-const isWater = t => t===T.BAY || t===T.RIVER;
+// ゲーム用コアグリッド（道路計画は今後もこのタイルで進める）
+function typeAt(x,z){
+  const p = sdParts(x,z);
+  if(p.sIsl > 0) return T.FILL;
+  if(p.sd > 0) return T.LAND;
+  return (p.sRiv < p.sBay) ? T.RIVER : T.BAY;
+}
+const grid = new Uint8Array(N*N);
+const cellX = i => -HALF + i*CS + CS/2, cellZ = j => -HALF + j*CS + CS/2;
+for(let j=0;j<N;j++)for(let i=0;i<N;i++) grid[j*N+i] = typeAt(cellX(i), cellZ(j));
+window.CITY = { N, CS, HALF, T, grid, cellX, cellZ };
 
-// ================= 描画（マージ済みジオメトリ＝1タイプ1メッシュ） =================
-function buildLayer(cells, y, baseColor, jitter=0.035){
-  // cells: [i,j] の配列。1枚のBufferGeometryにまとめ、頂点色で微妙な揺らぎ
-  const pos=[], col=[], c=new THREE.Color();
-  for(const [i,j] of cells){
-    const x0=-HALF+i*CS, z0=-HALF+j*CS, x1=x0+CS, z1=z0+CS;
-    c.setHex(baseColor);
-    const f = 1 + (((i*73856093 ^ j*19349663)>>>0)%1000/1000 - 0.5)*2*jitter;   // 決定的ジッター
-    const r=Math.min(1,c.r*f), g=Math.min(1,c.g*f), b=Math.min(1,c.b*f);
-    pos.push(x0,y,z0, x0,y,z1, x1,y,z1,  x0,y,z0, x1,y,z1, x1,y,z0);
-    for(let k=0;k<6;k++) col.push(r,g,b);
+const hash=(i,j)=> (((i*73856093 ^ j*19349663)>>>0)%1000)/1000;
+const clamp01=v=>Math.min(1,Math.max(0,v));
+
+// ================= 地形メッシュ（頂点=連続距離から高さと色を決める） =================
+const SUB=3, STEPV=CS/SUB;                       // 頂点間隔=1.0
+const NV=Ne*SUB, V=NV+1;
+const vxAt = vi => -HALF + (vi/SUB - EXT)*CS;
+{
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const cGrass=new THREE.Color(0x66ad49), cSand=new THREE.Color(0xecd9a6), cWet=new THREE.Color(0xcfbd8f);
+  const cBed=new THREE.Color(0xc2b083), cFill=new THREE.Color(0xa8b29b), cLush=new THREE.Color(0x7cc258);
+  const tmp=new THREE.Color();
+  for(let vj=0;vj<V;vj++)for(let vi=0;vi<V;vi++){
+    const x=vxAt(vi), z=vxAt(vj);
+    const {sd, sBay, sRiv, sIsl} = sdParts(x,z);
+    let h;
+    // 水際は必ず「連続な斜面」で水面(y=0.02)を横切る → 波打ち際の等高線が滑らかな曲線になる
+    if(sIsl > 0){ h = (sIsl<=1) ? -0.12 + sIsl*0.34 : Math.min(0.5, 0.22 + (sIsl-1)*0.08); }   // 埋立地
+    else if(sd <= 0){ h = -0.12 + Math.max(-2.4, sd*0.42); }          // 水底へ
+    else if(sd <= 1){ h = -0.12 + sd*0.28; }                          // 水際の連続斜面（0.16へ）
+    else if(sd <= 5){ h = 0.16; }                                     // 浜は低く平ら
+    else {
+      const t = clamp01((sd-5)/9);                                    // 5〜14で街の高さへ
+      const n = (hash(vi>>3,vj>>3)*0.6 + hash(vi>>1,vj>>1)*0.4 - 0.5)*0.10*t;
+      h = 0.16 + t*1.3 + n;
+    }
+    const o=(vj*V+vi)*3;
+    pos[o]=x; pos[o+1]=h; pos[o+2]=z;
+    // ---- 色 ----
+    if(sIsl > 0){ tmp.copy(cFill); const f=1+(hash(vi,vj)-0.5)*0.05; tmp.r*=f; tmp.g*=f; tmp.b*=f; }
+    else {
+      tmp.copy(cGrass);
+      const f = 1 + ((hash(vi>>3,vj>>3)*0.65 + hash(vi>>1,vj>>1)*0.35) - 0.5)*0.09;
+      tmp.r*=f; tmp.g*=f; tmp.b*=f;
+      if(sRiv < 2.6) tmp.lerp(cLush, 0.5*(1 - sRiv/2.6));             // 川辺は瑞々しく
+      const sandF = 1 - clamp01((sBay-4)/4);                          // 湾に近いほど砂
+      if(sandF > 0) tmp.lerp(cSand, sandF);
+    }
+    // 水面下への移行も連続ブレンド（閾値なし）：濡れ砂→海底
+    const under = clamp01((0.5 - sd)/1.6);
+    if(under > 0){ tmp.lerp(cWet, Math.min(1, under*1.15)); tmp.lerp(cBed, clamp01((-sd-1.5)/2.5)); }
+    col[o]=tmp.r; col[o+1]=tmp.g; col[o+2]=tmp.b;
+  }
+  const idx=[];
+  for(let vj=0;vj<NV;vj++)for(let vi=0;vi<NV;vi++){
+    const a=vj*V+vi, b=a+1, c=a+V, d=c+1;
+    idx.push(a,c,b, b,c,d);
   }
   const geo=new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col,3));
-  geo.computeVertexNormals();
-  const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, side:THREE.DoubleSide}));
-  scene.add(m); return m;
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.95})));
 }
 
-// 底面（湾の色。継ぎ目隠し）
+// ================= 水面（全域1枚の板・色は距離グラデ）=================
+// 地形が水面より高い所では隠れる→見えている境界線＝連続関数の等高線＝完全に滑らかな波打ち際
 {
-  const base=new THREE.Mesh(new THREE.PlaneGeometry(N*CS, N*CS), new THREE.MeshStandardMaterial({color:0x35688c}));
-  base.rotation.x=-Math.PI/2; base.position.y=0; scene.add(base);
-}
-
-const landCells=[], bayCells=[], riverCells=[], fillCells=[], sandCells=[], bankCells=[];
-const at=(i,j)=> (i<0||j<0||i>=N||j>=N)? T.LAND : grid[gi(i,j)];   // 範囲外は陸扱い（マップ縁に偽砂浜を作らない）
-for(let j=0;j<N;j++)for(let i=0;i<N;i++){
-  const t=grid[gi(i,j)];
-  if(t===T.BAY) bayCells.push([i,j]);
-  else if(t===T.RIVER) riverCells.push([i,j]);
-  else {
-    const n4=[at(i+1,j),at(i-1,j),at(i,j+1),at(i,j-1)];
-    if(t===T.LAND && n4.includes(T.BAY)) sandCells.push([i,j]);            // 湾に面した陸＝砂浜
-    else if(n4.includes(T.RIVER)) bankCells.push([i,j]);                    // 川に面した陸＝護岸
-    else if(t===T.FILL) fillCells.push([i,j]);
-    else landCells.push([i,j]);
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const cFoam=new THREE.Color(0xf2fbf6), cShal=new THREE.Color(0x55c2d8), cDeep=new THREE.Color(0x2465a8);
+  const tmp=new THREE.Color();
+  for(let vj=0;vj<V;vj++)for(let vi=0;vi<V;vi++){
+    const x=vxAt(vi), z=vxAt(vj);
+    const {sd} = sdParts(x,z);
+    const w = -sd;                                                    // 水側の深さ(概算)
+    // 泡→浅瀬→深海を全て連続ブレンド（閾値なし＝ギザギザしない）
+    tmp.copy(cShal).lerp(cDeep, clamp01((w-1.6)/15));
+    const foamF = 1 - clamp01((w-0.2)/2.2);
+    if(foamF > 0) tmp.lerp(cFoam, foamF);
+    const o=(vj*V+vi)*3;
+    pos[o]=x; pos[o+1]=0.02; pos[o+2]=z;
+    col[o]=tmp.r; col[o+1]=tmp.g; col[o+2]=tmp.b;
   }
+  const idx=[];
+  for(let vj=0;vj<NV;vj++)for(let vi=0;vi<NV;vi++){
+    const a=vj*V+vi, b=a+1, c=a+V, d=c+1;
+    idx.push(a,c,b, b,c,d);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.33, metalness:0.05})));
 }
-buildLayer(bayCells,   0.04, 0x3d7ca8, 0.02);
-buildLayer(riverCells, 0.05, 0x4185ae, 0.02);
-buildLayer(landCells,  0.14, 0x93a07e);
-buildLayer(fillCells,  0.12, 0x9aa48b, 0.02);
-buildLayer(sandCells,  0.11, 0xd6cba2, 0.02);
-buildLayer(bankCells,  0.13, 0xa8b096, 0.02);
-
-// 次フェーズ（道路設置）用に公開
-window.CITY = { N, CS, HALF, T, grid, cellX, cellZ };
+// さらに外側は深い海
+{
+  const far=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400), new THREE.MeshStandardMaterial({color:0x2465a8, roughness:0.4}));
+  far.rotation.x=-Math.PI/2; far.position.y=-0.05; scene.add(far);
+}
 
 // ================= ラベル =================
 const TAGS=[
