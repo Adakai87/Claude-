@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>東京 v3.1 — BuildIt質感の地形（L0）</title>
+<title>東京 v3.3 — 地形＋幹線2本</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#2c5f88;font-family:system-ui,'Hiragino Sans',sans-serif}
   #app{position:fixed;inset:0}
@@ -18,9 +18,9 @@
 </head>
 <body>
 <div id="app"></div>
-<div id="note"><b>東京 v3.1 — BuildIt質感の地形（L0のみ・道路なし）</b><br>
-なめらか海岸線／水の深度グラデ＋波打ち際／街フラット＋海辺だけ坂／外は海。<br>
-内部データは100×100タイルのまま（道路計画に影響なし）。</div>
+<div id="note"><b>東京 v3.3 — 地形＋幹線2本（湾岸・環状）</b><br>
+道路が地形を切り開く方式（切土/盛土）。河口は朱色アーチ橋。<br>
+URLに ?top=1&h=26&x=30&z=96 で真上から検証できます。</div>
 <script type="module">
 import * as THREE from 'three';
 
@@ -37,7 +37,8 @@ let cam;
 function makeCam(){
   const a = innerWidth/innerHeight;
   cam = new THREE.OrthographicCamera(-VH*a, VH*a, VH, -VH, 1, 2000);
-  cam.position.set(VX+150, 170, VZ+150); cam.lookAt(VX,0,VZ);
+  if(q.get('top')){ cam.position.set(VX, 300, VZ+0.01); cam.lookAt(VX,0,VZ); }   // 真上（検証用）
+  else { cam.position.set(VX+150, 170, VZ+150); cam.lookAt(VX,0,VZ); }
 }
 makeCam();
 addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); makeCam(); render(); placeTags(); });
@@ -79,7 +80,7 @@ function typeAt(x,z){
 const grid = new Uint8Array(N*N);
 const cellX = i => -HALF + i*CS + CS/2, cellZ = j => -HALF + j*CS + CS/2;
 for(let j=0;j<N;j++)for(let i=0;i<N;i++) grid[j*N+i] = typeAt(cellX(i), cellZ(j));
-window.CITY = { N, CS, HALF, T, grid, cellX, cellZ };
+window.CITY = { N, CS, HALF, T, grid, cellX, cellZ, _scene:scene, _THREE:THREE };
 
 const hash=(i,j)=> (((i*73856093 ^ j*19349663)>>>0)%1000)/1000;
 const clamp01=v=>Math.min(1,Math.max(0,v));
@@ -94,6 +95,87 @@ function terrainH(x,z){
   return 0.16 + clamp01((sd-5)/9)*1.3;
 }
 
+// ================= 道路ネットワークのパス確定（地形より先！地形は道路に合わせて均される） =================
+function resample(pts, step){
+  const out=[pts[0]]; let acc=0;
+  for(let i=1;i<pts.length;i++){
+    let [px,pz]=out[out.length-1]; const [qx,qz]=pts[i];
+    let d=Math.hypot(qx-px,qz-pz);
+    while(acc+d>=step){ const t=(step-acc)/d; const mx=px+(qx-px)*t, mz=pz+(qz-pz)*t; out.push([mx,mz]); px=mx; pz=mz; d=Math.hypot(qx-px,qz-pz); acc=0; }
+    acc+=d;
+  }
+  out.push(pts[pts.length-1]); return out;
+}
+function prepPath(pts, {closed=false, flatY=null}={}){
+  let P = resample(pts, 2.5);
+  if(!closed)
+    for(let pass=0; pass<3; pass++)
+      for(let i=1;i<P.length-1;i++)
+        P[i]=[(P[i-1][0]+P[i][0]*2+P[i+1][0])/4, (P[i-1][1]+P[i][1]*2+P[i+1][1])/4];
+  if(closed){ P.push(P[0], P[1]); }
+  const rawY = P.map(([x,z])=>{
+    if(flatY!==null) return flatY;
+    return sdParts(x,z).sd > 0.3 ? terrainH(x,z) : 1.05;
+  });
+  const Y=rawY.slice();
+  const runs=[];
+  if(flatY===null){
+    for(let pass=0; pass<3; pass++)
+      for(let i=1;i<Y.length-1;i++) Y[i]=(Y[i-1]+Y[i]*2+Y[i+1])/4;
+    let s=-1;
+    for(let i=0;i<P.length;i++){
+      const onW = sdParts(P[i][0],P[i][1]).sd < 0.3;
+      if(onW && s<0) s=i;
+      if((!onW || i===P.length-1) && s>=0){ const e=onW? i : i-1; if(e-s>=3) runs.push([Math.max(0,s-2), Math.min(P.length-1,e+2)]); s=-1; }
+    }
+    for(const [a,b] of runs) for(let i=a;i<=b;i++){ const t=(i-a)/(b-a); Y[i]+=Math.pow(Math.sin(t*Math.PI),2)*0.55; }
+  }
+  return {P, Y, runs};
+}
+const coastRd=[]; for(let z=-148; z<=148; z+=4) coastRd.push([coastX(z)-8, z]);
+const RING={cx:-60, cz:-20, hx:40, hz:46, r:15};
+const ringRd=(()=>{
+  const pts=[]; const {cx,cz,hx,hz,r}=RING;
+  const seg=(x0,z0,x1,z1)=>{ const L=Math.hypot(x1-x0,z1-z0), st=Math.max(2,Math.round(L/3));
+    for(let k=0;k<st;k++) pts.push([x0+(x1-x0)*k/st, z0+(z1-z0)*k/st]); };
+  const arc=(ax,az,a0,a1)=>{ for(let k=0;k<=8;k++){ const a=a0+(a1-a0)*k/8; pts.push([ax+Math.cos(a)*r, az+Math.sin(a)*r]); } };
+  seg(cx-hx+r,cz-hz, cx+hx-r,cz-hz); arc(cx+hx-r,cz-hz+r, -Math.PI/2, 0);
+  seg(cx+hx,cz-hz+r, cx+hx,cz+hz-r); arc(cx+hx-r,cz+hz-r, 0, Math.PI/2);
+  seg(cx+hx-r,cz+hz, cx-hx+r,cz+hz); arc(cx-hx+r,cz+hz-r, Math.PI/2, Math.PI);
+  seg(cx-hx,cz+hz-r, cx-hx,cz-hz+r); arc(cx-hx+r,cz-hz+r, Math.PI, Math.PI*1.5);
+  return pts;
+})();
+const ROADS=[ prepPath(coastRd), prepPath(ringRd, {closed:true, flatY:1.46}) ];
+
+// 道路高さ場（切土・盛土）: 道路の近くの地形は道路の高さへ滑らかに均される（橋の下は変えない）
+const FCELL=1.5, FHALF=Ne*CS/2, FN=Math.ceil((Ne*CS)/FCELL)+4;
+const fDist=new Float32Array(FN*FN).fill(99), fY=new Float32Array(FN*FN);
+{
+  const R=9, rc=Math.ceil(R/FCELL);
+  for(const rd of ROADS){
+    for(let i=0;i<rd.P.length;i++){
+      const [x,z]=rd.P[i], y=rd.Y[i];
+      if(y - terrainH(x,z) > 0.6) continue;            // 橋区間は地形を変えない
+      const ci=Math.floor((x+FHALF)/FCELL), cj=Math.floor((z+FHALF)/FCELL);
+      for(let a=ci-rc;a<=ci+rc;a++)for(let b2=cj-rc;b2<=cj+rc;b2++){
+        if(a<0||b2<0||a>=FN||b2>=FN) continue;
+        const cxw=a*FCELL-FHALF+FCELL/2, czw=b2*FCELL-FHALF+FCELL/2;
+        const d=Math.hypot(cxw-x, czw-z), k=b2*FN+a;
+        if(d<fDist[k]){ fDist[k]=d; fY[k]=y; }
+      }
+    }
+  }
+}
+function groundH(x,z){
+  const n=terrainH(x,z);
+  const i=Math.floor((x+FHALF)/FCELL), j=Math.floor((z+FHALF)/FCELL);
+  if(i<0||j<0||i>=FN||j>=FN) return n;
+  const k=j*FN+i, d=fDist[k];
+  if(d>8.5) return n;
+  const w=clamp01((8.5-d)/2.6);                        // 路肩まで完全フラット→外へ滑らかに戻る
+  return n + (fY[k]-0.10 - n)*w;
+}
+
 // ================= 地形メッシュ（頂点=連続距離から高さと色を決める） =================
 const SUB=3, STEPV=CS/SUB;                       // 頂点間隔=1.0
 const NV=Ne*SUB, V=NV+1;
@@ -106,7 +188,7 @@ const vxAt = vi => -HALF + (vi/SUB - EXT)*CS;
   for(let vj=0;vj<V;vj++)for(let vi=0;vi<V;vi++){
     const x=vxAt(vi), z=vxAt(vj);
     const {sd, sBay, sRiv, sIsl} = sdParts(x,z);
-    const h = terrainH(x,z);   // 水際は連続な斜面で水面を横切る＝波打ち際が滑らか。街は完全フラット
+    const h = groundH(x,z);    // 自然地形＋道路による切土/盛土。水際は連続斜面＝波打ち際が滑らか
     const o=(vj*V+vi)*3;
     pos[o]=x; pos[o+1]=h; pos[o+2]=z;
     // ---- 色 ----
@@ -171,19 +253,8 @@ const vxAt = vi => -HALF + (vi/SUB - EXT)*CS;
   far.rotation.x=-Math.PI/2; far.position.y=-0.05; scene.add(far);
 }
 
-// ================= L1 道路・第1弾（湾岸幹線＋環状幹線） =================
+// ================= L1 道路の描画（パスは確定済み。地形は既に道路に合わせて均されている） =================
 window.CITY.road = new Uint8Array(N*N);           // 道路タイル記録（後の街路・街区づくりの土台）
-
-function resample(pts, step){
-  const out=[pts[0]]; let acc=0;
-  for(let i=1;i<pts.length;i++){
-    let [px,pz]=out[out.length-1]; const [qx,qz]=pts[i];
-    let d=Math.hypot(qx-px,qz-pz);
-    while(acc+d>=step){ const t=(step-acc)/d; const mx=px+(qx-px)*t, mz=pz+(qz-pz)*t; out.push([mx,mz]); px=mx; pz=mz; d=Math.hypot(qx-px,qz-pz); acc=0; }
-    acc+=d;
-  }
-  out.push(pts[pts.length-1]); return out;
-}
 // 高さつきリボン（各点にy）
 function ribbonY(P, Y, w, lift, color, rough=0.9){
   const pos=[]; const n=P.length; const nx=[], nz=[];
@@ -206,31 +277,9 @@ function ribbonY(P, Y, w, lift, color, rough=0.9){
   scene.add(m); return m;
 }
 const pillarMat = new THREE.MeshStandardMaterial({color:0x8b939d});
-// 幹線舗装：地形の高さをなぞる。水面上は自動で橋（デッキ高1.05＋橋脚）、前後は自然なスロープ
-function paveArterial(pts, {closed=false, flatY=null}={}){
+// 幹線舗装の描画（prepPath済みの {P,Y,runs} を受け取る）
+function paveArterial({P, Y, runs}){
   const W_AS=7.0, W_SW=W_AS+2.6;
-  let P = resample(pts, 2.5);
-  if(closed){ P.push(P[0], P[1]); }                                 // ループは重ねて閉じる＝継ぎ目レス
-  // 高さ: 街なか道路はフラット固定。地形追従型は「水の上(sd<0.3)だけ」橋になる
-  const rawY = P.map(([x,z])=>{
-    if(flatY!==null) return flatY;
-    return sdParts(x,z).sd > 0.3 ? terrainH(x,z) : 1.05;
-  });
-  const Y=rawY.slice();
-  if(flatY===null)
-    for(let pass=0; pass<3; pass++)                                 // 平滑化＝橋の取り付けスロープ
-      for(let i=1;i<Y.length-1;i++) Y[i]=(Y[i-1]+Y[i]*2+Y[i+1])/4;
-  // 橋区間の検出（水の上の連続区間）→ デッキを緩いアーチに
-  const runs=[];
-  if(flatY===null){
-    let s=-1;
-    for(let i=0;i<P.length;i++){
-      const onW = sdParts(P[i][0],P[i][1]).sd < 0.3;
-      if(onW && s<0) s=i;
-      if((!onW || i===P.length-1) && s>=0){ const e=onW? i : i-1; if(e-s>=3) runs.push([Math.max(0,s-2), Math.min(P.length-1,e+2)]); s=-1; }
-    }
-    for(const [a,b] of runs) for(let i=a;i<=b;i++){ const t=(i-a)/(b-a); Y[i]+=Math.sin(t*Math.PI)*0.55; }
-  }
   ribbonY(P,Y,W_SW,0.045,0xdcd6c4,0.95);                            // 歩道縁（ベージュ）
   ribbonY(P,Y,W_AS,0.075,0x7d838b,0.85);                            // アスファルト（明るめ）
   // 白の破線センターライン
@@ -253,8 +302,18 @@ function paveArterial(pts, {closed=false, flatY=null}={}){
   }
   for(const [a,b] of runs){
     const seg=P.slice(a,b+1), segY=Y.slice(a,b+1), n=seg.length;
-    // 桁（デッキ側面の見付け）
-    ribbonY(seg, segY, W_SW+0.2, -0.22, 0x5f6771, 0.8);
+    // 桁（デッキ側面の見付け）: 水の上だけに描く（陸のたもとに暗い帯を出さない）
+    { let gs=-1;
+      for(let i=a;i<=b;i++){
+        const onW = sdParts(P[i][0],P[i][1]).sd < 0.5;
+        if(onW && gs<0) gs=i;
+        if((!onW || i===b) && gs>=0){
+          const ge = onW? i : i-1;
+          if(ge-gs>=1) ribbonY(P.slice(Math.max(a,gs-1), Math.min(b,ge+1)+1), Y.slice(Math.max(a,gs-1), Math.min(b,ge+1)+1), W_SW+0.2, -0.22, 0x5f6771, 0.8);
+          gs=-1;
+        }
+      }
+    }
     const span=(n-1)*2.5, pk=Math.min(4.6, span*0.24);
     for(const side of [1,-1]){
       const O=offsetPts(seg, side*(W_AS/2+0.6));
@@ -295,24 +354,8 @@ function paveArterial(pts, {closed=false, flatY=null}={}){
     }
   }
 }
-// --- 湾岸幹線（海岸線に沿う。河口は自動で橋になる）---
-{
-  const pts=[]; for(let z=-148; z<=148; z+=4) pts.push([coastX(z)-8, z]);
-  paveArterial(pts);
-}
-// --- 環状幹線（ダウンタウン予定地を囲む角丸ループ。川の西側）---
-const RING={cx:-60, cz:-20, hx:40, hz:46, r:15};
-{
-  const pts=[]; const {cx,cz,hx,hz,r}=RING;
-  const seg=(x0,z0,x1,z1)=>{ const L=Math.hypot(x1-x0,z1-z0), st=Math.max(2,Math.round(L/3));
-    for(let k=0;k<st;k++) pts.push([x0+(x1-x0)*k/st, z0+(z1-z0)*k/st]); };
-  const arc=(ax,az,a0,a1)=>{ for(let k=0;k<=8;k++){ const a=a0+(a1-a0)*k/8; pts.push([ax+Math.cos(a)*r, az+Math.sin(a)*r]); } };
-  seg(cx-hx+r,cz-hz, cx+hx-r,cz-hz); arc(cx+hx-r,cz-hz+r, -Math.PI/2, 0);
-  seg(cx+hx,cz-hz+r, cx+hx,cz+hz-r); arc(cx+hx-r,cz+hz-r, 0, Math.PI/2);
-  seg(cx+hx-r,cz+hz, cx-hx+r,cz+hz); arc(cx-hx+r,cz+hz-r, Math.PI/2, Math.PI);
-  seg(cx-hx,cz+hz-r, cx-hx,cz-hz+r); arc(cx-hx+r,cz-hz+r, Math.PI, Math.PI*1.5);
-  paveArterial(pts, {closed:true, flatY:1.46});   // 街なかの環状線は完全フラット
-}
+// 確定済みの道路ネットワークを描画（湾岸幹線＋環状幹線）
+for(const rd of ROADS) paveArterial(rd);
 
 // ================= ラベル =================
 const TAGS=[
