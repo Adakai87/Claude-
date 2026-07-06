@@ -220,16 +220,68 @@ function paveArterial(pts, {closed=false, flatY=null}={}){
   if(flatY===null)
     for(let pass=0; pass<3; pass++)                                 // 平滑化＝橋の取り付けスロープ
       for(let i=1;i<Y.length-1;i++) Y[i]=(Y[i-1]+Y[i]*2+Y[i+1])/4;
+  // 橋区間の検出（水の上の連続区間）→ デッキを緩いアーチに
+  const runs=[];
+  if(flatY===null){
+    let s=-1;
+    for(let i=0;i<P.length;i++){
+      const onW = sdParts(P[i][0],P[i][1]).sd < 0.3;
+      if(onW && s<0) s=i;
+      if((!onW || i===P.length-1) && s>=0){ const e=onW? i : i-1; if(e-s>=3) runs.push([Math.max(0,s-2), Math.min(P.length-1,e+2)]); s=-1; }
+    }
+    for(const [a,b] of runs) for(let i=a;i<=b;i++){ const t=(i-a)/(b-a); Y[i]+=Math.sin(t*Math.PI)*0.55; }
+  }
   ribbonY(P,Y,W_SW,0.045,0xdcd6c4,0.95);                            // 歩道縁（ベージュ）
   ribbonY(P,Y,W_AS,0.075,0x7d838b,0.85);                            // アスファルト（明るめ）
   // 白の破線センターライン
   for(let i=0;i+2<P.length;i+=4){
     ribbonY(P.slice(i,i+2), Y.slice(i,i+2), 0.5, 0.095, 0xf7f5ec, 0.8);
   }
-  // 橋部分：橋脚（水の上だけ）
-  for(let i=0;i<P.length;i++){
-    if(sdParts(P[i][0],P[i][1]).sd < 0 && Y[i] > 0.6){
-      if(i%3===0){ const p=new THREE.Mesh(new THREE.BoxGeometry(1.1,Y[i]+0.5,1.1),pillarMat); p.position.set(P[i][0], (Y[i]-0.5)/2, P[i][1]); scene.add(p); }
+  // ===== 橋の装飾（朱色の鋼アーチ＋吊り材＋白欄干＋コンクリ橋脚）=====
+  const archMat=new THREE.MeshStandardMaterial({color:0xc84b3f, roughness:0.55, metalness:0.25});
+  const railMat=new THREE.MeshStandardMaterial({color:0xf4f3ea, roughness:0.7});
+  const pierMat=new THREE.MeshStandardMaterial({color:0x9aa0a6, roughness:0.9});
+  const girdMat=new THREE.MeshStandardMaterial({color:0x5f6771, roughness:0.8});
+  function offsetPts(seg, off){
+    const O=[]; const n=seg.length;
+    for(let i=0;i<n;i++){
+      const a=seg[Math.max(0,i-1)], b=seg[Math.min(n-1,i+1)];
+      let dx=b[0]-a[0], dz=b[1]-a[1]; const L=Math.hypot(dx,dz)||1;
+      O.push([seg[i][0]-dz/L*off, seg[i][1]+dx/L*off]);
+    }
+    return O;
+  }
+  for(const [a,b] of runs){
+    const seg=P.slice(a,b+1), segY=Y.slice(a,b+1), n=seg.length;
+    // 桁（デッキ側面の見付け）
+    ribbonY(seg, segY, W_SW+0.2, -0.22, 0x5f6771, 0.8);
+    const span=(n-1)*2.5, pk=Math.min(4.6, span*0.24);
+    for(const side of [1,-1]){
+      const O=offsetPts(seg, side*(W_AS/2+0.6));
+      // 朱色アーチ主桁
+      const v3=O.map((p,k)=>{ const t=k/(n-1); return new THREE.Vector3(p[0], segY[k]+0.3+Math.sin(t*Math.PI)*pk, p[1]); });
+      scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(v3), 28, 0.3, 6), archMat));
+      // 吊り材
+      for(let k=1;k<n-1;k+=2){
+        const t=k/(n-1), hgt=0.3+Math.sin(t*Math.PI)*pk;
+        const c=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,hgt,4), archMat);
+        c.position.set(O[k][0], segY[k]+hgt/2, O[k][1]); scene.add(c);
+      }
+      // 白い欄干（支柱＋笠木）
+      const R=offsetPts(seg, side*(W_AS/2+0.15));
+      for(let k=0;k<n;k+=2){
+        const post=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.6,0.1), railMat);
+        post.position.set(R[k][0], segY[k]+0.3, R[k][1]); scene.add(post);
+      }
+      ribbonY(R, segY, 0.16, 0.62, 0xf4f3ea, 0.7);
+    }
+    // コンクリ橋脚（両端＋中央、水中のみ）
+    for(const m of [a+2, Math.round((a+b)/2), b-2]){
+      if(m<=a||m>=b) continue;
+      if(sdParts(P[m][0],P[m][1]).sd < 0){
+        const p=new THREE.Mesh(new THREE.BoxGeometry(2.2, Y[m]+0.6, 1.3), pierMat);
+        p.position.set(P[m][0], (Y[m]-0.6)/2, P[m][1]); scene.add(p);
+      }
     }
   }
   // 道路タイルを記録
