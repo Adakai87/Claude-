@@ -394,8 +394,12 @@ function buildMesh(type, ghost=false, floors=3){
     const wall=TX(texDarkWall,0xffffff,3,1), stone=TX(texStone,0xffffff,2.4,1);
     // 外構: 芝の敷地・白い低塀・アプローチ
     box(11.6,0.12,11.2, M(0x6fae57), 0,0.10,0);
-    box(3.6,0.5,0.3, M(0xf2efe8), -3.9,0.35,5.5);
-    box(3.0,0.5,0.3, M(0xf2efe8),  4.2,0.35,5.5);
+    const wallW=M(0xf2efe8);
+    box(4.6,0.5,0.28, wallW, -3.45,0.35,5.5);                     // 塀: 前面左
+    box(2.4,0.5,0.28, wallW,  4.45,0.35,5.5);                     // 前面右(玄関だけ開口)
+    box(0.28,0.5,11.0, wallW, -5.66,0.35,0);                      // 左側面
+    box(0.28,0.5,11.0, wallW,  5.66,0.35,0);                      // 右側面
+    box(11.6,0.5,0.28, wallW, 0,0.35,-5.5);                       // 背面
     box(2.2,0.08,2.6, M(0xa8705a), 2.1,0.16,4.9);                 // レンガのアプローチ
     // 本体
     box(W,F1,D, wall, 0,F1/2+0.1,0);                              // 1F
@@ -409,9 +413,19 @@ function buildMesh(type, ghost=false, floors=3){
     box(W*0.72,0.24,D*0.72, M(0x2a2d33), 0,RY+0.45,0);            // 寄棟の上段
     // --- 2F: バルコニー(左)＋黒枠の大窓 ---
     const zF=D/2+0.1, y2=F1+BAND+F2*0.5+0.1;
-    box(3.8,0.16,1.5, M(0x33363c), -3.2,F1+BAND+0.18,zF+0.75);    // バルコニー床
-    box(3.7,0.8,0.06, M(0xcfe0ea,{transparent:true,opacity:0.4}), -3.2,F1+BAND+0.68,zF+1.42); // ガラス手すり
-    box(3.7,0.08,0.1, M(0x1a1c20), -3.2,F1+BAND+1.10,zF+1.42);    // 手すり笠木
+    const by=F1+BAND;
+    box(3.8,0.16,1.5, M(0x33363c), -3.2,by+0.18,zF+0.75);         // バルコニー床
+    box(3.8,0.22,1.5, M(0x24272d), -3.2,by+0.02,zF+0.75);         // 床の見付け(厚み)
+    const bGlass=M(0xcfe0ea,{transparent:true,opacity:0.38});
+    const bFrame=M(0x1a1c20);
+    box(3.66,0.78,0.05, bGlass, -3.2,by+0.66,zF+1.46);            // 囲い: 前面ガラス
+    box(0.05,0.78,1.42, bGlass, -5.06,by+0.66,zF+0.73);           // 囲い: 左面ガラス
+    box(0.05,0.78,1.42, bGlass, -1.34,by+0.66,zF+0.73);           // 囲い: 右面ガラス
+    box(3.78,0.09,0.1, bFrame, -3.2,by+1.09,zF+1.46);             // 笠木: 前
+    box(0.1,0.09,1.52, bFrame, -5.06,by+1.09,zF+0.73);            // 笠木: 左
+    box(0.1,0.09,1.52, bFrame, -1.34,by+1.09,zF+0.73);            // 笠木: 右
+    for(const [px,pz] of [[-5.06,zF+1.46],[-1.34,zF+1.46],[-5.06,zF+0.06],[-1.34,zF+0.06]])
+      box(0.09,1.02,0.09, bFrame, px,by+0.62,pz);                 // 隅の支柱
     const glass=(w2,h2,x2,y3,z2)=>{ box(w2+0.24,h2+0.24,0.1, M(0x16181c), x2,y3,z2);
       box(w2,h2,0.12, winM(0x9db6c8), x2,y3,z2+0.02); };
     glass(2.6,1.6, -3.2, y2, zF);                                 // バルコニー窓
