@@ -738,6 +738,7 @@ function placeBuilding(type,i,j,floors=3){
   }
   const entry={type,i,j,floors,group:g,solid};
   buildings.push(entry);
+  if(typeof rebuildNPCs==='function') rebuildNPCs();   // 住民を更新（新しい家から人が出てくる）
   return entry;
 }
 // マンションの増築（追加工事）
@@ -823,6 +824,73 @@ const player=new THREE.Group(); player.visible=false; scene.add(player);
   head.position.y=1.62; head.castShadow=true; player.add(head);
   const cap=new THREE.Mesh(new THREE.SphereGeometry(0.31,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0xe25b4a}));
   cap.position.y=1.66; player.add(cap);
+}
+
+// ================= NPC住民（v1: 家からスポーンして道路を散歩） =================
+const NPC_COLORS=[0xe2a03f,0x7dc463,0xd46a8e,0x6fb7d8,0xb08bd0,0xe0705a,0x8f9f6a,0x5f86c9];
+const NPC_HAIR=[0x3a2e26,0x6b4a2e,0x2b2b30,0x8a6b45];
+const npcs=[];
+const npcGroup=new THREE.Group(); scene.add(npcGroup);
+function makeNPC(k){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.3,0.44,5,10),
+    new THREE.MeshStandardMaterial({color:NPC_COLORS[k%NPC_COLORS.length]}));
+  body.position.y=0.78; body.castShadow=true; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.26,12,10),
+    new THREE.MeshStandardMaterial({color:0xf2c9a0}));
+  head.position.y=1.45; g.add(head);
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.27,12,9,0,Math.PI*2,0,Math.PI*0.5),
+    new THREE.MeshStandardMaterial({color:NPC_HAIR[(k*5+1)%NPC_HAIR.length]}));
+  hair.position.y=1.49; g.add(hair);
+  g.scale.setScalar(0.92+((k*37)%13)/90);              // 身長に個体差
+  return g;
+}
+const isRoadCell=(i,j)=>inGrid(i,j)&&road[j*N+i]===1;
+function homeRoadCell(b){                              // 家の外周から接する道路マスを探す
+  const def=BLD_DEFS[b.type];
+  for(let a=-1;a<=def.fw;a++)for(let c=-1;c<=def.fd;c++){
+    if(a>=0&&a<def.fw&&c>=0&&c<def.fd) continue;
+    if(isRoadCell(b.i+a,b.j+c)) return [b.i+a,b.j+c];
+  }
+  return null;
+}
+function rebuildNPCs(){
+  for(const n of npcs) npcGroup.remove(n.mesh);
+  npcs.length=0;
+  let k=0;
+  for(const b of buildings){
+    if(!(b.type in RES || b.type==='mansion')) continue;   // 住民は住宅から
+    const cell=homeRoadCell(b); if(!cell) continue;
+    if(npcs.length>=24) break;                             // 表示上限（軽さ優先）
+    const mesh=makeNPC(k);
+    npcs.push({mesh, from:cell, to:cell, t:1, prev:null,
+      side:(k%2?1:-1)*(0.9+(k%3)*0.25),                    // 道の端を歩く（左右ばらけ）
+      speed:1.0+((k*29)%10)/14, k});
+    npcGroup.add(mesh);
+    k++;
+  }
+}
+function npcNext(n){
+  const cand=[[1,0],[-1,0],[0,1],[0,-1]]
+    .map(d=>[n.from[0]+d[0],n.from[1]+d[1]])
+    .filter(c=>isRoadCell(c[0],c[1]));
+  if(!cand.length) return n.from;
+  const fwd=cand.filter(c=>!(n.prev&&c[0]===n.prev[0]&&c[1]===n.prev[1]));
+  const pool=fwd.length?fwd:cand;                      // 行き止まりだけUターン
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function stepNPCs(dt,now){
+  const h=gameHour%24, active=h>6.3&&h<22.2;
+  for(const n of npcs){
+    n.mesh.visible = active || n.k%7===0;              // 夜はほぼ帰宅（たまに夜ふかし）
+    if(!n.mesh.visible) continue;
+    n.t+=dt*n.speed/CS;
+    if(n.t>=1){ n.prev=n.from; n.from=n.to; n.to=npcNext(n); n.t=0; }
+    const fx=cx(n.from[0]), fz=cz(n.from[1]), dx=cx(n.to[0])-fx, dz=cz(n.to[1])-fz;
+    const len=Math.hypot(dx,dz)||1, ox=-dz/len*n.side, oz=dx/len*n.side;
+    n.mesh.position.set(fx+dx*n.t+ox, 0.55+Math.abs(Math.sin(now*0.009+n.k*2))*0.05, fz+dz*n.t+oz);
+    if(dx||dz) n.mesh.rotation.y=Math.atan2(dx,dz);
+  }
 }
 const WOFF=new THREE.Vector3(11,17,15);            // 歩き時の追従カメラ（海側上空から陸向き）
 let walkTarget=null;
@@ -946,7 +1014,7 @@ $('confirm').onclick=()=>{
     const cost=n*COSTS.road;
     if(!pay(cost)){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
   } else { money+=n*COSTS.road/2; updateHUD(); }
-  pending.clear(); redrawPreview(); rebuildRoads(); updateConfirm();
+  pending.clear(); redrawPreview(); rebuildRoads(); rebuildNPCs(); updateConfirm();
   saveCity();
   toast(tool==='erase' ? `🧹 ${n}マス撤去！ +${fmt(n*COSTS.road/2)}` : `🔨 ${n}マス建設！ -${fmt(n*COSTS.road)}`);
 };
@@ -1152,7 +1220,7 @@ function paintCell(i,j){
         if(b.solid){ const si=SOLIDS.indexOf(b.solid); if(si>=0) SOLIDS.splice(si,1); }
         const refund=Math.floor((COSTS[b.type]||0)/2);
         money+=refund; updateHUD();
-        buildings.splice(idx,1); saveCity(); toast('🧹 撤去！ +'+fmt(refund));
+        buildings.splice(idx,1); rebuildNPCs(); saveCity(); toast('🧹 撤去！ +'+fmt(refund));
       }
     }
     return;
@@ -1217,6 +1285,7 @@ renderer.setAnimationLoop((now)=>{
   gameHour=(gameHour+delta*24/DAY_SEC)%24;
   if(prevHour===23 && Math.floor(gameHour)===0) newDay();   // 0時: 賃料＋住民税を入金
   if(seaMesh) seaMesh.position.y=0.02+0.05*Math.sin(now*0.0011);   // 波: 水面がゆっくり上下→波打ち際が動く
+  stepNPCs(delta,now);                                 // 住民の散歩（両レンズ共通）
 
   applyTimeOfDay();
   if(now-lastSave>10000){ saveCity(); lastSave=now; }   // 時刻も10秒ごとに保存
