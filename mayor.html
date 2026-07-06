@@ -124,7 +124,7 @@ sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
 sun.shadow.camera.left=-120; sun.shadow.camera.right=120; sun.shadow.camera.top=120; sun.shadow.camera.bottom=-120;
 scene.add(sun);
 
-const TOD={tint:[]};   // 昼夜が色を触る材質の登録簿
+const TOD={tint:[],windows:[]};   // 昼夜が色を触る材質の登録簿
 
 // ================= 土地（草原＋南に浜と海） =================
 const clamp01=v=>Math.min(1,Math.max(0,v));
@@ -223,6 +223,108 @@ function rebuildRoads(){
   }
 }
 
+// ================= 建物（2×2マス・道路沿いにのみ建つ） =================
+const bld=new Uint8Array(N*N);                     // 建物占有
+const buildings=[];                                 // {type,i,j,group}
+const SOLIDS=[];                                    // 歩行の当たり判定
+function footprintOK(i,j){
+  if(i<0||j<0||i>N-2||j>N-2) return false;
+  for(let a=0;a<2;a++)for(let b=0;b<2;b++){
+    if(!buildable(i+a,j+b)) return false;
+    const k=(j+b)*N+(i+a);
+    if(road[k]||bld[k]) return false;
+  }
+  return true;
+}
+function nearRoadDir(i,j){                          // 隣接する道路の方向（=建物が向く方向）
+  for(let a=0;a<2;a++)for(let b=0;b<2;b++){
+    for(const [dx,dz] of [[0,1],[0,-1],[1,0],[-1,0]]){
+      const ii=i+a+dx, jj=j+b+dz;
+      if(inGrid(ii,jj)&&road[jj*N+ii]) return [dx,dz];
+    }
+  }
+  return null;
+}
+function makeSign(text,bg){
+  const c=document.createElement('canvas'); c.width=256; c.height=96;
+  const g=c.getContext('2d');
+  g.fillStyle=bg; g.fillRect(0,0,256,96);
+  g.strokeStyle='rgba(255,255,255,.75)'; g.lineWidth=6; g.strokeRect(6,6,244,84);
+  g.fillStyle='#fff'; g.font='bold 46px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.fillText(text,128,52);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+// 建物ファクトリ（ghost=trueで半透明プレビュー）
+function buildMesh(type, ghost=false){
+  const g=new THREE.Group();
+  const M=(color,extra={})=>{ const m=new THREE.MeshStandardMaterial({color,roughness:0.9,...extra});
+    if(ghost){ m.transparent=true; m.opacity=0.55; } return m; };
+  const box=(w,h,d,mat,x,y,z,ry=0)=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    b.position.set(x,y,z); b.rotation.y=ry; if(!ghost){b.castShadow=true;b.receiveShadow=true;} g.add(b); return b; };
+  if(type==='cottage'){
+    box(6.4,3.0,5.4, M(0xf2e3c2), 0,1.5,0);                       // 壁
+    const roofM=M(0xc96a4e);
+    const r1=box(7.2,0.22,3.6, roofM, 0,3.9,-1.5); r1.rotation.x=0.62;
+    const r2=box(7.2,0.22,3.6, roofM, 0,3.9, 1.5); r2.rotation.x=-0.62;
+    box(6.5,0.5,0.24, M(0xf2e3c2), 0,3.25,0);                     // 妻壁
+    box(1.1,1.8,0.14, M(0x8a5a38), 1.6,0.9,2.72);                 // ドア
+    const winM=M(0xfff2c8,{emissive:0xffdf9a,emissiveIntensity:0.06});
+    if(!ghost) TOD.windows.push(winM);
+    box(1.2,1.0,0.12, winM, -1.4,1.5,2.72);                       // 窓（夜に灯る）
+    box(1.0,0.9,0.12, winM, -2.2,1.6,0, Math.PI/2); g.children.at(-1).position.x=-3.24;
+    box(0.7,1.2,0.7, M(0xb0672f), 2.0,4.3,-0.8);                  // 煙突
+  }
+  else if(type==='bakery'){
+    box(7.0,4.4,5.6, M(0xe8c89a), 0,2.2,0);                       // 本体
+    box(7.4,0.4,6.0, M(0x8a5a3a), 0,4.6,0);                       // 屋根縁
+    const winM=M(0xfff2c8,{emissive:0xffdf9a,emissiveIntensity:0.06});
+    if(!ghost) TOD.windows.push(winM);
+    box(4.2,1.5,0.14, winM, -0.6,1.35,2.86);                      // ショーウィンドウ
+    box(1.2,1.9,0.14, M(0x7a4a2e), 2.4,0.95,2.86);                // ドア
+    const awn=box(6.6,0.14,1.5, M(0xd97f4e), 0,2.6,3.4); awn.rotation.x=0.3;
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(3.6,1.35),
+      ghost? M(0xb06a35) : new THREE.MeshBasicMaterial({map:makeSign('BAKERY','#b06a35')}));
+    sign.position.set(0,3.6,2.88); g.add(sign);
+  }
+  return g;
+}
+const BLD_DEFS={ cottage:{nm:'コテージ',ic:'🏠'}, bakery:{nm:'パン屋',ic:'🥐'} };
+function placeBuilding(type,i,j){
+  const dir=nearRoadDir(i,j)||[0,1];
+  const g=buildMesh(type,false);
+  const x=cx(i)+CS/2, z=cz(j)+CS/2;
+  g.position.set(x, 0.5, z);
+  g.rotation.y=Math.atan2(dir[0],dir[1]);            // 道路の方を向く
+  scene.add(g);
+  for(let a=0;a<2;a++)for(let b=0;b<2;b++) bld[(j+b)*N+(i+a)]=1;
+  buildings.push({type,i,j,group:g});
+  SOLIDS.push({x0:x-3.6,x1:x+3.6,z0:z-3.1,z1:z+3.1});
+}
+// ゴースト（配置プレビュー）
+let ghost=null, ghostPlate=null, ghostAt=null, ghostValid=false;
+const plateOK=new THREE.MeshBasicMaterial({color:0x6fe06a,transparent:true,opacity:0.4});
+const plateNG=new THREE.MeshBasicMaterial({color:0xff5a4a,transparent:true,opacity:0.4});
+function showGhost(type){
+  hideGhost();
+  ghost=buildMesh(type,true); ghost.visible=false; scene.add(ghost);
+  ghostPlate=new THREE.Mesh(new THREE.BoxGeometry(CS*2,0.06,CS*2), plateOK);
+  ghostPlate.visible=false; scene.add(ghostPlate);
+}
+function hideGhost(){
+  if(ghost){ scene.remove(ghost); ghost=null; }
+  if(ghostPlate){ scene.remove(ghostPlate); ghostPlate=null; }
+  ghostAt=null; ghostValid=false;
+}
+function moveGhost(i,j){
+  i=Math.max(0,Math.min(N-2,i-1)); j=Math.max(0,Math.min(N-2,j-1));   // 指の位置が建物の中心になるように
+  ghostAt=[i,j];
+  ghostValid = footprintOK(i,j) && !!nearRoadDir(i,j);
+  const x=cx(i)+CS/2, z=cz(j)+CS/2;
+  const dir=nearRoadDir(i,j)||[0,1];
+  ghost.position.set(x,0.5,z); ghost.rotation.y=Math.atan2(dir[0],dir[1]); ghost.visible=true;
+  ghostPlate.position.set(x,0.56,z); ghostPlate.material= ghostValid? plateOK : plateNG; ghostPlate.visible=true;
+}
+
 // プレビュー（緑=OK / 赤=NG）
 const prevGroup=new THREE.Group(); scene.add(prevGroup);
 const okMat=new THREE.MeshBasicMaterial({color:0x6fe06a,transparent:true,opacity:0.55});
@@ -277,8 +379,8 @@ const toast=(msg)=>{ const t=$('toast'); t.textContent=msg; t.style.opacity=1; c
 
 const CATALOG={
   road:[ {id:'road',ic:'🛣️',nm:'ふつうの道'}, {id:'erase',ic:'🧹',nm:'撤去'}, {id:'stone',ic:'🧱',nm:'石畳(準備中)',dis:true} ],
-  home:[ {id:'h1',ic:'🏠',nm:'準備中',dis:true} ],
-  shop:[ {id:'s1',ic:'🏪',nm:'準備中',dis:true} ],
+  home:[ {id:'bld:cottage',ic:'🏠',nm:'コテージ'}, {id:'h2',ic:'🏡',nm:'準備中',dis:true} ],
+  shop:[ {id:'bld:bakery',ic:'🥐',nm:'パン屋'}, {id:'s2',ic:'🏪',nm:'準備中',dis:true} ],
   civic:[ {id:'c1',ic:'🏛️',nm:'準備中',dis:true} ],
   deco:[ {id:'d1',ic:'🌳',nm:'準備中',dis:true} ],
 };
@@ -299,14 +401,20 @@ document.querySelectorAll('.tab').forEach(t=>{
 $('build').onclick=()=>{ if(mode!=='browse')return; mode='menu'; menu.classList.add('show'); };
 function closeMenu(){ menu.classList.remove('show'); }
 function startPlacing(id){
-  tool = id==='erase' ? 'erase' : 'road';
+  tool = id;
   mode='placing'; closeMenu();
   $('modebar').classList.add('show'); $('modeframe').classList.add('show');
-  $('modetext').textContent = tool==='erase' ? '消したい道路をなぞろう' : '道路をなぞって敷こう';
+  if(id.startsWith('bld:')){
+    $('modetext').textContent='場所をタップして配置しよう';
+    showGhost(id.slice(4));
+  } else {
+    $('modetext').textContent = id==='erase' ? '消したい所をなぞろう' : '道路をなぞって敷こう';
+  }
   updateConfirm();
 }
 function exitPlacing(toMenu=true){
   mode= toMenu?'menu':'browse'; tool=null;
+  hideGhost();
   pending.clear(); redrawPreview();
   $('modebar').classList.remove('show'); $('modeframe').classList.remove('show'); $('confirm').classList.remove('show');
   if(toMenu) menu.classList.add('show');
@@ -314,10 +422,25 @@ function exitPlacing(toMenu=true){
 $('cancel').onclick=()=>exitPlacing(true);
 function updateConfirm(){
   const c=$('confirm');
+  if(tool&&tool.startsWith('bld:')){
+    if(ghostAt){ c.classList.add('show'); c.textContent='✓ 建てる'; } else c.classList.remove('show');
+    return;
+  }
   if(pending.size>0){ c.classList.add('show'); c.textContent=`✓ 建設（${pending.size}マス）`; }
   else c.classList.remove('show');
 }
 $('confirm').onclick=()=>{
+  if(tool&&tool.startsWith('bld:')){
+    if(!ghostAt) return;
+    if(!ghostValid){
+      toast( footprintOK(...ghostAt) ? '🛣️ 道路の近くにしか建てられないよ' : '❌ ここには建てられないよ' );
+      return;
+    }
+    placeBuilding(tool.slice(4), ...ghostAt);
+    toast('🏠 建てました！続けて置けるよ');
+    ghostValid=false; ghostPlate.material=plateNG;
+    return;
+  }
   let n=0;
   for(const key of pending){ const [i,j]=key.split(',').map(Number);
     if(tool==='erase'){ if(road[j*N+i]){road[j*N+i]=0;n++;} }
@@ -434,8 +557,19 @@ addEventListener('wheel',e=>{ dist=Math.max(45,Math.min(180,dist+e.deltaY*0.08))
 function paint(e){
   const c=pickCell(e); if(!c) return;
   const {i,j}=c;
+  if(tool&&tool.startsWith('bld:')){ moveGhost(i,j); updateConfirm(); return; }
   if(tool==='erase'){
     if(inGrid(i,j)&&road[j*N+i]){ pending.add(i+','+j); redrawPreview(); updateConfirm(); }
+    else if(inGrid(i,j)&&bld[j*N+i]){                       // 建物の撤去は即時
+      const idx=buildings.findIndex(b=> i>=b.i&&i<b.i+2&&j>=b.j&&j<b.j+2);
+      if(idx>=0){ const b=buildings[idx]; scene.remove(b.group);
+        for(let a2=0;a2<2;a2++)for(let b2=0;b2<2;b2++) bld[(b.j+b2)*N+(b.i+a2)]=0;
+        const x=cx(b.i)+CS/2, z=cz(b.j)+CS/2;
+        const si=SOLIDS.findIndex(s2=>Math.abs((s2.x0+s2.x1)/2-x)<0.1&&Math.abs((s2.z0+s2.z1)/2-z)<0.1);
+        if(si>=0) SOLIDS.splice(si,1);
+        buildings.splice(idx,1); toast('🧹 建物を撤去！');
+      }
+    }
     return;
   }
   if(!buildable(i,j)){ flashNG(i,j); return; }      // 浜・海は赤フラッシュ
@@ -475,6 +609,8 @@ function applyTimeOfDay(){
   sun.intensity=A[4]+(B[4]-A[4])*t;
   lerpHex(A[5],B[5],t,tintC).lerp(_cA.setHex(0xffffff),0.22);
   for(const m of TOD.tint) m.color.copy(tintC);
+  const n=(h>=16.8?Math.min(1,(h-16.8)/1.4):(h<6.8?1-Math.max(0,(h-5.2)/1.6):0));
+  for(const m of TOD.windows) m.emissiveIntensity=0.06+n*1.5;   // 夕暮れに窓が灯る
   const dayT=Math.min(1,Math.max(0,(h-6)/12.7));
   sun.position.set(Math.cos(dayT*Math.PI)*80, Math.max(24, Math.sin(dayT*Math.PI)*85+8), 30+dayT*55);   // 夕方も地面に光が届く高さを確保
   const hh=Math.floor(h), mm=Math.floor((h-hh)*60);
@@ -524,6 +660,17 @@ renderer.setAnimationLoop((now)=>{
       player.position.addScaledVector(dir,SPEED*power*delta);
       player.position.x=Math.max(-150,Math.min(150,player.position.x));
       player.position.z=Math.max(-150,Math.min(COAST(player.position.x)-3,player.position.z));   // 海には入らない
+      for(const s2 of SOLIDS){                                // 建物にめり込まない
+        const px=player.position.x, pz=player.position.z, r=0.45;
+        if(px>s2.x0-r&&px<s2.x1+r&&pz>s2.z0-r&&pz<s2.z1+r){
+          const dxl=px-(s2.x0-r), dxr=(s2.x1+r)-px, dzf=pz-(s2.z0-r), dzb=(s2.z1+r)-pz;
+          const m2=Math.min(dxl,dxr,dzf,dzb);
+          if(m2===dxl) player.position.x=s2.x0-r;
+          else if(m2===dxr) player.position.x=s2.x1+r;
+          else if(m2===dzf) player.position.z=s2.z0-r;
+          else player.position.z=s2.z1+r;
+        }
+      }
       const yaw=Math.atan2(dir.x,dir.z);
       let d2=yaw-player.rotation.y;
       while(d2>Math.PI)d2-=Math.PI*2; while(d2<-Math.PI)d2+=Math.PI*2;
