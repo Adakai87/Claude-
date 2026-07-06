@@ -184,6 +184,72 @@ function palm(x,z,s=1){
 }
 for(const [x,z] of [[-30,17],[-10,18],[12,17.5],[34,18],[52,16.5],[-52,16.5]]) palm(x,z,1+((x*7)%10)/30);
 
+// ================= 商店街の建物5軒（キットバッシング：箱の組合せ＋色替え展開） =================
+const SOLIDS=[];                                            // 当たり判定ボックス {x0,x1,z0,z1}
+function makeSignTex(text, bg, fg='#ffffff'){
+  const c=document.createElement('canvas'); c.width=256; c.height=96;
+  const g=c.getContext('2d');
+  g.fillStyle=bg; g.fillRect(0,0,256,96);
+  g.strokeStyle='rgba(255,255,255,.75)'; g.lineWidth=6; g.strokeRect(6,6,244,84);
+  g.fillStyle=fg; g.font='bold 44px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.fillText(text, 128, 52);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function shop({x, w=10, d=7.5, hh=5.6, wall, upper, roof, awn, sign, signBg}){
+  const zFront=-0.9, zc=zFront-d/2, GY=0.5;                 // 前面は歩道の縁、街の高さに建つ
+  const g=new THREE.Group(); g.position.set(x, GY, zc); scene.add(g);
+  const box=(bw,bh,bd,color,px,py,pz,emissive)=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),
+      new THREE.MeshStandardMaterial(emissive? {color, emissive:emissive.c, emissiveIntensity:emissive.i} : {color, roughness:0.9}));
+    m.position.set(px,py,pz); m.castShadow=true; m.receiveShadow=true; g.add(m); return m;
+  };
+  box(w, hh, d, wall, 0, hh/2, 0);                           // 本体
+  box(w*0.985, 2.0, d*0.985, upper, 0, hh-1.0, 0.02);        // 2階の色帯（外壁の変化）
+  box(w+0.5, 0.4, d+0.5, roof, 0, hh+0.2, 0);                // コーニス（軒先の縁）
+  box(w*0.35, 0.7, d*0.4, 0xcfd6da, w*0.18, hh+0.75, -d*0.15); // 屋上の室外機
+  // --- 1階の顔（店先）---
+  box(w*0.88, 2.1, 0.18, 0x4a4038, 0, 1.15, d/2+0.02);       // 店先の枠（濃い木枠）
+  const win=box(w*0.60, 1.35, 0.1, 0xfff2c8, -w*0.10, 1.15, d/2+0.14, {c:0xffdf9a, i:0.55}); // ショーウィンドウ（灯り）
+  box(w*0.16, 1.7, 0.12, 0x7a5a3a, w*0.30, 0.95, d/2+0.14);  // ドア
+  box(w*0.16, 0.16, 0.14, 0xf2e8d8, w*0.30, 1.86, d/2+0.15); // ドアの庇
+  // --- ひさし（アウニング）：白フチ＋店色 ---
+  const aw=box(w*0.92, 0.14, 1.7, awn, 0, 2.42, d/2+0.85);
+  aw.rotation.x=0.28;
+  box(w*0.92, 0.14, 0.35, 0xf6f3ea, 0, 2.20, d/2+1.58);      // 白フチ
+  // --- 看板 ---
+  const st=new THREE.Mesh(new THREE.PlaneGeometry(w*0.55, w*0.55*96/256),
+    new THREE.MeshBasicMaterial({map:makeSignTex(sign, signBg)}));
+  st.position.set(0, 3.35, d/2+0.12); g.add(st);
+  // --- 2階の窓（白フレーム＋昼は空色）---
+  for(const wx of [-w*0.26, 0, w*0.26]){
+    box(1.15, 1.15, 0.1, 0xffffff, wx, hh-1.0, d/2+0.06);
+    box(0.92, 0.92, 0.1, 0xa9cfe0, wx, hh-1.0, d/2+0.10);
+  }
+  // 当たり判定（前面に少し余白）
+  SOLIDS.push({x0:x-w/2-0.2, x1:x+w/2+0.2, z0:zc-d/2-0.2, z1:zFront+0.15});
+  return g;
+}
+shop({x:-32, wall:0xf3e0bc, upper:0xe8d2a8, roof:0x9a6a48, awn:0xd97f4e, sign:'BAKERY', signBg:'#b06a35'});
+shop({x:-16, wall:0xe0906a, upper:0xd08058, roof:0x6a4a3a, awn:0x8a5a3a, sign:'CAFE',   signBg:'#6f4a32', hh:6.4});
+shop({x:  0, wall:0xcfe6d2, upper:0xbcd8c2, roof:0x5f8a5a, awn:0xe08aa8, sign:'FLOWER', signBg:'#4f7a4a'});
+shop({x: 16, wall:0xaecbe8, upper:0x9cbcd8, roof:0x5a6a8a, awn:0x4a6a9a, sign:'GOODS',  signBg:'#3f5a80', hh:6.0});
+shop({x: 32, wall:0xeef4f6, upper:0xdfe9ec, roof:0x3f5a78, awn:0x2f6a9a, sign:'FISH',   signBg:'#1f4a70'});
+// 店前の小物（ベンチと植木鉢＝生活感）
+for(const bx of [-24, 8, 24]){
+  const bench=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.22,0.6), new THREE.MeshStandardMaterial({color:0x9a6b42}));
+  bench.position.set(bx, 0.82, 0.4); bench.castShadow=true; scene.add(bench);
+  for(const o of [-0.85,0.85]){
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.3,0.5), new THREE.MeshStandardMaterial({color:0x6a4a30}));
+    leg.position.set(bx+o, 0.65, 0.4); scene.add(leg);
+  }
+}
+for(const px of [-8, -40, 40]){
+  const pot=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.26,0.5,8), new THREE.MeshStandardMaterial({color:0xb06a45}));
+  pot.position.set(px, 0.75, 0.3); pot.castShadow=true; scene.add(pot);
+  const bush=new THREE.Mesh(new THREE.SphereGeometry(0.42,8,7), new THREE.MeshStandardMaterial({color:0x4f9a4d}));
+  bush.position.set(px, 1.25, 0.3); bush.castShadow=true; scene.add(bush);
+}
+
 // ================= あなたの分身 =================
 const player = new THREE.Group(); scene.add(player);
 {
@@ -239,7 +305,7 @@ const padVec={x:0,y:0,on:false};                            // 画面座標系: 
 
 // ================= ゲームループ（道場第1週と同じ心臓！）=================
 const SPEED=6.5;
-const camOff=new THREE.Vector3(-13, 19, -18);   // 北西上空から南東へ＝海がいつも画面に入る構図
+const camOff=new THREE.Vector3(14, 24, 22);     // 海側上空から陸へ＝店の顔が見えて、手前に浜が入るBuildIt構図
 const camLook=new THREE.Vector3();
 let last=performance.now();
 function tick(now){
@@ -272,6 +338,18 @@ function tick(now){
     player.position.addScaledVector(dir, SPEED*power*delta);
     player.position.x=Math.max(-82, Math.min(82, player.position.x));
     player.position.z=Math.max(-70, Math.min(24, player.position.z));
+    // 建物にめり込まない（一番浅い方向へ押し出す）
+    for(const s of SOLIDS){
+      const px=player.position.x, pz=player.position.z, r=0.45;
+      if(px>s.x0-r && px<s.x1+r && pz>s.z0-r && pz<s.z1+r){
+        const dxl=px-(s.x0-r), dxr=(s.x1+r)-px, dzf=pz-(s.z0-r), dzb=(s.z1+r)-pz;
+        const m=Math.min(dxl,dxr,dzf,dzb);
+        if(m===dxl) player.position.x=s.x0-r;
+        else if(m===dxr) player.position.x=s.x1+r;
+        else if(m===dzf) player.position.z=s.z0-r;
+        else player.position.z=s.z1+r;
+      }
+    }
     const yaw=Math.atan2(dir.x, dir.z);
     let d=yaw-player.rotation.y;
     while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2;
@@ -283,7 +361,7 @@ function tick(now){
   const wantPos=new THREE.Vector3().addVectors(player.position, camOff);
   cam.position.lerp(wantPos, Math.min(1, delta*4));
   camLook.lerp(player.position, Math.min(1, delta*6));
-  cam.lookAt(camLook.x, camLook.y+1.0, camLook.z);
+  cam.lookAt(camLook.x, camLook.y+1.0, camLook.z+3.5);   // 注視点を少し海側へ＝画面下に浜と海が入る
   renderer.render(scene, cam);
 }
 cam.position.copy(player.position).add(camOff);
