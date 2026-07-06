@@ -72,16 +72,6 @@
   #money{top:100px;color:var(--gold)} #pop{top:142px} #daily{top:184px;color:#8fe8a0}
   #skip{position:fixed;left:178px;top:56px;padding:6px 13px;font-size:13px;border-radius:16px}
   #reset{position:fixed;left:12px;top:228px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
-  /* 俯瞰角スライダー（右端・縦） */
-  #tiltwrap{position:fixed;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;
-    align-items:center;gap:4px;z-index:5}
-  #tiltwrap span{font-size:15px;filter:drop-shadow(0 1px 2px rgba(0,0,60,.4))}
-  #tilt{-webkit-appearance:none;appearance:none;width:120px;height:22px;transform:rotate(-90deg);
-    transform-origin:center;margin:50px 0;background:transparent;touch-action:none}
-  #tilt::-webkit-slider-runnable-track{height:8px;border-radius:6px;background:rgba(16,52,88,.75);
-    border:1.5px solid rgba(255,255,255,.7)}
-  #tilt::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;margin-top:-8px;
-    background:linear-gradient(#ffd76a,#e8a41f);border:2.5px solid #fff;box-shadow:0 2px 5px rgba(10,40,80,.4)}
   #bpanel{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);border-radius:18px;
     padding:12px 18px;border:2.5px solid rgba(255,255,255,.85);text-align:center;display:none;min-width:220px}
   #bpanel.show{display:block}
@@ -106,7 +96,6 @@
 <div id="pop">👥 0人</div>
 <div id="daily">📈 ¥0/日</div>
 <button class="btn red" id="reset">🗑️</button>
-<div id="tiltwrap"><span>📐</span><input id="tilt" type="range" min="20" max="83" value="54" step="1"></div>
 <button class="btn" id="dive">🚶 ダイブイン</button>
 <button class="btn" id="build">🔨</button>
 
@@ -815,17 +804,14 @@ const target=new THREE.Vector3(0,0,20);
 let dist=95;
 const MIND=45, MAXD=420;                               // ズーム範囲（最大=マップ全体が見渡せる）
 let pitch=THREE.MathUtils.degToRad(54);                // 俯瞰角 20°(浅い)〜83°(ほぼ真上)
+let yaw=0;                                             // 水平回転（2本指ひねり／右ドラッグ横）
 const MINP=THREE.MathUtils.degToRad(20), MAXP=THREE.MathUtils.degToRad(83);
 function applyCam(){
-  cam.position.set(target.x, dist*Math.sin(pitch), target.z+dist*Math.cos(pitch));
+  const ch=dist*Math.cos(pitch);
+  cam.position.set(target.x+ch*Math.sin(yaw), dist*Math.sin(pitch), target.z+ch*Math.cos(yaw));
   cam.lookAt(target.x, 0, target.z);
 }
-function setPitch(p){
-  pitch=Math.max(MINP,Math.min(MAXP,p));
-  const s=document.getElementById('tilt');
-  if(s) s.value=Math.round(THREE.MathUtils.radToDeg(pitch));
-  applyCam();
-}
+function setPitch(p){ pitch=Math.max(MINP,Math.min(MAXP,p)); applyCam(); }
 applyCam();
 
 // ================= あなたの分身（ダイブイン用。1つの世界を共有） =================
@@ -974,7 +960,7 @@ function diveIn(){
   if(sdLand(sx,sz)<6) sz=COAST(sx)-14;             // 海を見てたら浜の内側に降ろす
   player.position.set(sx, Math.max(0.5,groundH(sx,sz)), sz);
   player.visible=true; walkTarget=null;
-  ['build','dive','skip','tiltwrap'].forEach(id=>$(id).style.display='none');
+  ['build','dive','skip'].forEach(id=>$(id).style.display='none');
   trans={ t:0, dur:1.15,
     fromPos:cam.position.clone(), fromLook:new THREE.Vector3(target.x,0,target.z),
     toPos:new THREE.Vector3().addVectors(player.position,WOFF),
@@ -987,7 +973,8 @@ function ascend(){
   target.x=Math.max(-110,Math.min(110,player.position.x));
   target.z=Math.max(-110,Math.min(120,player.position.z));
   dist=aerialDist;
-  const toPos=new THREE.Vector3(target.x, dist*Math.sin(pitch), target.z+dist*Math.cos(pitch));
+  const ch=dist*Math.cos(pitch);
+  const toPos=new THREE.Vector3(target.x+ch*Math.sin(yaw), dist*Math.sin(pitch), target.z+ch*Math.cos(yaw));
   trans={ t:0, dur:1.1,
     fromPos:cam.position.clone(), fromLook:new THREE.Vector3(player.position.x,1,player.position.z+3.5),
     toPos, toLook:new THREE.Vector3(target.x,0,target.z) };
@@ -1045,7 +1032,6 @@ $('reset').onclick=()=>{
 $('dive').onclick=diveIn;
 $('mayorbtn').onclick=ascend;
 $('skip').onclick=()=>{ gameHour=8; newDay(); };   // ⏭ 次の日の朝8時へ（収入も即入金）
-$('tilt').addEventListener('input',e=>setPitch(THREE.MathUtils.degToRad(+e.target.value)));
 // メニューの外(地図)をタップしたらメニューを閉じる
 renderer.domElement.addEventListener('pointerdown',()=>{ if(mode==='menu'){ mode='browse'; closeMenu(); } });
 
@@ -1077,11 +1063,12 @@ function pickCell(e){
 const touches=new Map();
 let panLast=null, pinchLast=null, drawing=false, tiltLast=null;
 renderer.domElement.addEventListener('pointerdown',e=>{
-  if(e.button===2){ tiltLast=e.clientY; return; }      // 右ドラッグ=俯瞰角
+  if(e.button===2){ tiltLast={x:e.clientX,y:e.clientY}; return; }   // 右ドラッグ=回転(横)+俯瞰角(縦)
   touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(touches.size===2){ drawing=false; panLast=null;
     const [a,b]=[...touches.values()];
-    pinchLast={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2};
+    pinchLast={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2,
+               ang:Math.atan2(b.y-a.y,b.x-a.x)};
     return;
   }
   if(mode==='placing'){ drawing=true; strokeLast=null; paint(e); }
@@ -1094,20 +1081,30 @@ renderer.domElement.addEventListener('pointerdown',e=>{
   else if(mode==='browse') panLast={x:e.clientX,y:e.clientY};
 });
 renderer.domElement.addEventListener('pointermove',e=>{
-  if(tiltLast!==null && (e.buttons&2)){ setPitch(pitch+(e.clientY-tiltLast)*0.005); tiltLast=e.clientY; return; }
+  if(tiltLast!==null && (e.buttons&2)){
+    yaw-=(e.clientX-tiltLast.x)*0.005;
+    setPitch(pitch+(e.clientY-tiltLast.y)*0.005);
+    tiltLast={x:e.clientX,y:e.clientY}; return;
+  }
   if(!touches.has(e.pointerId)) return;
   touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(touches.size===2 && pinchLast){
+  if(touches.size===2 && pinchLast){                   // 2本指 = ピンチでズーム + ひねりで回転 + 上下で俯瞰角
     const [a,b]=[...touches.values()];
     const d=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    const ang=Math.atan2(b.y-a.y,b.x-a.x);
     dist=Math.max(MIND,Math.min(MAXD, dist*pinchLast.d/Math.max(1,d)));
-    target.x-=(mx-pinchLast.cx)*dist*0.0011; target.z-=(my-pinchLast.cy)*dist*0.0011;
-    pinchLast={d,cx:mx,cy:my}; applyCam(); return;
+    let dA=ang-pinchLast.ang;
+    if(dA>Math.PI)dA-=Math.PI*2; if(dA<-Math.PI)dA+=Math.PI*2;
+    yaw+=dA;                                           // 地図が指のひねりに付いてくる向き
+    pitch=Math.max(MINP,Math.min(MAXP, pitch+(my-pinchLast.cy)*0.004));
+    pinchLast={d,cx:mx,cy:my,ang}; applyCam(); return;
   }
   if(drawing && mode==='placing'){ paint(e); return; }
-  if(panLast){
-    target.x-=(e.clientX-panLast.x)*dist*0.0011;
-    target.z-=(e.clientY-panLast.y)*dist*0.0011;
+  if(panLast){                                         // パンは回転(yaw)に合わせて世界方向へ変換
+    const k=dist*0.0011, dx=(e.clientX-panLast.x)*k, dy=(e.clientY-panLast.y)*k;
+    const c=Math.cos(yaw), s=Math.sin(yaw);
+    target.x-=dx*c+dy*s;
+    target.z-=-dx*s+dy*c;
     target.x=Math.max(-110,Math.min(110,target.x));
     target.z=Math.max(-110,Math.min(120,target.z));
     panLast={x:e.clientX,y:e.clientY}; applyCam();
@@ -1231,7 +1228,7 @@ renderer.setAnimationLoop((now)=>{
     cam.lookAt(lk);
     if(trans.t>=1){
       if(mode==='descend'){ mode='walk'; $('pad').classList.add('show'); $('mayorbtn').classList.add('show'); camLook.copy(player.position); }
-      else { mode='browse'; ['build','dive','skip','tiltwrap'].forEach(id=>$(id).style.display=''); applyCam(); }
+      else { mode='browse'; ['build','dive','skip'].forEach(id=>$(id).style.display=''); applyCam(); }
       trans=null;
     }
   }
