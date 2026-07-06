@@ -65,10 +65,11 @@
     opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
   #clock{position:fixed;left:12px;top:58px;color:#fff;font-weight:800;font-size:14px;letter-spacing:1px;
     background:var(--navy);padding:6px 14px;border-radius:16px;border:2.5px solid rgba(255,255,255,.85)}
-  #money,#pop{position:fixed;left:12px;color:#fff;font-weight:800;font-size:14px;letter-spacing:.5px;
+  #money,#pop,#daily{position:fixed;left:12px;color:#fff;font-weight:800;font-size:14px;letter-spacing:.5px;
     background:var(--navy);padding:6px 14px;border-radius:16px;border:2.5px solid rgba(255,255,255,.85)}
-  #money{top:100px;color:var(--gold)} #pop{top:142px}
-  #reset{position:fixed;left:12px;top:186px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
+  #money{top:100px;color:var(--gold)} #pop{top:142px} #daily{top:184px;color:#8fe8a0}
+  #skip{position:fixed;left:178px;top:56px;padding:6px 13px;font-size:13px;border-radius:16px}
+  #reset{position:fixed;left:12px;top:228px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
   #bpanel{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);border-radius:18px;
     padding:12px 18px;border:2.5px solid rgba(255,255,255,.85);text-align:center;display:none;min-width:220px}
   #bpanel.show{display:block}
@@ -87,9 +88,11 @@
 <body>
 <div id="app"></div>
 <div id="cityname">🏙️ マイシティ</div>
-<div id="clock">10:00</div>
+<div id="clock">Day 1・10:00</div>
+<button class="btn" id="skip">⏭ 次の日</button>
 <div id="money">💰 ¥2.5億</div>
 <div id="pop">👥 0人</div>
+<div id="daily">📈 ¥0/日</div>
 <button class="btn red" id="reset">🗑️</button>
 <button class="btn" id="dive">🚶 ダイブイン</button>
 <button class="btn" id="build">🔨</button>
@@ -153,7 +156,34 @@ const COSTS={ road:1000000, cottage:20000000, jh_s:22000000, jh_m:35000000,
   bakery:40000000, cafe:40000000, flower:40000000, mart:60000000,
   koban:80000000, tree:500000, park:20000000, fountain:50000000 };
 const RES={ cottage:4, jh_s:4, jh_m:6, mod_s:4, mod_m:6, apart:12, lux:5, mansionPerFloor:6 };
+const RENT_RATE=0.01, TAX_PER_RES=1000;              // 賃料1%/日・住民税¥1,000/人/日（docs/economy.md v3）
+const RENT=new Set(['cottage','jh_s','jh_m','mod_s','mod_m','apart','mansion','lux',
+                    'bakery','cafe','flower','mart']);   // 賃料が入る建物（公共・装飾は対象外）
 let money=250000000;   // 初期資金¥2.5億（最初の街区バスケット×1.2で逆算）
+let day=1;
+function bldInvested(b){                             // 建設費＋増築の累計投資額（賃料の元本）
+  let c=COSTS[b.type]||0;
+  if(b.type==='mansion'&&b.floors>3) c+=50000000*(((b.floors-2)*(b.floors-1))/2-1);
+  return c;
+}
+function calcDaily(){
+  let rent=0;
+  for(const b of buildingsRef()) if(RENT.has(b.type)) rent+=bldInvested(b)*RENT_RATE;
+  rent=Math.round(rent);
+  const tax=calcPop()*TAX_PER_RES;
+  return {rent, tax, total:rent+tax};
+}
+function newDay(){                                   // 0時: 賃料＋住民税を1日分まとめて入金
+  day++;
+  const d=calcDaily();
+  if(d.total>0){
+    money+=d.total;
+    toast(`🌅 Day ${day}｜収入 +${fmt(d.total)}（賃料${fmt(d.rent)}・住民税${fmt(d.tax)}）`);
+  }else{
+    toast(`🌅 Day ${day} スタート`);
+  }
+  updateHUD(); saveCity();
+}
 function calcPop(){
   let p=0;
   for(const b of buildingsRef()){
@@ -171,6 +201,7 @@ function fmt(n){
 function updateHUD(){
   document.getElementById('money').textContent='💰 '+fmt(money);
   document.getElementById('pop').textContent='👥 '+calcPop()+'人';
+  document.getElementById('daily').textContent='📈 '+fmt(calcDaily().total)+'/日';
 }
 function pay(cost){
   if(money<cost) return false;
@@ -693,7 +724,7 @@ const SAVE_KEY='mycity_v1';
 function saveCity(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v:2, money, road:Array.from(road),
+      v:3, money, day, road:Array.from(road),
       b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors})),
       h:gameHour
     }));
@@ -702,11 +733,12 @@ function saveCity(){
 function loadCity(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
-    if(!d||(d.v!==1&&d.v!==2)) return false;
+    if(!d||(d.v!==1&&d.v!==2&&d.v!==3)) return false;
     d.road.forEach((v,k)=>{ road[k]=v; });
     rebuildRoads();
     for(const bb of (d.b||[])) placeBuilding(bb.t, bb.i, bb.j, bb.f||3);
-    money = (d.v===2 && typeof d.money==='number') ? d.money : 250000000;
+    money = (d.v>=2 && typeof d.money==='number') ? d.money : 250000000;
+    if(typeof d.day==='number') day=d.day;
     if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
     return true;
   }catch(e){ return false; }
@@ -817,7 +849,7 @@ function diveIn(){
   if(sdLand(sx,sz)<6) sz=COAST(sx)-14;             // 海を見てたら浜の内側に降ろす
   player.position.set(sx, Math.max(0.5,groundH(sx,sz)), sz);
   player.visible=true; walkTarget=null;
-  ['build','dive'].forEach(id=>$(id).style.display='none');
+  ['build','dive','skip'].forEach(id=>$(id).style.display='none');
   trans={ t:0, dur:1.15,
     fromPos:cam.position.clone(), fromLook:new THREE.Vector3(target.x,0,target.z),
     toPos:new THREE.Vector3().addVectors(player.position,WOFF),
@@ -887,6 +919,7 @@ $('reset').onclick=()=>{
 };
 $('dive').onclick=diveIn;
 $('mayorbtn').onclick=ascend;
+$('skip').onclick=()=>{ gameHour=8; newDay(); };   // ⏭ 次の日の朝8時へ（収入も即入金）
 // メニューの外(地図)をタップしたらメニューを閉じる
 renderer.domElement.addEventListener('pointerdown',()=>{ if(mode==='menu'){ mode='browse'; closeMenu(); } });
 
@@ -1036,7 +1069,7 @@ function applyTimeOfDay(){
   const dayT=Math.min(1,Math.max(0,(h-6)/12.7));
   sun.position.set(Math.cos(dayT*Math.PI)*80, Math.max(24, Math.sin(dayT*Math.PI)*85+8), 30+dayT*55);   // 夕方も地面に光が届く高さを確保
   const hh=Math.floor(h), mm=Math.floor((h-hh)*60);
-  clockEl.textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  clockEl.textContent=`Day ${day}・${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
 }
 
 // 起動時にロード（保存があれば街が蘇る）
@@ -1051,10 +1084,8 @@ renderer.setAnimationLoop((now)=>{
   const delta=Math.min(0.05,rawDelta); last=now;     // 移動用は上限つき（コマ落ち時の瞬間移動防止）
   const prevHour=Math.floor(gameHour);
   gameHour=(gameHour+delta*24/DAY_SEC)%24;
-  if(Math.floor(gameHour)!==prevHour){                   // 毎時: 税収 = 人口×¥10万
-    const inc=calcPop()*100000;
-    if(inc>0){ money+=inc; updateHUD(); }
-  }
+  if(prevHour===23 && Math.floor(gameHour)===0) newDay();   // 0時: 賃料＋住民税を入金
+
   applyTimeOfDay();
   if(now-lastSave>10000){ saveCity(); lastSave=now; }   // 時刻も10秒ごとに保存
   if(mode==='descend'||mode==='ascend'){             // レンズの切替演出
@@ -1065,7 +1096,7 @@ renderer.setAnimationLoop((now)=>{
     cam.lookAt(lk);
     if(trans.t>=1){
       if(mode==='descend'){ mode='walk'; $('pad').classList.add('show'); $('mayorbtn').classList.add('show'); camLook.copy(player.position); }
-      else { mode='browse'; ['build','dive'].forEach(id=>$(id).style.display=''); applyCam(); }
+      else { mode='browse'; ['build','dive','skip'].forEach(id=>$(id).style.display=''); applyCam(); }
       trans=null;
     }
   }
