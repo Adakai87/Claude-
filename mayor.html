@@ -289,9 +289,9 @@ function buildMesh(type, ghost=false, floors=3){
   const box=(w,h,d,mat,x,y,z,rx=0)=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
     b.position.set(x,y,z); b.rotation.x=rx; if(!ghost){b.castShadow=true;b.receiveShadow=true;} g.add(b); return b; };
   const gableRoof=(w,d,y,color,over=0.8)=>{ const m=M(color);
-    box(w+over,0.22,d*0.62,m, 0,y,-d*0.26, 0.62);
-    box(w+over,0.22,d*0.62,m, 0,y, d*0.26,-0.62);
-    box(w+over*0.5,0.3,0.3, m, 0,y+0.85,0); };
+    box(w+over,0.22,d*0.62,m, 0,y,-d*0.26,-0.62);   // 北側スロープ（中央の棟が高い山形Λ）
+    box(w+over,0.22,d*0.62,m, 0,y, d*0.26, 0.62);   // 南側スロープ
+    box(w+over*0.5,0.3,0.3, m, 0,y+0.85,0); };      // 棟木
   if(type==='cottage'){
     box(6.4,3.0,5.4, M(0xf2e3c2), 0,1.5,0);
     gableRoof(6.4,5.4,3.9, 0xc96a4e);
