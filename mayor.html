@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>マイシティ — 市長モード（第一歩）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue1:#5bc6f0; --blue2:#2e9ad8; --navy:rgba(16,52,88,.92);
+    --green1:#8ee06a; --green2:#45b13a; --red1:#ff8a7a; --red2:#e8503f;
+    --cream:#fff8ea; --gold:#ffc63f;
+  }
+  html,body{margin:0;height:100%;overflow:hidden;background:#79c7e3;touch-action:none;
+    font-family:'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',system-ui,sans-serif}
+  #app{position:fixed;inset:0}
+  .btn{border:none;color:#fff;font-family:inherit;font-weight:800;cursor:pointer;user-select:none;-webkit-user-select:none;
+    text-shadow:0 2px 0 rgba(0,0,60,.25);
+    background:linear-gradient(#5bc6f0,#2e9ad8);
+    border:3px solid #fff;border-radius:20px;
+    box-shadow:0 4px 10px rgba(10,40,80,.35), inset 0 -5px 0 rgba(10,40,90,.28), inset 0 2px 0 rgba(255,255,255,.45);}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 5px rgba(10,40,80,.35), inset 0 -3px 0 rgba(10,40,90,.28)}
+  .btn.green{background:linear-gradient(var(--green1),var(--green2))}
+  .btn.red{background:linear-gradient(var(--red1),var(--red2))}
+  /* 上部HUD */
+  #cityname{position:fixed;left:12px;top:12px;color:#fff;font-weight:900;font-size:15px;letter-spacing:1px;
+    background:var(--navy);padding:8px 18px;border-radius:20px;border:2.5px solid rgba(255,255,255,.85);
+    box-shadow:0 3px 8px rgba(10,40,80,.3)}
+  #dive{position:fixed;right:12px;top:12px;padding:9px 16px;font-size:14px;border-radius:20px}
+  /* 建設ボタン（右下の大きな丸） */
+  #build{position:fixed;right:18px;bottom:22px;width:74px;height:74px;border-radius:50%;font-size:32px;line-height:1}
+  /* 建設メニュー（下からのパネル） */
+  #menu{position:fixed;left:0;right:0;bottom:0;background:var(--navy);border-radius:22px 22px 0 0;
+    padding:10px 12px calc(14px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .22s ease;
+    box-shadow:0 -6px 24px rgba(10,30,60,.35);border-top:3px solid rgba(255,255,255,.7)}
+  #menu.show{transform:translateY(0)}
+  #menu .handle{width:52px;height:5px;border-radius:3px;background:rgba(255,255,255,.5);margin:2px auto 10px}
+  #tabs{display:flex;gap:8px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px}
+  .tab{flex:0 0 auto;color:#dceefc;font-weight:800;font-size:13px;padding:7px 14px;border-radius:16px;
+    background:rgba(255,255,255,.13);border:2px solid transparent;cursor:pointer}
+  .tab.sel{background:#fff;color:#1d6fae;border-color:var(--gold)}
+  #items{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 4px}
+  .card{flex:0 0 auto;width:96px;background:var(--cream);border-radius:16px;padding:8px 6px 7px;text-align:center;
+    border:3px solid #f0e2c4;box-shadow:0 3px 6px rgba(60,40,10,.18);cursor:pointer}
+  .card .ic{font-size:30px;line-height:1.2}
+  .card .nm{font-size:12px;font-weight:800;color:#5a4a30;margin-top:3px}
+  .card.sel{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,198,63,.45),0 3px 6px rgba(60,40,10,.18)}
+  .card.dis{opacity:.45;filter:grayscale(.4)}
+  /* 敷設モードUI */
+  #modebar{position:fixed;left:50%;top:14px;transform:translateX(-50%);display:none;align-items:center;gap:10px}
+  #modebar.show{display:flex}
+  #modetext{color:#fff;font-weight:800;font-size:14px;background:var(--navy);
+    padding:9px 18px;border-radius:20px;border:2.5px solid rgba(255,255,255,.85)}
+  #cancel{width:44px;height:44px;border-radius:50%;font-size:19px;padding:0}
+  #confirm{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:none;
+    padding:13px 30px;font-size:17px;border-radius:26px}
+  #confirm.show{display:block}
+  /* 敷設モード中の画面フチ */
+  #modeframe{position:fixed;inset:0;pointer-events:none;display:none;
+    box-shadow:inset 0 0 0 4px rgba(255,198,63,.9), inset 0 0 26px rgba(255,198,63,.35);border-radius:2px}
+  #modeframe.show{display:block}
+  #toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);color:#fff;font-weight:800;font-size:14px;
+    background:var(--navy);padding:10px 20px;border-radius:20px;border:2.5px solid rgba(255,255,255,.85);
+    opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="cityname">🏙️ マイシティ</div>
+<button class="btn" id="dive">🚶 ダイブイン</button>
+<button class="btn" id="build">🔨</button>
+
+<div id="menu">
+  <div class="handle"></div>
+  <div id="tabs">
+    <div class="tab sel" data-tab="road">🛣️ 道路</div>
+    <div class="tab" data-tab="home">🏠 住宅</div>
+    <div class="tab" data-tab="shop">🏪 商業</div>
+    <div class="tab" data-tab="civic">🏛️ 公共</div>
+    <div class="tab" data-tab="deco">🌳 装飾</div>
+  </div>
+  <div id="items"></div>
+</div>
+
+<div id="modebar"><div id="modetext">道路をなぞって敷こう</div><button class="btn red" id="cancel">✕</button></div>
+<button class="btn green" id="confirm">✓ 建設</button>
+<div id="modeframe"></div>
+<div id="toast"></div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ================= 基本 =================
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8fd3ea);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.2;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const cam=new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 1, 1200);
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
+scene.add(new THREE.HemisphereLight(0xfff8ea,0x7fae8a,1.0));
+const sun=new THREE.DirectionalLight(0xfff0d0,1.15); sun.position.set(60,90,30);
+sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-120; sun.shadow.camera.right=120; sun.shadow.camera.top=120; sun.shadow.camera.bottom=-120;
+scene.add(sun);
+
+// ================= 土地（草原＋南に浜と海） =================
+const clamp01=v=>Math.min(1,Math.max(0,v));
+const hash=(i,j)=>(((i*73856093^j*19349663)>>>0)%1000)/1000;
+const COAST=x=>96+5*Math.sin(x*0.045)+2.5*Math.sin(x*0.13+2);
+const sdLand=(x,z)=>COAST(x)-z;
+function groundH(x,z){
+  const sd=sdLand(x,z);
+  if(sd<=0) return -0.1+Math.max(-1.8,sd*0.3);
+  if(sd<=1.2) return -0.1+sd*0.2;
+  if(sd<=8) return 0.14;
+  if(sd<=14) return 0.14+(sd-8)/6*0.36;
+  return 0.5;
+}
+{ // 地形
+  const S=320, ST=2, NVx=S/ST, V=NVx+1, H=S/2;
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const g1=new THREE.Color(0x6cb14c), sd1=new THREE.Color(0xf0dca8), wet=new THREE.Color(0xd9c491), bed=new THREE.Color(0xc9b788);
+  const tmp=new THREE.Color();
+  for(let j=0;j<V;j++)for(let i=0;i<V;i++){
+    const x=-H+i*ST, z=-H+j*ST, sd=sdLand(x,z), o=(j*V+i)*3;
+    pos[o]=x; pos[o+1]=groundH(x,z); pos[o+2]=z;
+    tmp.copy(g1);
+    const f=1+((hash(i>>3,j>>3)*0.6+hash(i>>1,j>>1)*0.4)-0.5)*0.08; tmp.r*=f;tmp.g*=f;tmp.b*=f;
+    const sF=1-clamp01((sd-10)/4); if(sF>0)tmp.lerp(sd1,sF);
+    const wF=clamp01((1.8-sd)/2.2); if(wF>0)tmp.lerp(wet,wF);
+    if(sd<-1.5)tmp.lerp(bed,clamp01((-sd-1.5)/2));
+    col[o]=tmp.r;col[o+1]=tmp.g;col[o+2]=tmp.b;
+  }
+  const idx=[]; for(let j=0;j<NVx;j++)for(let i=0;i<NVx;i++){const a=j*V+i,b=a+1,c=a+V,d=c+1;idx.push(a,c,b,b,c,d);}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}));
+  m.receiveShadow=true; scene.add(m);
+}
+{ // 海
+  const S=560, ST=4, NVx=S/ST, V=NVx+1, H=S/2;
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const foam=new THREE.Color(0xf4fbf7), shal=new THREE.Color(0x5fc8da), deep=new THREE.Color(0x2a72b8);
+  const tmp=new THREE.Color();
+  for(let j=0;j<V;j++)for(let i=0;i<V;i++){
+    const x=-H+i*ST, z=-H+j*ST, w=-sdLand(x,z), o=(j*V+i)*3;
+    tmp.copy(shal).lerp(deep,clamp01((w-1.5)/14));
+    const fF=1-clamp01((w-0.2)/2.0); if(fF>0)tmp.lerp(foam,fF);
+    pos[o]=x;pos[o+1]=0.02;pos[o+2]=z;
+    col[o]=tmp.r;col[o+1]=tmp.g;col[o+2]=tmp.b;
+  }
+  const idx=[]; for(let j=0;j<NVx;j++)for(let i=0;i<NVx;i++){const a=j*V+i,b=a+1,c=a+V,d=c+1;idx.push(a,c,b,b,c,d);}
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.3,metalness:0.05})));
+}
+
+// ================= 都市データ（世界の正体は「表」） =================
+const N=40, CS=4, GH=N*CS/2;                       // 40×40マス・1マス4m
+const road=new Uint8Array(N*N);                    // 0=なし 1=道路
+const ci=x=>Math.floor((x+GH)/CS), cj=z=>Math.floor((z+GH)/CS);
+const cx=i=>-GH+i*CS+CS/2, cz=j=>-GH+j*CS+CS/2;
+const inGrid=(i,j)=>i>=0&&j>=0&&i<N&&j<N;
+const buildable=(i,j)=> inGrid(i,j) && sdLand(cx(i),cz(j))>10;   // 浜と海はNG(赤)
+
+// ================= 道路の描画（オートタイル） =================
+const roadGroup=new THREE.Group(); scene.add(roadGroup);
+const asMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85});
+const swMat=new THREE.MeshStandardMaterial({color:0xd9d2c0,roughness:0.95});
+const dashMat=new THREE.MeshStandardMaterial({color:0xf7f5ec,roughness:0.8});
+function rebuildRoads(){
+  roadGroup.clear();
+  const Y=0.52;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    if(!road[j*N+i]) continue;
+    const x=cx(i), z=cz(j);
+    const sw=new THREE.Mesh(new THREE.BoxGeometry(CS,0.05,CS), swMat);
+    sw.position.set(x,Y,z); sw.receiveShadow=true; roadGroup.add(sw);
+    const a=new THREE.Mesh(new THREE.BoxGeometry(CS*0.78,0.06,CS*0.78), asMat);
+    a.position.set(x,Y+0.02,z); a.receiveShadow=true; roadGroup.add(a);
+    // 隣接方向へアスファルトを繋げる
+    const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+    let mask=0;
+    dirs.forEach(([dx,dz],k)=>{
+      if(inGrid(i+dx,j+dz)&&road[(j+dz)*N+i+dx]){
+        mask|=1<<k;
+        const c=new THREE.Mesh(new THREE.BoxGeometry(dx?CS*0.24:CS*0.78,0.06,dz?CS*0.24:CS*0.78), asMat);
+        c.position.set(x+dx*CS*0.44, Y+0.02, z+dz*CS*0.44); roadGroup.add(c);
+      }
+    });
+    // 白破線（直線部分のみ）
+    if(mask===0b0011||mask===0b0001||mask===0b0010){ const d=new THREE.Mesh(new THREE.BoxGeometry(CS*0.34,0.02,0.28),dashMat); d.position.set(x,Y+0.06,z); roadGroup.add(d); }
+    if(mask===0b1100||mask===0b0100||mask===0b1000){ const d=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.02,CS*0.34),dashMat); d.position.set(x,Y+0.06,z); roadGroup.add(d); }
+  }
+}
+
+// プレビュー（緑=OK / 赤=NG）
+const prevGroup=new THREE.Group(); scene.add(prevGroup);
+const okMat=new THREE.MeshBasicMaterial({color:0x6fe06a,transparent:true,opacity:0.55});
+const ngMat=new THREE.MeshBasicMaterial({color:0xff5a4a,transparent:true,opacity:0.5});
+const pending=new Set();                            // "i,j"
+function redrawPreview(){
+  prevGroup.clear();
+  for(const key of pending){
+    const [i,j]=key.split(',').map(Number);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(CS*0.94,0.08,CS*0.94), okMat);
+    m.position.set(cx(i),0.58,cz(j)); prevGroup.add(m);
+  }
+}
+function flashNG(i,j){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(CS*0.94,0.08,CS*0.94), ngMat);
+  m.position.set(cx(i),0.58,cz(j)); prevGroup.add(m);
+  setTimeout(()=>{ prevGroup.remove(m); },350);
+}
+
+// ================= カメラ（パン＋ピンチズーム） =================
+const target=new THREE.Vector3(0,0,20);
+let dist=95;
+function applyCam(){
+  cam.position.set(target.x, dist*0.86, target.z+dist*0.62);
+  cam.lookAt(target.x, 0, target.z);
+}
+applyCam();
+
+// ================= モード管理（UXフロー通りの状態機械） =================
+// browse → menu → placing(road/erase)
+let mode='browse';
+let tool=null;                                      // 'road' | 'erase'
+const $=id=>document.getElementById(id);
+const menu=$('menu'), items=$('items');
+const toast=(msg)=>{ const t=$('toast'); t.textContent=msg; t.style.opacity=1; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1600); };
+
+const CATALOG={
+  road:[ {id:'road',ic:'🛣️',nm:'ふつうの道'}, {id:'erase',ic:'🧹',nm:'撤去'}, {id:'stone',ic:'🧱',nm:'石畳(準備中)',dis:true} ],
+  home:[ {id:'h1',ic:'🏠',nm:'準備中',dis:true} ],
+  shop:[ {id:'s1',ic:'🏪',nm:'準備中',dis:true} ],
+  civic:[ {id:'c1',ic:'🏛️',nm:'準備中',dis:true} ],
+  deco:[ {id:'d1',ic:'🌳',nm:'準備中',dis:true} ],
+};
+function renderItems(tab){
+  items.innerHTML='';
+  for(const it of CATALOG[tab]){
+    const el=document.createElement('div');
+    el.className='card'+(it.dis?' dis':'');
+    el.innerHTML=`<div class="ic">${it.ic}</div><div class="nm">${it.nm}</div>`;
+    if(!it.dis) el.onclick=()=>startPlacing(it.id);
+    items.appendChild(el);
+  }
+}
+renderItems('road');
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('sel')); t.classList.add('sel'); renderItems(t.dataset.tab); };
+});
+$('build').onclick=()=>{ if(mode!=='browse')return; mode='menu'; menu.classList.add('show'); };
+function closeMenu(){ menu.classList.remove('show'); }
+function startPlacing(id){
+  tool = id==='erase' ? 'erase' : 'road';
+  mode='placing'; closeMenu();
+  $('modebar').classList.add('show'); $('modeframe').classList.add('show');
+  $('modetext').textContent = tool==='erase' ? '消したい道路をなぞろう' : '道路をなぞって敷こう';
+  updateConfirm();
+}
+function exitPlacing(toMenu=true){
+  mode= toMenu?'menu':'browse'; tool=null;
+  pending.clear(); redrawPreview();
+  $('modebar').classList.remove('show'); $('modeframe').classList.remove('show'); $('confirm').classList.remove('show');
+  if(toMenu) menu.classList.add('show');
+}
+$('cancel').onclick=()=>exitPlacing(true);
+function updateConfirm(){
+  const c=$('confirm');
+  if(pending.size>0){ c.classList.add('show'); c.textContent=`✓ 建設（${pending.size}マス）`; }
+  else c.classList.remove('show');
+}
+$('confirm').onclick=()=>{
+  let n=0;
+  for(const key of pending){ const [i,j]=key.split(',').map(Number);
+    if(tool==='erase'){ if(road[j*N+i]){road[j*N+i]=0;n++;} }
+    else { if(!road[j*N+i]){road[j*N+i]=1;n++;} }
+  }
+  pending.clear(); redrawPreview(); rebuildRoads(); updateConfirm();
+  toast(tool==='erase' ? `🧹 ${n}マス撤去！` : `🔨 ${n}マス建設！`);
+};
+$('dive').onclick=()=>{ location.href='slice.html'; };
+// メニューの外(地図)をタップしたらメニューを閉じる
+renderer.domElement.addEventListener('pointerdown',()=>{ if(mode==='menu'){ mode='browse'; closeMenu(); } });
+
+// ================= 入力（パン/ズーム/なぞり敷設） =================
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), gPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-0.55);
+function pickCell(e){
+  ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(ndc,cam);
+  const hit=new THREE.Vector3();
+  if(!ray.ray.intersectPlane(gPlane,hit)) return null;
+  return {i:ci(hit.x), j:cj(hit.z)};
+}
+const touches=new Map();
+let panLast=null, pinchLast=null, drawing=false;
+renderer.domElement.addEventListener('pointerdown',e=>{
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touches.size===2){ drawing=false; panLast=null;
+    const [a,b]=[...touches.values()];
+    pinchLast={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2};
+    return;
+  }
+  if(mode==='placing'){ drawing=true; paint(e); }
+  else panLast={x:e.clientX,y:e.clientY};
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(!touches.has(e.pointerId)) return;
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touches.size===2 && pinchLast){
+    const [a,b]=[...touches.values()];
+    const d=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    dist=Math.max(45,Math.min(180, dist*pinchLast.d/Math.max(1,d)));
+    target.x-=(mx-pinchLast.cx)*dist*0.0011; target.z-=(my-pinchLast.cy)*dist*0.0011;
+    pinchLast={d,cx:mx,cy:my}; applyCam(); return;
+  }
+  if(drawing && mode==='placing'){ paint(e); return; }
+  if(panLast){
+    target.x-=(e.clientX-panLast.x)*dist*0.0011;
+    target.z-=(e.clientY-panLast.y)*dist*0.0011;
+    target.x=Math.max(-110,Math.min(110,target.x));
+    target.z=Math.max(-110,Math.min(120,target.z));
+    panLast={x:e.clientX,y:e.clientY}; applyCam();
+  }
+});
+const endPointer=e=>{
+  touches.delete(e.pointerId);
+  if(touches.size<2) pinchLast=null;
+  if(touches.size===0){ panLast=null; drawing=false; }
+};
+renderer.domElement.addEventListener('pointerup',endPointer);
+renderer.domElement.addEventListener('pointercancel',endPointer);
+addEventListener('wheel',e=>{ dist=Math.max(45,Math.min(180,dist+e.deltaY*0.08)); applyCam(); },{passive:true});
+
+function paint(e){
+  const c=pickCell(e); if(!c) return;
+  const {i,j}=c;
+  if(tool==='erase'){
+    if(inGrid(i,j)&&road[j*N+i]){ pending.add(i+','+j); redrawPreview(); updateConfirm(); }
+    return;
+  }
+  if(!buildable(i,j)){ flashNG(i,j); return; }      // 浜・海は赤フラッシュ
+  if(road[j*N+i]) return;
+  const key=i+','+j;
+  if(!pending.has(key)){ pending.add(key); redrawPreview(); updateConfirm(); }
+}
+
+// ================= ループ =================
+renderer.setAnimationLoop(()=>{ renderer.render(scene,cam); });
+</script>
+</body>
+</html>
