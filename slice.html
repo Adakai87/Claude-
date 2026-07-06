@@ -10,6 +10,9 @@
   #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:#fff;font-size:13px;font-weight:600;
         background:rgba(30,60,80,.55);padding:8px 16px;border-radius:18px;pointer-events:none;white-space:nowrap;
         text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  #clock{position:fixed;right:14px;top:12px;color:#fff;font-size:15px;font-weight:700;letter-spacing:1px;
+         background:rgba(30,50,70,.5);padding:6px 14px;border-radius:16px;pointer-events:none;
+         text-shadow:0 1px 2px rgba(0,0,0,.4)}
   #pad{position:fixed;left:22px;bottom:22px;width:124px;height:124px;border-radius:50%;
        background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.35);touch-action:none;z-index:10}
   #stick{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;
@@ -22,6 +25,7 @@
 <div id="app"></div>
 <div id="hint">左下のパッドで移動／どこかをタップでもOK（PCはWASD）</div>
 <div id="pad"><div id="stick"></div></div>
+<div id="clock">10:00</div>
 <script type="module">
 import * as THREE from 'three';
 
@@ -33,14 +37,18 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;        // 映画的な色の乗り（白飛び・泥色を防ぐ）
+renderer.toneMappingExposure = 1.25;
 document.getElementById('app').appendChild(renderer.domElement);
+
+const q = new URLSearchParams(location.search);            // ?t=17.5 などの検証用パラメータ
 
 // 追従カメラ（斜め見下ろし）
 const cam = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 500);
 addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); });
 
 // 光：暖かい午後の太陽
-scene.add(new THREE.HemisphereLight(0xfff8ea, 0x7fae8a, 0.95));
+const hemi = new THREE.HemisphereLight(0xfff8ea, 0x7fae8a, 0.95); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0d0, 1.25);
 sun.position.set(40, 60, 20);
 sun.castShadow = true;
@@ -48,6 +56,25 @@ sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left=-70; sun.shadow.camera.right=70;
 sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
 scene.add(sun);
+
+// 昼夜システムが色を触る対象の登録簿
+const TOD = { tint:[], windows:[], lamps:[], pools:[] };
+// 光だまり（街灯や窓の下の丸い明かり。夜のゲームの定石テク）
+const poolTex = (()=>{
+  const c=document.createElement('canvas'); c.width=128; c.height=128;
+  const g=c.getContext('2d');
+  const gr=g.createRadialGradient(64,64,4,64,64,62);
+  gr.addColorStop(0,'rgba(255,225,150,0.85)'); gr.addColorStop(1,'rgba(255,225,150,0)');
+  g.fillStyle=gr; g.fillRect(0,0,128,128);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+})();
+function lightPool(x,y,z,r,maxOp){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(r*2,r*2),
+    new THREE.MeshBasicMaterial({map:poolTex, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending}));
+  m.rotation.x=-Math.PI/2; m.position.set(x,y,z); scene.add(m);
+  TOD.pools.push({mat:m.material, maxOp});
+  return m;
+}
 
 // ================= 世界：海辺（南が海）=================
 // 海岸線: z = COAST(x) より南(+z)が海。ゆるくカーブさせる
@@ -94,7 +121,9 @@ function groundH(x,z){
   geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
   geo.setAttribute('color', new THREE.BufferAttribute(col,3));
   geo.setIndex(idx); geo.computeVertexNormals();
-  const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.95}));
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.95});
+  TOD.tint.push(mat);                                       // 夜は世界の色味ごと落とす
+  const m=new THREE.Mesh(geo, mat);
   m.receiveShadow=true; scene.add(m);
 }
 // 海面（岸=白い泡→ターコイズ→沖=濃い青、連続グラデ）
@@ -119,7 +148,9 @@ function groundH(x,z){
   geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
   geo.setAttribute('color', new THREE.BufferAttribute(col,3));
   geo.setIndex(idx); geo.computeVertexNormals();
-  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.3, metalness:0.05})));
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.3, metalness:0.05});
+  TOD.tint.push(mat);
+  scene.add(new THREE.Mesh(geo, mat));
 }
 // 海沿いの通り（商店街のメインストリート。x方向にまっすぐ＝歩きやすさ優先）
 const STREET_Z = 4;                                        // 通りの中心線
@@ -210,6 +241,7 @@ function shop({x, w=10, d=7.5, hh=5.6, wall, upper, roof, awn, sign, signBg}){
   // --- 1階の顔（店先）---
   box(w*0.88, 2.1, 0.18, 0x4a4038, 0, 1.15, d/2+0.02);       // 店先の枠（濃い木枠）
   const win=box(w*0.60, 1.35, 0.1, 0xfff2c8, -w*0.10, 1.15, d/2+0.14, {c:0xffdf9a, i:0.55}); // ショーウィンドウ（灯り）
+  TOD.windows.push(win.material);                            // 夜に灯る
   box(w*0.16, 1.7, 0.12, 0x7a5a3a, w*0.30, 0.95, d/2+0.14);  // ドア
   box(w*0.16, 0.16, 0.14, 0xf2e8d8, w*0.30, 1.86, d/2+0.15); // ドアの庇
   // --- ひさし（アウニング）：白フチ＋店色 ---
@@ -249,6 +281,24 @@ for(const px of [-8, -40, 40]){
   const bush=new THREE.Mesh(new THREE.SphereGeometry(0.42,8,7), new THREE.MeshStandardMaterial({color:0x4f9a4d}));
   bush.position.set(px, 1.25, 0.3); bush.castShadow=true; scene.add(bush);
 }
+
+// 街灯（海側の歩道沿い。夜に灯る）
+{
+  const poleMat=new THREE.MeshStandardMaterial({color:0x4a5560, roughness:0.7});
+  for(let x=-56; x<=56; x+=16){
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.1,3.2,6), poleMat);
+    pole.position.set(x, 0.5+1.6, 8.2); pole.castShadow=true; scene.add(pole);
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,0.9), poleMat);
+    arm.position.set(x, 0.5+3.15, 8.2-0.4); scene.add(arm);
+    const headMat=new THREE.MeshStandardMaterial({color:0xfff4d0, emissive:0xffe8a0, emissiveIntensity:0.05});
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.2,10,8), headMat);
+    head.position.set(x, 0.5+3.1, 8.2-0.85); scene.add(head);
+    TOD.lamps.push(headMat);
+    lightPool(x, 0.58, 8.2-0.85, 3.4, 0.75);               // 街灯の光だまり
+  }
+}
+// 店の窓明かりの光だまり（歩道にこぼれる灯り）
+for(const sx of [-32,-16,0,16,32]) lightPool(sx-1, 0.575, 0.8, 2.6, 0.5);
 
 // ================= あなたの分身 =================
 const player = new THREE.Group(); scene.add(player);
@@ -303,6 +353,50 @@ const padVec={x:0,y:0,on:false};                            // 画面座標系: 
   padEl.addEventListener('pointercancel', end);
 }
 
+// ================= 時間と光（昼夜サイクル）=================
+const DAY_SEC = 300;                                        // 現実5分 = ゲーム内1日
+let gameHour = q.get('t')!==null ? +q.get('t') : 10;        // ?t=17.5 で夕方から開始（検証用）
+const clockEl = document.getElementById('clock');
+// キーフレーム: [時刻, 空, 半球光強度, 太陽色, 太陽強度, 世界の色味]
+const KEYS = [
+  [0.0, 0x101d33, 0.36, 0x6f86c0, 0.18, 0x7086ab],          // 深夜（月明かり）
+  [4.5, 0x152441, 0.38, 0x7690c8, 0.20, 0x7690b0],
+  [6.0, 0xf2b26a, 0.58, 0xffb066, 0.60, 0xd4b195],          // 朝焼け
+  [8.0, 0xa8d8ec, 0.95, 0xfff0d0, 1.05, 0xffffff],
+  [12,  0x8fd3ea, 1.05, 0xffffff, 1.20, 0xffffff],
+  [16,  0x92cbe4, 1.00, 0xffedc0, 1.10, 0xfff5e8],
+  [17.5,0xf7a45e, 0.85, 0xff8a3a, 1.9,  0xffe0bc],          // 夕日（太陽を主役に）
+  [18.7,0xe06a45, 0.52, 0xff6a30, 0.60, 0xd9a890],          // 日没
+  [19.6,0x1d2c4a, 0.42, 0x6f86c0, 0.16, 0x7690b0],          // 宵
+  [24,  0x101d33, 0.36, 0x6f86c0, 0.18, 0x7086ab],
+];
+const _cA=new THREE.Color(), _cB=new THREE.Color();
+function lerpHex(a,b,t,into){ _cA.setHex(a); _cB.setHex(b); into.copy(_cA).lerp(_cB,t); return into; }
+const skyC=new THREE.Color(), sunC=new THREE.Color(), tintC=new THREE.Color();
+function applyTimeOfDay(){
+  const h=gameHour%24;
+  let i=0; while(i<KEYS.length-1 && KEYS[i+1][0]<h) i++;
+  const A=KEYS[i], B=KEYS[Math.min(i+1,KEYS.length-1)];
+  const t=(h-A[0])/Math.max(0.001,(B[0]-A[0]));
+  scene.background = lerpHex(A[1],B[1],t,skyC);
+  hemi.intensity = A[2]+(B[2]-A[2])*t;
+  hemi.color.copy(skyC).lerp(_cA.setHex(0xffffff), 0.35);   // 環境光の「色」も空に合わせる（夕方の空気感の正体）
+  sun.color.copy(lerpHex(A[3],B[3],t,sunC));
+  sun.intensity = A[4]+(B[4]-A[4])*t;
+  lerpHex(A[5],B[5],t,tintC).lerp(_cA.setHex(0xffffff), 0.35);   // 乗算は控えめに（泥色化防止）
+  for(const m of TOD.tint) m.color.copy(tintC);
+  // 太陽の位置: 朝は陸側から昇り、夕方は海の向こうへ沈む
+  const dayT=Math.min(1,Math.max(0,(h-6)/12.7));
+  sun.position.set(Math.cos(dayT*Math.PI)*70, Math.sin(dayT*Math.PI)*75+6, 20+dayT*45);
+  // 窓明かりと街灯: 夕方から灯り朝に消える
+  const n = (h>=16.8 ? Math.min(1,(h-16.8)/1.4) : (h<6.8 ? 1-Math.max(0,(h-5.2)/1.6) : 0));   // 夕暮れに早めに灯る
+  for(const m of TOD.windows) m.emissiveIntensity = 0.06 + n*1.5;
+  for(const m of TOD.lamps)   m.emissiveIntensity = 0.05 + n*2.2;
+  for(const p of TOD.pools)   p.mat.opacity = n * p.maxOp;
+  const hh=Math.floor(h), mm=Math.floor((h-hh)*60);
+  clockEl.textContent = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
 // ================= ゲームループ（道場第1週と同じ心臓！）=================
 const SPEED=6.5;
 const camOff=new THREE.Vector3(14, 24, 22);     // 海側上空から陸へ＝店の顔が見えて、手前に浜が入るBuildIt構図
@@ -310,6 +404,8 @@ const camLook=new THREE.Vector3();
 let last=performance.now();
 function tick(now){
   const delta=Math.min(0.05,(now-last)/1000); last=now;    // delta秒（道場で学ぶやつ）
+  gameHour=(gameHour + delta*24/DAY_SEC)%24;               // 時間が流れる
+  applyTimeOfDay();
   // --- 入力 → 移動方向（優先度: パッド > キー > タップ目的地）---
   const dir=new THREE.Vector3();
   let power=1;                                              // パッドの倒し具合＝歩く速さ（アナログ）
