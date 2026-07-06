@@ -65,6 +65,7 @@
     opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
   #clock{position:fixed;left:12px;top:58px;color:#fff;font-weight:800;font-size:14px;letter-spacing:1px;
     background:var(--navy);padding:6px 14px;border-radius:16px;border:2.5px solid rgba(255,255,255,.85)}
+  #reset{position:fixed;left:12px;top:100px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
   /* 歩きモード用UI */
   #pad{position:fixed;left:22px;bottom:22px;width:124px;height:124px;border-radius:50%;
     background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.4);touch-action:none;z-index:10;display:none}
@@ -79,6 +80,7 @@
 <div id="app"></div>
 <div id="cityname">🏙️ マイシティ</div>
 <div id="clock">10:00</div>
+<button class="btn red" id="reset">🗑️</button>
 <button class="btn" id="dive">🚶 ダイブイン</button>
 <button class="btn" id="build">🔨</button>
 
@@ -369,6 +371,29 @@ const keys={};
 addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
+// ================= セーブ（自動保存＝「消えない街」） =================
+const SAVE_KEY='mycity_v1';
+function saveCity(){
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v:1, road:Array.from(road),
+      b:buildings.map(x=>({t:x.type,i:x.i,j:x.j})),
+      h:gameHour
+    }));
+  }catch(e){}
+}
+function loadCity(){
+  try{
+    const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
+    if(!d||d.v!==1) return false;
+    d.road.forEach((v,k)=>{ road[k]=v; });
+    rebuildRoads();
+    for(const bb of (d.b||[])) placeBuilding(bb.t, bb.i, bb.j);
+    if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
+    return true;
+  }catch(e){ return false; }
+}
+
 // ================= モード管理（UXフロー通りの状態機械） =================
 // browse → menu → placing(road/erase) → (dive) descend → walk → ascend → browse
 let mode='browse';
@@ -437,6 +462,7 @@ $('confirm').onclick=()=>{
       return;
     }
     placeBuilding(tool.slice(4), ...ghostAt);
+    saveCity();
     toast('🏠 建てました！続けて置けるよ');
     ghostValid=false; ghostPlate.material=plateNG;
     return;
@@ -447,6 +473,7 @@ $('confirm').onclick=()=>{
     else { if(!road[j*N+i]){road[j*N+i]=1;n++;} }
   }
   pending.clear(); redrawPreview(); rebuildRoads(); updateConfirm();
+  saveCity();
   toast(tool==='erase' ? `🧹 ${n}マス撤去！` : `🔨 ${n}マス建設！`);
 };
 // ================= ダイブイン ⇄ 市長ビュー（同じ世界を2つのレンズで） =================
@@ -478,6 +505,11 @@ function ascend(){
     toPos, toLook:new THREE.Vector3(target.x,0,target.z) };
   mode='ascend';
 }
+$('reset').onclick=()=>{
+  if(confirm('街を最初から作り直しますか？（保存データを消します）')){
+    localStorage.removeItem(SAVE_KEY); location.reload();
+  }
+};
 $('dive').onclick=diveIn;
 $('mayorbtn').onclick=ascend;
 // メニューの外(地図)をタップしたらメニューを閉じる
@@ -567,7 +599,7 @@ function paint(e){
         const x=cx(b.i)+CS/2, z=cz(b.j)+CS/2;
         const si=SOLIDS.findIndex(s2=>Math.abs((s2.x0+s2.x1)/2-x)<0.1&&Math.abs((s2.z0+s2.z1)/2-z)<0.1);
         if(si>=0) SOLIDS.splice(si,1);
-        buildings.splice(idx,1); toast('🧹 建物を撤去！');
+        buildings.splice(idx,1); saveCity(); toast('🧹 建物を撤去！');
       }
     }
     return;
@@ -617,14 +649,18 @@ function applyTimeOfDay(){
   clockEl.textContent=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
 }
 
+// 起動時にロード（保存があれば街が蘇る）
+if(loadCity()) toast('🏙️ おかえりなさい、市長！');
+
 // ================= ループ =================
 const SPEED=6.5, camLook=new THREE.Vector3();
-let last=performance.now();
+let last=performance.now(), lastSave=performance.now();
 renderer.setAnimationLoop((now)=>{
   const rawDelta=(now-last)/1000;                    // 演出用は実時間（低FPS端末でも所要時間一定）
   const delta=Math.min(0.05,rawDelta); last=now;     // 移動用は上限つき（コマ落ち時の瞬間移動防止）
   gameHour=(gameHour+delta*24/DAY_SEC)%24;
   applyTimeOfDay();
+  if(now-lastSave>10000){ saveCity(); lastSave=now; }   // 時刻も10秒ごとに保存
   if(mode==='descend'||mode==='ascend'){             // レンズの切替演出
     trans.t+=rawDelta/trans.dur;
     const e=easeIO(Math.min(1,trans.t));
