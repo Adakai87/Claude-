@@ -65,7 +65,10 @@
     opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
   #clock{position:fixed;left:12px;top:58px;color:#fff;font-weight:800;font-size:14px;letter-spacing:1px;
     background:var(--navy);padding:6px 14px;border-radius:16px;border:2.5px solid rgba(255,255,255,.85)}
-  #reset{position:fixed;left:12px;top:100px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
+  #money,#pop{position:fixed;left:12px;color:#fff;font-weight:800;font-size:14px;letter-spacing:.5px;
+    background:var(--navy);padding:6px 14px;border-radius:16px;border:2.5px solid rgba(255,255,255,.85)}
+  #money{top:100px;color:var(--gold)} #pop{top:142px}
+  #reset{position:fixed;left:12px;top:186px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
   #bpanel{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);border-radius:18px;
     padding:12px 18px;border:2.5px solid rgba(255,255,255,.85);text-align:center;display:none;min-width:220px}
   #bpanel.show{display:block}
@@ -85,6 +88,8 @@
 <div id="app"></div>
 <div id="cityname">🏙️ マイシティ</div>
 <div id="clock">10:00</div>
+<div id="money">💰 ¥50,000</div>
+<div id="pop">👥 0人</div>
 <button class="btn red" id="reset">🗑️</button>
 <button class="btn" id="dive">🚶 ダイブイン</button>
 <button class="btn" id="build">🔨</button>
@@ -140,6 +145,31 @@ sun.shadow.camera.left=-120; sun.shadow.camera.right=120; sun.shadow.camera.top=
 scene.add(sun);
 
 const TOD={tint:[],windows:[]};   // 昼夜が色を触る材質の登録簿
+
+// ================= 経済（フェーズ3: お金と人口） =================
+const COSTS={ road:100, cottage:1000, jh_s:1200, jh_m:2000, mod_s:1500, mod_m:2500,
+  apart:4000, mansion:8000, lux:15000, bakery:2000, cafe:2000, flower:2000, mart:3000,
+  koban:5000, tree:200, park:1500, fountain:3000 };
+const RES={ cottage:4, jh_s:4, jh_m:6, mod_s:4, mod_m:6, apart:12, lux:5, mansionPerFloor:6 };
+let money=50000;
+function calcPop(){
+  let p=0;
+  for(const b of buildingsRef()){
+    if(b.type==='mansion') p+=RES.mansionPerFloor*b.floors;
+    else p+=RES[b.type]||0;
+  }
+  return p;
+}
+let buildingsRef=()=>[];                             // buildings定義後に差し替え
+function fmt(n){ return '¥'+n.toLocaleString('ja-JP'); }
+function updateHUD(){
+  document.getElementById('money').textContent='💰 '+fmt(money);
+  document.getElementById('pop').textContent='👥 '+calcPop()+'人';
+}
+function pay(cost){
+  if(money<cost) return false;
+  money-=cost; updateHUD(); return true;
+}
 
 // ================= 土地（草原＋南に浜と海） =================
 const clamp01=v=>Math.min(1,Math.max(0,v));
@@ -241,6 +271,7 @@ function rebuildRoads(){
 // ================= 建物（敷地サイズ可変・道路沿いにのみ建つ） =================
 const bld=new Uint8Array(N*N);
 const buildings=[];                                 // {type,i,j,floors,group,solid}
+buildingsRef=()=>buildings;
 const SOLIDS=[];
 const BLD_DEFS={
   cottage:{nm:'コテージ',   ic:'🏠', fw:2, fd:2},
@@ -656,7 +687,7 @@ const SAVE_KEY='mycity_v1';
 function saveCity(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v:1, road:Array.from(road),
+      v:1, money, road:Array.from(road),
       b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors})),
       h:gameHour
     }));
@@ -669,6 +700,7 @@ function loadCity(){
     d.road.forEach((v,k)=>{ road[k]=v; });
     rebuildRoads();
     for(const bb of (d.b||[])) placeBuilding(bb.t, bb.i, bb.j, bb.f||3);
+    if(typeof d.money==='number') money=d.money;
     if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
     return true;
   }catch(e){ return false; }
@@ -697,7 +729,8 @@ function renderItems(tab){
   for(const it of CATALOG[tab]){
     const el=document.createElement('div');
     el.className='card'+(it.dis?' dis':'');
-    el.innerHTML=`<div class="ic">${it.ic}</div><div class="nm">${it.nm}</div>`;
+    const cost = it.id==='road'? '¥100/マス' : it.id==='erase'? '半額返金' : it.id&&it.id.startsWith('bld:')? fmt(COSTS[it.id.slice(4)]||0) : '';
+    el.innerHTML=`<div class="ic">${it.ic}</div><div class="nm">${it.nm}</div>${cost?`<div class="nm" style="color:#a8823a">${cost}</div>`:''}`;
     if(!it.dis) el.onclick=()=>startPlacing(it.id);
     items.appendChild(el);
   }
@@ -734,7 +767,8 @@ function updateConfirm(){
     if(ghostAt){ c.classList.add('show'); c.textContent='✓ 建てる'; } else c.classList.remove('show');
     return;
   }
-  if(pending.size>0){ c.classList.add('show'); c.textContent=`✓ 建設（${pending.size}マス）`; }
+  if(pending.size>0){ c.classList.add('show');
+    c.textContent = tool==='erase' ? `✓ 撤去（${pending.size}マス）` : `✓ 建設（${pending.size}マス ${fmt(pending.size*COSTS.road)}）`; }
   else c.classList.remove('show');
 }
 $('confirm').onclick=()=>{
@@ -745,9 +779,12 @@ $('confirm').onclick=()=>{
       toast( footprintOK(ghostAt[0],ghostAt[1],def.fw,def.fd) ? '🛣️ 道路の近くにしか建てられないよ' : '❌ ここには建てられないよ' );
       return;
     }
+    const cost=COSTS[ghostType]||0;
+    if(!pay(cost)){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
     placeBuilding(tool.slice(4), ...ghostAt);
-    saveCity();
-    toast('🏠 建てました！続けて置けるよ');
+    saveCity(); updateHUD();
+    const res = ghostType==='mansion'? RES.mansionPerFloor*3 : RES[ghostType]||0;
+    toast( res>0 ? `🏠 建設！ ${res}人が入居しました` : '🔨 建設しました！' );
     ghostValid=false; ghostPlate.material=plateNG;
     return;
   }
@@ -756,9 +793,13 @@ $('confirm').onclick=()=>{
     if(tool==='erase'){ if(road[j*N+i]){road[j*N+i]=0;n++;} }
     else { if(!road[j*N+i]){road[j*N+i]=1;n++;} }
   }
+  if(tool!=='erase'){
+    const cost=n*COSTS.road;
+    if(!pay(cost)){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
+  } else { money+=n*COSTS.road/2; updateHUD(); }
   pending.clear(); redrawPreview(); rebuildRoads(); updateConfirm();
   saveCity();
-  toast(tool==='erase' ? `🧹 ${n}マス撤去！` : `🔨 ${n}マス建設！`);
+  toast(tool==='erase' ? `🧹 ${n}マス撤去！ +${fmt(n*COSTS.road/2)}` : `🔨 ${n}マス建設！ -${fmt(n*COSTS.road)}`);
 };
 // ================= ダイブイン ⇄ 市長ビュー（同じ世界を2つのレンズで） =================
 let trans=null, aerialDist=95;
@@ -802,20 +843,34 @@ renderer.domElement.addEventListener('pointerup',e=>{
   let obj=hits[0].object; while(obj.parent&&!buildings.some(b=>b.group===obj)) obj=obj.parent;
   const b=buildings.find(bb=>bb.group===obj); if(!b) return;
   selBld=b;
-  const def=BLD_DEFS[b.type];
-  $('bptitle').textContent=`${def.ic} ${def.nm}`;
-  $('bpbody').textContent= def.up ? `${b.floors}階建て` : 'すてきな住まい';
-  $('bpup').style.display= def.up ? '' : 'none';
-  $('bpup').textContent= b.floors>=8 ? '🏆 最上級！' : '⬆️ 増築する';
+  refreshBPanel();
   $('bpanel').classList.add('show');
 });
+function refreshBPanel(){
+  const b=selBld; if(!b) return;
+  const def=BLD_DEFS[b.type];
+  $('bptitle').textContent=`${def.ic} ${def.nm}`;
+  if(def.up){
+    const cost=3000*(b.floors+1), need=20*b.floors;
+    $('bpbody').textContent=`${b.floors}階建て・住民${RES.mansionPerFloor*b.floors}人 ／ 増築: ${fmt(cost)}・要人口${need}人`;
+    $('bpup').style.display='';
+    $('bpup').textContent= b.floors>=8 ? '🏆 最上級！' : `⬆️ 増築 ${fmt(cost)}`;
+  } else {
+    const res=RES[b.type]||0;
+    $('bpbody').textContent= res>0 ? `住民${res}人が暮らしています` : 'まちの施設';
+    $('bpup').style.display='none';
+  }
+}
 $('bpup').onclick=()=>{
-  if(!selBld) return;
-  if(upgradeBuilding(selBld)){
-    saveCity();
-    $('bpbody').textContent=`${selBld.floors}階建て`;
-    $('bpup').textContent= selBld.floors>=8 ? '🏆 最上級！' : '⬆️ 増築する';
-    toast(`🏗️ 増築完了！${selBld.floors}階建てになった`);
+  const b=selBld; if(!b) return;
+  if(b.floors>=8){ toast('🏆 もう最上級です！'); return; }
+  const cost=3000*(b.floors+1), need=20*b.floors;
+  if(calcPop()<need){ toast(`👥 人口が足りない！（あと${need-calcPop()}人）`); return; }
+  if(money<cost){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
+  money-=cost;
+  if(upgradeBuilding(b)){
+    saveCity(); updateHUD(); refreshBPanel();
+    toast(`🏗️ 増築完了！${b.floors}階建て・${RES.mansionPerFloor}人が入居`);
   }
 };
 $('bpclose').onclick=()=>{ $('bpanel').classList.remove('show'); selBld=null; };
@@ -926,7 +981,9 @@ function paintCell(i,j){
         scene.remove(b.group);
         for(let a2=0;a2<def.fw;a2++)for(let b2=0;b2<def.fd;b2++) bld[(b.j+b2)*N+(b.i+a2)]=0;
         if(b.solid){ const si=SOLIDS.indexOf(b.solid); if(si>=0) SOLIDS.splice(si,1); }
-        buildings.splice(idx,1); saveCity(); toast('🧹 建物を撤去！');
+        const refund=Math.floor((COSTS[b.type]||0)/2);
+        money+=refund; updateHUD();
+        buildings.splice(idx,1); saveCity(); toast('🧹 撤去！ +'+fmt(refund));
       }
     }
     return;
@@ -978,6 +1035,7 @@ function applyTimeOfDay(){
 
 // 起動時にロード（保存があれば街が蘇る）
 if(loadCity()) toast('🏙️ おかえりなさい、市長！');
+updateHUD();
 
 // ================= ループ =================
 const SPEED=6.5, camLook=new THREE.Vector3();
@@ -985,7 +1043,12 @@ let last=performance.now(), lastSave=performance.now();
 renderer.setAnimationLoop((now)=>{
   const rawDelta=(now-last)/1000;                    // 演出用は実時間（低FPS端末でも所要時間一定）
   const delta=Math.min(0.05,rawDelta); last=now;     // 移動用は上限つき（コマ落ち時の瞬間移動防止）
+  const prevHour=Math.floor(gameHour);
   gameHour=(gameHour+delta*24/DAY_SEC)%24;
+  if(Math.floor(gameHour)!==prevHour){                   // 毎時: 税収 = 人口×¥10
+    const inc=calcPop()*10;
+    if(inc>0){ money+=inc; updateHUD(); }
+  }
   applyTimeOfDay();
   if(now-lastSave>10000){ saveCity(); lastSave=now; }   // 時刻も10秒ごとに保存
   if(mode==='descend'||mode==='ascend'){             // レンズの切替演出
