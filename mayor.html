@@ -252,6 +252,13 @@ const BLD_DEFS={
   mansion:{nm:'マンション',  ic:'🏬', fw:3, fd:3, up:true},   // 増築できる
   bakery: {nm:'パン屋',      ic:'🥐', fw:2, fd:2},
   lux:    {nm:'高級邸宅',    ic:'🏆', fw:3, fd:3},
+  cafe:   {nm:'カフェ',      ic:'☕', fw:2, fd:2},
+  mart:   {nm:'コンビニ',    ic:'🏪', fw:2, fd:2},
+  flower: {nm:'花屋',        ic:'🌸', fw:2, fd:2},
+  koban:  {nm:'交番',        ic:'🚓', fw:2, fd:2},
+  tree:   {nm:'街路樹',      ic:'🌳', fw:1, fd:1, noRoad:true, slim:true},
+  park:   {nm:'小さな公園',  ic:'🏞️', fw:2, fd:2, noRoad:true, walkIn:true},
+  fountain:{nm:'噴水広場',   ic:'⛲', fw:2, fd:2, noRoad:true, walkIn:true},
 };
 function footprintOK(i,j,fw,fd){
   if(i<0||j<0||i>N-fw||j>N-fd) return false;
@@ -446,6 +453,88 @@ function buildMesh(type, ghost=false, floors=3){
     const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.11,1.5,6),M(0x8a6a48)); tr.position.set(-1.2,0.85,5.0); if(!ghost)tr.castShadow=true; g.add(tr);
     const lv=new THREE.Mesh(new THREE.SphereGeometry(0.75,8,7),M(0x5fa04d)); lv.position.set(-1.2,2.0,5.0); if(!ghost)lv.castShadow=true; g.add(lv);
   }
+  else if(type==='cafe'){
+    box(6.6,3.6,5.4, M(0xd08a5e), 0,1.9,0);                       // テラコッタ
+    box(7.0,0.4,5.8, M(0x6a4a3a), 0,3.9,0);
+    box(6.7,0.7,5.5, M(0xf2e3c2), 0,0.45,0);                      // クリームの腰
+    box(3.6,1.5,0.14, winM(), -0.9,1.6,2.76);
+    box(1.1,1.9,0.14, M(0x5a3a28), 2.2,1.05,2.76);
+    const awn=box(6.2,0.13,1.4, M(0x7a4a32), 0,2.85,3.2); awn.rotation.x=0.3;
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(3.0,1.15),
+      ghost? M(0x6f4a32) : new THREE.MeshBasicMaterial({map:makeSign('CAFE','#6f4a32')}));
+    sign.position.set(0,3.35,2.78); g.add(sign);
+    for(const tx of [-2.4,-0.8]){                                  // テラス席
+      const tb=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.08,10),M(0xf2efe8)); tb.position.set(tx,0.95,3.6); g.add(tb);
+      const tl=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.85,6),M(0x6a4a3a)); tl.position.set(tx,0.5,3.6); g.add(tl);
+    }
+  }
+  else if(type==='mart'){
+    box(7.0,3.4,5.6, M(0xf4f2ec), 0,1.8,0);                       // 白い箱
+    box(7.3,0.35,5.9, M(0xd8d4cc), 0,3.6,0);
+    box(6.6,1.8,0.14, winM(0xd8ecf4), -0.2,1.15,2.86);            // 全面ガラス(夜に強く光る)
+    box(7.0,0.55,0.16, M(0x2f6fc0), 0,2.65,2.86);                 // 青帯
+    box(7.0,0.22,0.17, M(0xe84a3a), 0,2.28,2.86);                 // 赤ライン
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(2.8,1.0),
+      ghost? M(0x2f6fc0) : new THREE.MeshBasicMaterial({map:makeSign('MART','#2f6fc0')}));
+    sign.position.set(0,3.15,2.9); g.add(sign);
+  }
+  else if(type==='flower'){
+    box(6.4,3.2,5.2, M(0xcfe6d2), 0,1.7,0);                       // ミント
+    box(6.8,0.4,5.6, M(0x5f8a5a), 0,3.5,0);
+    box(3.4,1.4,0.14, winM(), -0.8,1.5,2.66);
+    box(1.0,1.8,0.14, M(0x4a6a48), 2.2,1.0,2.66);
+    const awn=box(6.0,0.13,1.3, M(0xe08aa8), 0,2.6,3.05); awn.rotation.x=0.3;
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.1),
+      ghost? M(0x4f7a4a) : new THREE.MeshBasicMaterial({map:makeSign('FLOWER','#4f7a4a')}));
+    sign.position.set(0,3.05,2.7); g.add(sign);
+    for(let k=0;k<3;k++){                                          // 店先の花
+      box(0.7,0.4,0.5, M(0x8a6a48), -2.3+k*1.1, 0.75, 3.35);
+      const fl=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,6),M([0xe86a8a,0xf2c94a,0xe8574a][k]));
+      fl.position.set(-2.3+k*1.1,1.15,3.35); g.add(fl);
+    }
+  }
+  else if(type==='koban'){
+    box(5.8,3.2,4.8, M(0xf2efe8), 0,1.7,0);                       // 白い箱
+    gableRoof(5.8,4.8,3.95, 0x4a5568, 0.8);
+    box(1.2,2.0,0.14, M(0x3a4a5a), 1.4,1.1,2.46);                 // ドア
+    box(1.6,1.1,0.12, winM(), -1.2,1.7,2.46);
+    box(3.4,0.6,0.16, M(0x2f5fa0), 0,2.85,2.5);                   // 青看板
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6),
+      M(0xe84a3a,{emissive:0xc0281a,emissiveIntensity:0.6}));
+    lamp.position.set(0,3.45,2.5); g.add(lamp);                    // 赤ランプ
+  }
+  else if(type==='tree'){
+    const s2=0.9+((typeof arguments!=='undefined')?0:0)+ (Math.random()*0.35);
+    const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.12*s2,0.16*s2,1.6*s2,7),M(0x8a6a48));
+    tr.position.y=0.8*s2; if(!ghost)tr.castShadow=true; g.add(tr);
+    const l1=new THREE.Mesh(new THREE.SphereGeometry(1.05*s2,9,8),M(0x5fa04d)); l1.position.y=2.2*s2; if(!ghost)l1.castShadow=true; g.add(l1);
+    const l2=new THREE.Mesh(new THREE.SphereGeometry(0.7*s2,8,7),M(0x6fae57)); l2.position.set(0.5*s2,2.8*s2,0.2*s2); if(!ghost)l2.castShadow=true; g.add(l2);
+  }
+  else if(type==='park'){
+    box(7.6,0.14,7.6, M(0x74b45c), 0,0.1,0);                      // 明るい芝
+    box(7.6,0.5,0.22, M(0x4f7a4a), 0,0.3,3.7); box(7.6,0.5,0.22, M(0x4f7a4a), 0,0.3,-3.7);   // 生垣
+    box(0.22,0.5,7.6, M(0x4f7a4a), 3.7,0.3,0); box(0.22,0.5,7.6, M(0x4f7a4a), -3.7,0.3,0);
+    box(1.4,0.06,7.2, M(0xd9cba6), 0,0.18,0);                      // 小道
+    box(7.2,0.06,1.4, M(0xd9cba6), 0,0.18,0);
+    for(const [tx,tz] of [[-2.4,-2.4],[2.4,2.4]]){
+      const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.15,1.4,7),M(0x8a6a48)); tr.position.set(tx,0.7,tz); if(!ghost)tr.castShadow=true; g.add(tr);
+      const lv=new THREE.Mesh(new THREE.SphereGeometry(0.95,9,8),M(0x5fa04d)); lv.position.set(tx,1.95,tz); if(!ghost)lv.castShadow=true; g.add(lv);
+    }
+    box(1.6,0.2,0.5, M(0xb07a3e), 2.3,0.62,-2.2);                  // ベンチ
+    box(1.6,0.2,0.5, M(0xb07a3e), -2.3,0.62,2.2);
+  }
+  else if(type==='fountain'){
+    box(7.6,0.14,7.6, M(0xd9d4c8), 0,0.1,0);                       // 石畳広場
+    const rim=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.4,0.6,18),M(0xc4beb0)); rim.position.y=0.4; if(!ghost)rim.castShadow=true; g.add(rim);
+    const wat=new THREE.Mesh(new THREE.CylinderGeometry(2.05,2.05,0.5,18),M(0x55c2d8,{emissive:0x1a5a6a,emissiveIntensity:0.25})); wat.position.y=0.48; g.add(wat);
+    const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.4,1.2,10),M(0xc4beb0)); ped.position.y=1.2; g.add(ped);
+    const top=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.9,0.25,12),M(0xc4beb0)); top.position.y=1.9; g.add(top);
+    const jet=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.8,6),M(0xbfe8f2,{transparent:true,opacity:0.7})); jet.position.y=2.4; g.add(jet);
+    for(const a of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
+      const bn=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.2,0.45),M(0xb07a3e));
+      bn.position.set(Math.cos(a)*3.1,0.6,Math.sin(a)*3.1); bn.rotation.y=-a; g.add(bn);
+    }
+  }
   else if(type==='bakery'){
     box(7.0,4.4,5.6, M(0xe8c89a), 0,2.2,0);
     box(7.4,0.4,6.0, M(0x8a5a3a), 0,4.6,0);
@@ -465,11 +554,15 @@ function placeBuilding(type,i,j,floors=3){
   const g=buildMesh(type,false,floors);
   const [x,z]=bldCenter(def,i,j);
   g.position.set(x,0.5,z);
-  g.rotation.y=Math.atan2(dir[0],dir[1]);
+  g.rotation.y = def.noRoad ? ((i*7+j*13)%4)*(Math.PI/2) : Math.atan2(dir[0],dir[1]);
   scene.add(g);
   for(let a=0;a<def.fw;a++)for(let b=0;b<def.fd;b++) bld[(j+b)*N+(i+a)]=1;
-  const solid={x0:x-def.fw*CS/2+0.3,x1:x+def.fw*CS/2-0.3,z0:z-def.fd*CS/2+0.4,z1:z+def.fd*CS/2-0.4};
-  SOLIDS.push(solid);
+  let solid=null;
+  if(!def.walkIn){
+    const m=def.slim?1.3:0.3;
+    solid={x0:x-def.fw*CS/2+m,x1:x+def.fw*CS/2-m,z0:z-def.fd*CS/2+(def.slim?1.3:0.4),z1:z+def.fd*CS/2-(def.slim?1.3:0.4)};
+    SOLIDS.push(solid);
+  }
   const entry={type,i,j,floors,group:g,solid};
   buildings.push(entry);
   return entry;
@@ -507,7 +600,7 @@ function moveGhost(i,j){
   i=Math.max(0,Math.min(N-def.fw, i-Math.floor(def.fw/2)));
   j=Math.max(0,Math.min(N-def.fd, j-Math.floor(def.fd/2)));
   ghostAt=[i,j];
-  ghostValid = footprintOK(i,j,def.fw,def.fd) && !!nearRoadDir(i,j,def.fw,def.fd);
+  ghostValid = footprintOK(i,j,def.fw,def.fd) && (def.noRoad || !!nearRoadDir(i,j,def.fw,def.fd));
   const [x,z]=bldCenter(def,i,j);
   const dir=nearRoadDir(i,j,def.fw,def.fd)||[0,1];
   ghost.position.set(x,0.5,z); ghost.rotation.y=Math.atan2(dir[0],dir[1]); ghost.visible=true;
@@ -595,9 +688,9 @@ const CATALOG={
          {id:'bld:mod_s',ic:'🏢',nm:'モダン・小'}, {id:'bld:mod_m',ic:'🏡',nm:'モダン・中'},
          {id:'bld:apart',ic:'🏘️',nm:'アパート'}, {id:'bld:mansion',ic:'🏬',nm:'マンション'},
          {id:'bld:lux',ic:'🏆',nm:'高級邸宅'} ],
-  shop:[ {id:'bld:bakery',ic:'🥐',nm:'パン屋'}, {id:'s2',ic:'🏪',nm:'準備中',dis:true} ],
-  civic:[ {id:'c1',ic:'🏛️',nm:'準備中',dis:true} ],
-  deco:[ {id:'d1',ic:'🌳',nm:'準備中',dis:true} ],
+  shop:[ {id:'bld:bakery',ic:'🥐',nm:'パン屋'}, {id:'bld:cafe',ic:'☕',nm:'カフェ'}, {id:'bld:mart',ic:'🏪',nm:'コンビニ'}, {id:'bld:flower',ic:'🌸',nm:'花屋'} ],
+  civic:[ {id:'bld:koban',ic:'🚓',nm:'交番'}, {id:'c2',ic:'🏫',nm:'準備中',dis:true} ],
+  deco:[ {id:'bld:tree',ic:'🌳',nm:'街路樹'}, {id:'bld:park',ic:'🏞️',nm:'小さな公園'}, {id:'bld:fountain',ic:'⛲',nm:'噴水広場'} ],
 };
 function renderItems(tab){
   items.innerHTML='';
@@ -770,7 +863,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{
     pinchLast={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2};
     return;
   }
-  if(mode==='placing'){ drawing=true; paint(e); }
+  if(mode==='placing'){ drawing=true; strokeLast=null; paint(e); }
   else if(mode==='walk'){                            // タップ移動
     ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
     ray.setFromCamera(ndc,cam);
@@ -801,16 +894,29 @@ renderer.domElement.addEventListener('pointermove',e=>{
 const endPointer=e=>{
   touches.delete(e.pointerId);
   if(touches.size<2) pinchLast=null;
-  if(touches.size===0){ panLast=null; drawing=false; }
+  if(touches.size===0){ panLast=null; drawing=false; strokeLast=null; }
 };
 renderer.domElement.addEventListener('pointerup',endPointer);
 renderer.domElement.addEventListener('pointercancel',endPointer);
 addEventListener('wheel',e=>{ dist=Math.max(45,Math.min(180,dist+e.deltaY*0.08)); applyCam(); },{passive:true});
 
+let strokeLast=null;                                 // なぞり補間用（速いスワイプでもマスが飛ばない）
+function lineCells(a,b2){
+  const cells=[]; const di=b2[0]-a[0], dj=b2[1]-a[1];
+  const steps=Math.max(Math.abs(di),Math.abs(dj));
+  for(let t=1;t<=steps;t++) cells.push([a[0]+Math.round(di*t/steps), a[1]+Math.round(dj*t/steps)]);
+  return cells;
+}
 function paint(e){
   const c=pickCell(e); if(!c) return;
   const {i,j}=c;
   if(tool&&tool.startsWith('bld:')){ moveGhost(i,j); updateConfirm(); return; }
+  const targets = strokeLast ? lineCells(strokeLast,[i,j]) : [[i,j]];
+  strokeLast=[i,j];
+  for(const [ti,tj] of targets) paintCell(ti,tj);
+  return;
+}
+function paintCell(i,j){
   if(tool==='erase'){
     if(inGrid(i,j)&&road[j*N+i]){ pending.add(i+','+j); redrawPreview(); updateConfirm(); }
     else if(inGrid(i,j)&&bld[j*N+i]){                       // 建物の撤去は即時
@@ -819,7 +925,7 @@ function paint(e){
       if(idx>=0){ const b=buildings[idx]; const def=BLD_DEFS[b.type];
         scene.remove(b.group);
         for(let a2=0;a2<def.fw;a2++)for(let b2=0;b2<def.fd;b2++) bld[(b.j+b2)*N+(b.i+a2)]=0;
-        const si=SOLIDS.indexOf(b.solid); if(si>=0) SOLIDS.splice(si,1);
+        if(b.solid){ const si=SOLIDS.indexOf(b.solid); if(si>=0) SOLIDS.splice(si,1); }
         buildings.splice(idx,1); saveCity(); toast('🧹 建物を撤去！');
       }
     }
