@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マイシティ — 開発ロードマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue1:#5bc6f0; --blue2:#2e9ad8; --navy:#12365e; --navy2:#1c3252;
+    --green1:#8ee06a; --green2:#45b13a; --cream:#fff8ea; --gold:#ffc63f; --gold2:#e8a41f;
+    --ink:#fff; --ink2:#cfe4f4; --ink3:#8fa8c7; --line:rgba(255,255,255,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(#79c7e3,#4e9fd0 320px,#3d7fb8);min-height:100vh;
+    font-family:'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',system-ui,sans-serif;color:var(--ink);
+    padding:18px 14px 60px}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-size:22px;font-weight:900;letter-spacing:1px;margin:6px 0 2px;text-shadow:0 2px 0 rgba(0,0,60,.25)}
+  .sub{color:#eaf6ff;font-size:13px;font-weight:700;margin-bottom:14px;text-shadow:0 1px 0 rgba(0,0,60,.2)}
+  .panel{background:var(--navy);border:2.5px solid rgba(255,255,255,.85);border-radius:18px;
+    box-shadow:0 4px 12px rgba(10,40,80,.35);padding:16px;margin-bottom:16px}
+  .btn{border:none;color:#fff;font-family:inherit;font-weight:800;cursor:pointer;user-select:none;
+    text-shadow:0 1px 0 rgba(0,0,60,.25);background:linear-gradient(#5bc6f0,#2e9ad8);
+    border:2.5px solid #fff;border-radius:14px;padding:6px 14px;font-size:12.5px;
+    box-shadow:0 3px 7px rgba(10,40,80,.35), inset 0 -4px 0 rgba(10,40,90,.28), inset 0 2px 0 rgba(255,255,255,.45)}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 3px rgba(10,40,80,.35), inset 0 -2px 0 rgba(10,40,90,.28)}
+  .btn.gold{background:linear-gradient(#ffd76a,#e8a41f);color:#3a2a06;text-shadow:none}
+  .btn.red{background:linear-gradient(#ff8a7a,#e8503f)}
+  .btn.on{outline:3px solid var(--gold);outline-offset:1px}
+  /* サマリー */
+  .stats{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1;min-width:130px;background:var(--navy2);border-radius:14px;padding:10px 14px;border:1.5px solid var(--line)}
+  .stat .k{font-size:11px;color:var(--ink3);font-weight:800}
+  .stat .v{font-size:22px;font-weight:900;color:var(--gold)}
+  .stat .v small{font-size:12px;color:var(--ink2)}
+  /* 凡例 */
+  .lrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:800;color:var(--ink2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .chip{width:14px;height:14px;border-radius:4px;display:inline-block}
+  .lrow .sp{margin-left:auto;display:flex;gap:8px}
+  /* ガント */
+  .gscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .gantt{min-width:720px;position:relative}
+  .grow{display:grid;grid-template-columns:150px 1fr;align-items:center;min-height:44px}
+  .glabel{font-size:12.5px;font-weight:900;color:var(--ink);padding-right:10px;line-height:1.3}
+  .glabel .ph{color:var(--ink3);font-size:10px;display:block}
+  .gtrack{position:relative;height:44px}
+  .ghead{display:grid;grid-template-columns:150px 1fr;margin-bottom:2px}
+  .gweeks{display:grid;grid-template-columns:repeat(var(--wk),1fr)}
+  .gweeks div{font-size:10px;color:var(--ink3);font-weight:800;border-left:1px solid var(--line);padding:2px 0 2px 5px}
+  .gridlines{position:absolute;inset:0;display:grid;grid-template-columns:repeat(var(--wk),1fr);pointer-events:none}
+  .gridlines div{border-left:1px solid var(--line)}
+  .bar{position:absolute;top:8px;height:28px;border-radius:8px;display:flex;align-items:center;gap:5px;
+    padding:0 9px;font-size:11.5px;font-weight:900;white-space:nowrap;color:#0e2a12;
+    box-shadow:inset 0 -3px 0 rgba(0,0,40,.18), inset 0 1px 0 rgba(255,255,255,.4), 0 2px 5px rgba(10,40,80,.3)}
+  .bar.done{background:linear-gradient(#8ee06a,#45b13a)}
+  .bar.act{background:linear-gradient(#ffd76a,#e8a41f);color:#3a2a06}
+  .bar.act .fill{position:absolute;left:0;top:0;bottom:0;border-radius:8px 0 0 8px;
+    background:rgba(255,255,255,.32);pointer-events:none}
+  .bar.todo{background:linear-gradient(#9db8d8,#7e9cc0);color:#152a44;opacity:.92}
+  .bar span{position:relative}
+  .today{position:absolute;top:0;bottom:0;width:2.5px;background:var(--gold);border-radius:2px;
+    box-shadow:0 0 8px rgba(255,198,63,.8);z-index:3}
+  .today::after{content:'▼今ここ';position:absolute;top:16px;left:5px;font-size:10px;color:var(--gold);font-weight:900;
+    text-shadow:0 1px 3px rgba(0,0,40,.6);white-space:nowrap}
+  .ms{position:absolute;top:14px;width:16px;height:16px;transform:rotate(45deg) translateX(-8px);border-radius:3px;
+    background:linear-gradient(#ffd76a,#e8a41f);border:2px solid #fff;box-shadow:0 2px 5px rgba(10,40,80,.4);z-index:2}
+  .ms.done{background:linear-gradient(#8ee06a,#45b13a)}
+  .msrow{height:34px}
+  .mslabel{position:absolute;top:0;font-size:9.5px;font-weight:800;color:var(--ink2);transform:translateX(-50%);white-space:nowrap}
+  /* タスクカード */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .card{background:var(--cream);border-radius:14px;padding:12px 14px;color:#333;border:2px solid rgba(255,255,255,.9);
+    box-shadow:0 3px 8px rgba(10,40,80,.25)}
+  .card h3{margin:0 0 6px;font-size:13.5px;font-weight:900;color:#1c3252;display:flex;align-items:center;gap:6px}
+  .card h3 .pct{margin-left:auto;font-size:12px;color:#e8a41f}
+  .card ul{list-style:none;margin:0;padding:0}
+  .card li{font-size:12px;font-weight:700;padding:3.5px 0;border-top:1.5px dashed rgba(28,50,82,.12);
+    display:flex;gap:7px;align-items:flex-start;line-height:1.45;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .card li:first-child{border-top:none}
+  .card li.d{color:#8a9099}.card li.d .tx{text-decoration:line-through;text-decoration-thickness:1.5px}
+  .card li.a{color:#1c3252}
+  .card li .tx{flex:1}
+  .xbtn{border:none;background:#ffd9d3;color:#c0392b;font-family:inherit;font-weight:900;font-size:11px;
+    border-radius:8px;width:20px;height:20px;cursor:pointer;flex:none;line-height:1}
+  .addrow{display:flex;gap:6px;margin-top:8px}
+  .addrow input{flex:1;min-width:0;border:2px solid rgba(28,50,82,.25);border-radius:10px;padding:6px 10px;
+    font-family:inherit;font-weight:700;font-size:12px;background:#fff;color:#1c3252;outline:none}
+  .addrow input:focus{border-color:var(--blue2)}
+  .addbtn{background:linear-gradient(#8ee06a,#45b13a);color:#fff;font-family:inherit;font-weight:900;
+    border-radius:10px;padding:0 12px;cursor:pointer;font-size:14px;border:2px solid #fff;box-shadow:0 2px 4px rgba(10,40,80,.25)}
+  .period{display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:8px;border-top:1.5px dashed rgba(28,50,82,.15);
+    font-size:11px;font-weight:800;color:#1c3252;flex-wrap:wrap}
+  .stepbtn{border:none;background:#dfeaf6;color:#1c3252;font-family:inherit;font-weight:900;border-radius:8px;
+    width:24px;height:24px;cursor:pointer;font-size:13px;line-height:1}
+  .stepbtn:active{background:#c3d8ee}
+  .pv{background:#fff;border-radius:8px;padding:2px 8px;border:1.5px solid rgba(28,50,82,.18)}
+  .pgrp{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .editonly{display:none}
+  body.editing .editonly{display:flex}
+  .foot{color:#dceefb;font-size:11.5px;font-weight:700;margin-top:14px;text-align:center;text-shadow:0 1px 0 rgba(0,0,60,.2)}
+  .foot a{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏙️ マイシティ 開発ロードマップ</h1>
+  <div class="sub">「1つの世界、2つのレンズ」— 市長として街をつくり、住民として生きる。 <a href="./mayor.html" style="color:#fff">▶ ゲームを開く</a></div>
+
+  <div class="panel"><div class="stats" id="stats"></div></div>
+
+  <div class="panel">
+    <div class="lrow">
+      <div class="legend">
+        <span><i class="chip" style="background:linear-gradient(#8ee06a,#45b13a)"></i>✅ 完了</span>
+        <span><i class="chip" style="background:linear-gradient(#ffd76a,#e8a41f)"></i>🚧 進行中</span>
+        <span><i class="chip" style="background:linear-gradient(#9db8d8,#7e9cc0)"></i>⏳ これから</span>
+        <span><i class="chip" style="background:linear-gradient(#ffd76a,#e8a41f);transform:rotate(45deg);border-radius:3px"></i>⭐ 節目</span>
+      </div>
+      <div class="sp">
+        <button class="btn gold" id="editbtn">✏️ カスタマイズ</button>
+        <button class="btn red" id="resetbtn" style="display:none">↺ 初期化</button>
+      </div>
+    </div>
+    <div class="gscroll"><div class="gantt" id="gantt"></div></div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="foot">タスクはタップで ✅⇄⬜。「✏️ カスタマイズ」でタスク追加・削除・期間ずらしができます（この端末に自動保存）。<br>
+  数字バランスの正典は <a href="https://github.com/Adakai87/Claude-/blob/claude/game-development-ucdm2s/docs/economy.md">docs/economy.md</a>。</div>
+</div>
+
+<script>
+// ================= 初期データ（ベースライン。編集内容は端末のlocalStorageに保存） =================
+const W0=new Date(2026,6,6);                       // 週0の月曜（ローカル時刻）
+const WEEKS=9;                                     // 表示する週数
+const DEFAULTS={
+ plan:[
+  {nm:'フェーズ1 スライス',ph:'海辺の商店街(技術検証)',ic:'🏖️',s:0,e:0.5,tasks:[
+    [1,'歩ける海辺(地形/海/浜/追従カメラ)'],[1,'商店街5軒(キットバッシング)'],[1,'昼夜サイクル(キーフレーム照明)']]},
+  {nm:'フェーズ2 市長モード基盤',ph:'UX階層とUIキット',ic:'🏗️',s:0,e:0.5,tasks:[
+    [1,'建設メニュー階層(ユーザー設計のUXフロー)'],[1,'道路なぞり敷設+ストローク補間'],[1,'BuildIt風UIキット'],[1,'レンズ統合(ダイブイン⇄俯瞰)'],[1,'昼夜を市長世界へ移植']]},
+  {nm:'フェーズ3 街づくりループ',ph:'建てる→稼ぐ→広げる',ic:'💰',s:0,e:1.5,tasks:[
+    [1,'建物16種(住宅8/商業4/公共/装飾)'],[1,'マンション増築(人口ゲート)'],[1,'高級邸宅(参考写真準拠のL2品質)'],[1,'セーブ/ロード(消えない街)'],[1,'経済v3: 賃料1%/日+住民税(リアル円)'],[1,'Day+⏭日送りスキップ'],[0,'プレイテスト→バランス調整(economy.md)']]},
+  {nm:'フェーズ4 ダイブイン生活・経営',ph:'住民レンズに中身を',ic:'🚶',s:1,e:5,tasks:[
+    [0,'入れる店(ドアで店内へ)'],[0,'自分の店の経営ループ(開店→接客→売上)'],[0,'NPC住民(歩く・店に来る)'],[0,'生活アクション(買い物・食べる など)'],[0,'商業収入と経営のつなぎ込み']]},
+  {nm:'フェーズ5 拡張・磨き',ph:'アートパスと深いシステム',ic:'✨',s:5,e:9,tasks:[
+    [0,'アートパス(アイコン/GLBアセット判断)'],[0,'道路の種類(石畳など)'],[0,'住宅・大サイズ+ランク制度'],[0,'税率スライダー×移住(シティーズ式)※後半判断'],[0,'スキップ仕様の最終判断(がっつり遊んで)']]},
+  {nm:'Godot道場(並走)',ph:'週1ミニ課題で手を動かす',ic:'🎓',s:0,e:9,tasks:[
+    [0,'week1: 箱を矢印キーで動かす(提出待ち)'],[0,'week2以降: 当たり判定→シーン→UI']]},
+ ],
+ ms:[
+  {w:0.4,nm:'経済v3',done:1},{w:2,nm:'初めて店に入れる'},{w:4,nm:'経営ループ一周'},{w:8.8,nm:'v1.0 遊べる街'},
+ ]};
+
+// ================= 状態（localStorage） =================
+const RKEY='mycity_roadmap_v1';
+let S;
+try{ S=JSON.parse(localStorage.getItem(RKEY)||'null'); }catch(e){ S=null; }
+if(!S||!Array.isArray(S.plan)) S=JSON.parse(JSON.stringify(DEFAULTS));
+const save=()=>{ try{ localStorage.setItem(RKEY,JSON.stringify(S)); }catch(e){} };
+let editing=false;
+
+// 進捗はタスクから自動計算（スプレッドシートの数式と同じ発想）
+const pctOf=p=>p.tasks.length?Math.round(p.tasks.filter(t=>t[0]).length/p.tasks.length*100):0;
+const stOf=p=>{const c=pctOf(p);return c>=100?'done':(c>0?'act':'todo');};
+
+// ================= 描画 =================
+const wkPct=w=>Math.min(100,Math.max(0,w/WEEKS*100));
+const wkLabel=i=>{const d=new Date(W0.getTime()+i*7*864e5);return (d.getMonth()+1)+'/'+d.getDate()+'週';};
+const ICON={done:'✅',act:'🚧',todo:'⏳'};
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function render(){
+  const g=document.getElementById('gantt');
+  let h=`<div class="ghead"><div></div><div class="gweeks" style="--wk:${WEEKS}">`;
+  for(let i=0;i<WEEKS;i++) h+=`<div>${wkLabel(i)}</div>`;
+  h+=`</div></div>`;
+  h+=`<div class="grow msrow"><div class="glabel">⭐ マイルストーン</div><div class="gtrack">`;
+  for(const m of S.ms){ const edge=m.w>WEEKS-1?'transform:translateX(-92%)':(m.w<0.6?'transform:translateX(-8%)':'');
+    h+=`<div class="ms ${m.done?'done':''}" style="left:${wkPct(m.w)}%"></div><div class="mslabel" style="left:${wkPct(m.w)}%;${edge}">${esc(m.nm)}</div>`; }
+  h+=`</div></div>`;
+  for(const p of S.plan){
+    const st=stOf(p), pct=pctOf(p);
+    h+=`<div class="grow"><div class="glabel">${p.ic} ${esc(p.nm)}<span class="ph">${esc(p.ph)}</span></div>
+        <div class="gtrack"><div class="gridlines" style="--wk:${WEEKS}">${'<div></div>'.repeat(WEEKS)}</div>
+        <div class="bar ${st}" style="left:${wkPct(p.s)}%;width:${Math.max(4,wkPct(p.e)-wkPct(p.s))}%">
+          ${st==='act'?`<div class="fill" style="width:${pct}%"></div>`:''}
+          <span>${ICON[st]} ${pct}%</span></div></div></div>`;
+  }
+  const todayW=(Date.now()-W0.getTime())/(7*864e5);
+  if(todayW>=0&&todayW<=WEEKS)
+    h+=`<div style="position:absolute;top:22px;bottom:0;left:calc(150px + (100% - 150px)*${(todayW/WEEKS).toFixed(4)});" class="today"></div>`;
+  g.style.setProperty('--wk',WEEKS);
+  g.innerHTML=h;
+
+  // サマリー
+  const all=S.plan.flatMap(p=>p.tasks), doneN=all.filter(t=>t[0]).length;
+  const main=S.plan.filter(p=>p.nm.startsWith('フェーズ'));
+  const phDone=main.filter(p=>stOf(p)==='done').length;
+  const cur=S.plan.find(p=>stOf(p)==='act')||S.plan.find(p=>stOf(p)==='todo');
+  const nextMs=S.ms.find(m=>!m.done);
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="k">フェーズ進捗</div><div class="v">${phDone}<small> / ${main.length} 完了</small></div></div>
+    <div class="stat"><div class="k">タスク消化</div><div class="v">${doneN}<small> / ${all.length}</small></div></div>
+    <div class="stat"><div class="k">いまの主戦場</div><div class="v" style="font-size:15px;line-height:2">${cur?cur.ic+' '+esc(cur.nm):'—'}</div></div>
+    <div class="stat"><div class="k">次のマイルストーン</div><div class="v" style="font-size:15px;line-height:2">${nextMs?'⭐ '+esc(nextMs.nm):'🎉 全達成'}</div></div>`;
+
+  // タスクカード
+  document.getElementById('cards').innerHTML=S.plan.map((p,pi)=>`
+    <div class="card"><h3>${p.ic} ${esc(p.nm)}<span class="pct">${pctOf(p)}%</span></h3><ul>
+    ${p.tasks.map((t,ti)=>`<li class="${t[0]?'d':'a'}" data-p="${pi}" data-t="${ti}"><span>${t[0]?'✅':'⬜'}</span><span class="tx">${esc(t[1])}</span>${editing?`<button class="xbtn" data-del="${pi}:${ti}">✕</button>`:''}</li>`).join('')}
+    </ul>
+    <div class="addrow editonly"><input type="text" placeholder="＋ タスクを追加…" data-add="${pi}" maxlength="60"><button class="addbtn" data-addbtn="${pi}">＋</button></div>
+    <div class="period editonly">📅
+      <span class="pgrp">開始 <button class="stepbtn" data-sh="${pi}:s:-1">◀</button><span class="pv">${wkLabel(Math.floor(p.s))}</span><button class="stepbtn" data-sh="${pi}:s:1">▶</button></span>
+      <span class="pgrp">終了 <button class="stepbtn" data-sh="${pi}:e:-1">◀</button><span class="pv">${wkLabel(Math.max(0,Math.ceil(p.e)-1))}</span><button class="stepbtn" data-sh="${pi}:e:1">▶</button></span></div>
+    </div>`).join('');
+}
+
+// ================= 操作（イベント委任） =================
+document.getElementById('cards').addEventListener('click',e=>{
+  const del=e.target.closest('[data-del]');
+  if(del){ const [pi,ti]=del.dataset.del.split(':').map(Number);
+    S.plan[pi].tasks.splice(ti,1); save(); render(); return; }
+  const ab=e.target.closest('[data-addbtn]');
+  if(ab){ const pi=+ab.dataset.addbtn, inp=document.querySelector(`input[data-add="${pi}"]`);
+    const v=(inp.value||'').trim(); if(!v) return;
+    S.plan[pi].tasks.push([0,v]); save(); render();
+    const ni=document.querySelector(`input[data-add="${pi}"]`); if(ni) ni.focus(); return; }
+  const sh=e.target.closest('[data-sh]');
+  if(sh){ const [pi,k,d]=sh.dataset.sh.split(':'); const p=S.plan[+pi], step=+d;
+    if(k==='s') p.s=Math.min(p.e-0.5,Math.max(0,p.s+step));
+    else p.e=Math.max(p.s+0.5,Math.min(WEEKS,p.e+step));
+    save(); render(); return; }
+  const li=e.target.closest('li[data-p]');
+  if(li){ const t=S.plan[+li.dataset.p].tasks[+li.dataset.t];
+    t[0]=t[0]?0:1; save(); render(); }
+});
+document.getElementById('cards').addEventListener('keydown',e=>{
+  if(e.key==='Enter' && e.target.matches('input[data-add]'))
+    document.querySelector(`[data-addbtn="${e.target.dataset.add}"]`).click();
+});
+document.getElementById('editbtn').addEventListener('click',()=>{
+  editing=!editing;
+  document.body.classList.toggle('editing',editing);
+  document.getElementById('editbtn').classList.toggle('on',editing);
+  document.getElementById('editbtn').textContent=editing?'✅ 編集おわり':'✏️ カスタマイズ';
+  document.getElementById('resetbtn').style.display=editing?'':'none';
+  render();
+});
+document.getElementById('resetbtn').addEventListener('click',()=>{
+  if(confirm('ロードマップを初期状態に戻しますか？（チェックや追加タスクが消えます）')){
+    S=JSON.parse(JSON.stringify(DEFAULTS)); save(); render();
+  }
+});
+render();
+</script>
+</body>
+</html>
