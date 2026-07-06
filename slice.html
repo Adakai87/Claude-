@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>街で、いきる — スライス#1 歩ける海辺</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#79c7e3;font-family:system-ui,'Hiragino Sans',sans-serif;touch-action:none}
+  #app{position:fixed;inset:0}
+  #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:#fff;font-size:13px;font-weight:600;
+        background:rgba(30,60,80,.55);padding:8px 16px;border-radius:18px;pointer-events:none;white-space:nowrap;
+        text-shadow:0 1px 2px rgba(0,0,0,.3)}
+</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hint">タップした場所へ歩きます（PCはWASD/矢印キーでも）</div>
+<script type="module">
+import * as THREE from 'three';
+
+// ================= 基本セット =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fd3ea);              // 明るい空色（BuildItの空気）
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('app').appendChild(renderer.domElement);
+
+// 追従カメラ（斜め見下ろし）
+const cam = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 500);
+addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); });
+
+// 光：暖かい午後の太陽
+scene.add(new THREE.HemisphereLight(0xfff8ea, 0x7fae8a, 0.95));
+const sun = new THREE.DirectionalLight(0xfff0d0, 1.25);
+sun.position.set(40, 60, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left=-70; sun.shadow.camera.right=70;
+sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
+scene.add(sun);
+
+// ================= 世界：海辺（南が海）=================
+// 海岸線: z = COAST(x) より南(+z)が海。ゆるくカーブさせる
+const COAST = x => 26 + 4*Math.sin(x*0.06) + 2*Math.sin(x*0.15+1);
+const sdLand = (x,z) => COAST(x) - z;                      // 正=陸side / 負=海side（連続量=なめらか海岸線）
+const clamp01 = v => Math.min(1, Math.max(0, v));
+const hash = (i,j)=> (((i*73856093 ^ j*19349663)>>>0)%1000)/1000;
+
+// 高さ: 街は完全フラット(0) → 砂浜へゆるく下る → 海底へ
+function groundH(x,z){
+  const sd = sdLand(x,z);
+  if(sd <= 0) return -0.1 + Math.max(-1.8, sd*0.30);       // 海底
+  if(sd <= 1.2) return -0.1 + sd*0.20;                     // 波打ち際の斜面
+  if(sd <= 9) return 0.14;                                 // 砂浜（低くフラット）
+  if(sd <= 15) return 0.14 + (sd-9)/6*0.36;                // 浜から街へのゆるい上がり
+  return 0.5;                                              // 街（完全フラット）
+}
+
+// 地形メッシュ（頂点色でBuildIt風の鮮やかグラデ）
+{
+  const SIZE=170, STEP=1.0, NV=Math.round(SIZE/STEP), V=NV+1, H=SIZE/2;
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const cGrass=new THREE.Color(0x6cb14c), cSand=new THREE.Color(0xf0dca8), cSandWet=new THREE.Color(0xd9c491), cBed=new THREE.Color(0xc9b788);
+  const tmp=new THREE.Color();
+  for(let j=0;j<V;j++)for(let i=0;i<V;i++){
+    const x=-H+i*STEP, z=-H+j*STEP, sd=sdLand(x,z);
+    const y=groundH(x,z);
+    const o=(j*V+i)*3;
+    pos[o]=x; pos[o+1]=y; pos[o+2]=z;
+    // 草(内陸) → 砂(浜) → 濡れ砂(水際) → 海底、全て連続ブレンド
+    tmp.copy(cGrass);
+    const f=1+((hash(i>>3,j>>3)*0.6+hash(i>>1,j>>1)*0.4)-0.5)*0.08;
+    tmp.r*=f; tmp.g*=f; tmp.b*=f;
+    const sandF = 1-clamp01((sd-11)/4);
+    if(sandF>0) tmp.lerp(cSand, sandF);
+    const wetF = clamp01((1.8-sd)/2.2);
+    if(wetF>0) tmp.lerp(cSandWet, wetF);
+    if(sd<-1.5) tmp.lerp(cBed, clamp01((-sd-1.5)/2));
+    col[o]=tmp.r; col[o+1]=tmp.g; col[o+2]=tmp.b;
+  }
+  const idx=[];
+  for(let j=0;j<NV;j++)for(let i=0;i<NV;i++){ const a=j*V+i,b=a+1,c=a+V,d=c+1; idx.push(a,c,b,b,c,d); }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.95}));
+  m.receiveShadow=true; scene.add(m);
+}
+// 海面（岸=白い泡→ターコイズ→沖=濃い青、連続グラデ）
+{
+  const SIZE=340, STEP=2.0, NV=Math.round(SIZE/STEP), V=NV+1, H=SIZE/2;
+  const pos=new Float32Array(V*V*3), col=new Float32Array(V*V*3);
+  const cFoam=new THREE.Color(0xf4fbf7), cShal=new THREE.Color(0x5fc8da), cDeep=new THREE.Color(0x2a72b8);
+  const tmp=new THREE.Color();
+  for(let j=0;j<V;j++)for(let i=0;i<V;i++){
+    const x=-H+i*STEP, z=-H+j*STEP;
+    const w=-sdLand(x,z);
+    tmp.copy(cShal).lerp(cDeep, clamp01((w-1.5)/14));
+    const foamF=1-clamp01((w-0.2)/2.0);
+    if(foamF>0) tmp.lerp(cFoam, foamF);
+    const o=(j*V+i)*3;
+    pos[o]=x; pos[o+1]=0.02; pos[o+2]=z;
+    col[o]=tmp.r; col[o+1]=tmp.g; col[o+2]=tmp.b;
+  }
+  const idx=[];
+  for(let j=0;j<NV;j++)for(let i=0;i<NV;i++){ const a=j*V+i,b=a+1,c=a+V,d=c+1; idx.push(a,c,b,b,c,d); }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  scene.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.3, metalness:0.05})));
+}
+// 海沿いの通り（商店街のメインストリート。x方向にまっすぐ＝歩きやすさ優先）
+const STREET_Z = 4;                                        // 通りの中心線
+{
+  const pts=[]; for(let x=-84;x<=84;x+=3) pts.push(x);
+  const mkRibbon=(w,y,color,rough)=>{
+    const p=[]; for(const x of pts){ p.push(x,y,STREET_Z-w/2, x,y,STREET_Z+w/2); }
+    const posA=[];
+    for(let i=0;i+3<p.length/3*1;i++){}
+    const geo=new THREE.PlaneGeometry(168, w, 1, 1);
+    const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color, roughness:rough}));
+    m.rotation.x=-Math.PI/2; m.position.set(0, y, STREET_Z); m.receiveShadow=true; scene.add(m); return m;
+  };
+  mkRibbon(9.4, 0.52, 0xd9d2c0, 0.95);                     // 歩道（明るいベージュ＝商店街の顔）
+  mkRibbon(6.2, 0.54, 0x8a9098, 0.85);                     // 車道
+  for(let x=-80;x<=80;x+=7){                               // 白破線
+    const d=new THREE.Mesh(new THREE.PlaneGeometry(3,0.4), new THREE.MeshStandardMaterial({color:0xf7f5ec}));
+    d.rotation.x=-Math.PI/2; d.position.set(x,0.56,STREET_Z); scene.add(d);
+  }
+}
+// ボードウォーク（海岸線に沿ってカーブする木道。BuildItの海辺の象徴）
+{
+  const W=3.4, Y=0.30;
+  const pts=[]; for(let x=-84;x<=84;x+=3) pts.push([x, COAST(x)-7.5]);
+  const pos=[];
+  const nrm=[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
+    let dx=b[0]-a[0], dz=b[1]-a[1]; const L=Math.hypot(dx,dz)||1;
+    nrm.push([-dz/L, dx/L]);
+  }
+  for(let i=0;i+1<pts.length;i++){
+    const h=W/2;
+    const ax=pts[i][0]+nrm[i][0]*h, az=pts[i][1]+nrm[i][1]*h, bx=pts[i][0]-nrm[i][0]*h, bz=pts[i][1]-nrm[i][1]*h;
+    const cx=pts[i+1][0]+nrm[i+1][0]*h, cz=pts[i+1][1]+nrm[i+1][1]*h, dx2=pts[i+1][0]-nrm[i+1][0]*h, dz2=pts[i+1][1]-nrm[i+1][1]*h;
+    pos.push(ax,Y,az, bx,Y,bz, cx,Y,cz,  bx,Y,bz, dx2,Y,dz2, cx,Y,cz);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  const bw=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0xc98f56, roughness:0.9, side:THREE.DoubleSide}));
+  bw.receiveShadow=true; scene.add(bw);
+  for(let i=0;i<pts.length;i++){                            // 板の目地（進行方向と直交）
+    const g=new THREE.Mesh(new THREE.PlaneGeometry(0.14,W), new THREE.MeshStandardMaterial({color:0xb37c47}));
+    g.rotation.x=-Math.PI/2;
+    g.rotation.z=Math.atan2(nrm[i][1], nrm[i][0]);
+    g.position.set(pts[i][0], Y+0.006, pts[i][1]); scene.add(g);
+  }
+}
+// ヤシの木（浜の空気づくり。仮アセット）
+function palm(x,z,s=1){
+  const g=new THREE.Group(); g.position.set(x, groundH(x,z), z); scene.add(g);
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.14*s,0.22*s,2.6*s,6), new THREE.MeshStandardMaterial({color:0x9a6b42}));
+  trunk.position.y=1.3*s; trunk.rotation.z=0.08; trunk.castShadow=true; g.add(trunk);
+  for(let k=0;k<6;k++){
+    const a=k/6*Math.PI*2;
+    const leaf=new THREE.Mesh(new THREE.BoxGeometry(2.0*s,0.06,0.5*s), new THREE.MeshStandardMaterial({color:0x3f9a4d}));
+    leaf.position.set(Math.cos(a)*0.8*s, 2.6*s, Math.sin(a)*0.8*s);
+    leaf.rotation.y=-a; leaf.rotation.z=0.35; leaf.castShadow=true; g.add(leaf);
+  }
+  return g;
+}
+for(const [x,z] of [[-30,17],[-10,18],[12,17.5],[34,18],[52,16.5],[-52,16.5]]) palm(x,z,1+((x*7)%10)/30);
+
+// ================= あなたの分身 =================
+const player = new THREE.Group(); scene.add(player);
+{
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.34,0.5,6,12), new THREE.MeshStandardMaterial({color:0x3f7fd2}));
+  body.position.y=0.85; body.castShadow=true; player.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.3,14,12), new THREE.MeshStandardMaterial({color:0xf2c9a0}));
+  head.position.y=1.62; head.castShadow=true; player.add(head);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.31,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0xe25b4a}));
+  cap.position.y=1.66; player.add(cap);
+}
+player.position.set(0, 0, STREET_Z);
+
+// ================= 操作：タップ移動＋WASD =================
+const keys={};
+addEventListener('keydown', e=>keys[e.key.toLowerCase()]=true);
+addEventListener('keyup',   e=>keys[e.key.toLowerCase()]=false);
+let target=null;
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0), -0.5);   // 街の高さの水平面
+addEventListener('pointerdown', e=>{
+  ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(ndc, cam);
+  const hit=new THREE.Vector3();
+  if(ray.ray.intersectPlane(groundPlane, hit)){
+    hit.x=Math.max(-82, Math.min(82, hit.x));
+    hit.z=Math.max(-70, Math.min(24, hit.z));               // 海には入らない（今はね）
+    target=hit;
+  }
+});
+
+// ================= ゲームループ（道場第1週と同じ心臓！）=================
+const SPEED=6.5;
+const camOff=new THREE.Vector3(-13, 19, -18);   // 北西上空から南東へ＝海がいつも画面に入る構図
+const camLook=new THREE.Vector3();
+let last=performance.now();
+function tick(now){
+  const delta=Math.min(0.05,(now-last)/1000); last=now;    // delta秒（道場で学ぶやつ）
+  // --- 入力 → 移動方向 ---
+  const dir=new THREE.Vector3();
+  if(keys['w']||keys['arrowup'])    { dir.x-=1; dir.z-=1; }
+  if(keys['s']||keys['arrowdown'])  { dir.x+=1; dir.z+=1; }
+  if(keys['a']||keys['arrowleft'])  { dir.x-=1; dir.z+=1; }
+  if(keys['d']||keys['arrowright']) { dir.x+=1; dir.z-=1; }
+  if(dir.lengthSq()>0){ target=null; dir.normalize(); }
+  else if(target){
+    const to=new THREE.Vector3().subVectors(target, player.position); to.y=0;
+    if(to.length()<0.25) target=null;
+    else dir.copy(to.normalize());
+  }
+  // --- 移動＋向き ---
+  if(dir.lengthSq()>0){
+    player.position.addScaledVector(dir, SPEED*delta);
+    player.position.x=Math.max(-82, Math.min(82, player.position.x));
+    player.position.z=Math.max(-70, Math.min(24, player.position.z));
+    const yaw=Math.atan2(dir.x, dir.z);
+    let d=yaw-player.rotation.y;
+    while(d>Math.PI)d-=Math.PI*2; while(d<-Math.PI)d+=Math.PI*2;
+    player.rotation.y+=d*Math.min(1, delta*12);
+  }
+  // 地面の高さに立つ
+  player.position.y = Math.max(0.5, groundH(player.position.x, player.position.z));
+  // --- 追従カメラ（少し遅れてついてくる＝気持ちよさの秘訣）---
+  const wantPos=new THREE.Vector3().addVectors(player.position, camOff);
+  cam.position.lerp(wantPos, Math.min(1, delta*4));
+  camLook.lerp(player.position, Math.min(1, delta*6));
+  cam.lookAt(camLook.x, camLook.y+1.0, camLook.z);
+  renderer.render(scene, cam);
+}
+cam.position.copy(player.position).add(camOff);
+camLook.copy(player.position);
+renderer.setAnimationLoop(tick);
+</script>
+</body>
+</html>
