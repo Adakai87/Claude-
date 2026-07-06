@@ -242,6 +242,7 @@ document.getElementById('cards').addEventListener('click',e=>{
     t[0]=t[0]?0:1; save(); render(); }
 });
 document.getElementById('cards').addEventListener('keydown',e=>{
+  if(e.isComposing || e.keyCode===229) return;   // 日本語変換中のEnterは無視（変換確定と追加を区別）
   if(e.key==='Enter' && e.target.matches('input[data-add]'))
     document.querySelector(`[data-addbtn="${e.target.dataset.add}"]`).click();
 });
