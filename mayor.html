@@ -63,6 +63,14 @@
   #toast{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);color:#fff;font-weight:800;font-size:14px;
     background:var(--navy);padding:10px 20px;border-radius:20px;border:2.5px solid rgba(255,255,255,.85);
     opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+  /* 歩きモード用UI */
+  #pad{position:fixed;left:22px;bottom:22px;width:124px;height:124px;border-radius:50%;
+    background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.4);touch-action:none;z-index:10;display:none}
+  #pad.show{display:block}
+  #stick{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;
+    background:rgba(255,255,255,.55);border:2px solid rgba(255,255,255,.8);transform:translate(-50%,-50%)}
+  #mayorbtn{position:fixed;right:12px;top:12px;padding:9px 16px;font-size:14px;border-radius:20px;display:none}
+  #mayorbtn.show{display:block}
 </style>
 </head>
 <body>
@@ -84,6 +92,8 @@
 </div>
 
 <div id="modebar"><div id="modetext">道路をなぞって敷こう</div><button class="btn red" id="cancel">✕</button></div>
+<button class="btn" id="mayorbtn">🗺️ 市長ビュー</button>
+<div id="pad"><div id="stick"></div></div>
 <button class="btn green" id="confirm">✓ 建設</button>
 <div id="modeframe"></div>
 <div id="toast"></div>
@@ -233,8 +243,24 @@ function applyCam(){
 }
 applyCam();
 
+// ================= あなたの分身（ダイブイン用。1つの世界を共有） =================
+const player=new THREE.Group(); player.visible=false; scene.add(player);
+{
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.34,0.5,6,12), new THREE.MeshStandardMaterial({color:0x3f7fd2}));
+  body.position.y=0.85; body.castShadow=true; player.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.3,14,12), new THREE.MeshStandardMaterial({color:0xf2c9a0}));
+  head.position.y=1.62; head.castShadow=true; player.add(head);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.31,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0xe25b4a}));
+  cap.position.y=1.66; player.add(cap);
+}
+const WOFF=new THREE.Vector3(11,17,15);            // 歩き時の追従カメラ（海側上空から陸向き）
+let walkTarget=null;
+const keys={};
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
 // ================= モード管理（UXフロー通りの状態機械） =================
-// browse → menu → placing(road/erase)
+// browse → menu → placing(road/erase) → (dive) descend → walk → ascend → browse
 let mode='browse';
 let tool=null;                                      // 'road' | 'erase'
 const $=id=>document.getElementById(id);
@@ -292,9 +318,55 @@ $('confirm').onclick=()=>{
   pending.clear(); redrawPreview(); rebuildRoads(); updateConfirm();
   toast(tool==='erase' ? `🧹 ${n}マス撤去！` : `🔨 ${n}マス建設！`);
 };
-$('dive').onclick=()=>{ location.href='slice.html'; };
+// ================= ダイブイン ⇄ 市長ビュー（同じ世界を2つのレンズで） =================
+let trans=null, aerialDist=95;
+const easeIO=t=> t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+function diveIn(){
+  if(mode!=='browse') return;
+  aerialDist=dist;
+  let sx=target.x, sz=target.z;
+  if(sdLand(sx,sz)<6) sz=COAST(sx)-14;             // 海を見てたら浜の内側に降ろす
+  player.position.set(sx, Math.max(0.5,groundH(sx,sz)), sz);
+  player.visible=true; walkTarget=null;
+  ['build','dive'].forEach(id=>$(id).style.display='none');
+  trans={ t:0, dur:1.15,
+    fromPos:cam.position.clone(), fromLook:new THREE.Vector3(target.x,0,target.z),
+    toPos:new THREE.Vector3().addVectors(player.position,WOFF),
+    toLook:new THREE.Vector3(player.position.x,1,player.position.z+3.5) };
+  mode='descend';
+}
+function ascend(){
+  if(mode!=='walk') return;
+  $('pad').classList.remove('show'); $('mayorbtn').classList.remove('show');
+  target.x=Math.max(-110,Math.min(110,player.position.x));
+  target.z=Math.max(-110,Math.min(120,player.position.z));
+  dist=aerialDist;
+  const toPos=new THREE.Vector3(target.x, dist*0.86, target.z+dist*0.62);
+  trans={ t:0, dur:1.1,
+    fromPos:cam.position.clone(), fromLook:new THREE.Vector3(player.position.x,1,player.position.z+3.5),
+    toPos, toLook:new THREE.Vector3(target.x,0,target.z) };
+  mode='ascend';
+}
+$('dive').onclick=diveIn;
+$('mayorbtn').onclick=ascend;
 // メニューの外(地図)をタップしたらメニューを閉じる
 renderer.domElement.addEventListener('pointerdown',()=>{ if(mode==='menu'){ mode='browse'; closeMenu(); } });
+
+// 歩き用バーチャルパッド
+const padVec={x:0,y:0,on:false};
+{
+  const padEl=$('pad'), stickEl=$('stick'), R=45; let pid=null;
+  const center=()=>{ const r=padEl.getBoundingClientRect(); return {cx:r.left+r.width/2, cy:r.top+r.height/2}; };
+  const upd=e=>{ const {cx,cy}=center(); let dx=e.clientX-cx, dy=e.clientY-cy;
+    const L=Math.hypot(dx,dy); if(L>R){dx*=R/L;dy*=R/L;}
+    stickEl.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    padVec.x=dx/R; padVec.y=dy/R; };
+  padEl.addEventListener('pointerdown',e=>{ pid=e.pointerId; padEl.setPointerCapture(pid); padVec.on=true; walkTarget=null; upd(e); });
+  padEl.addEventListener('pointermove',e=>{ if(e.pointerId===pid&&padVec.on) upd(e); });
+  const end=e=>{ if(e.pointerId!==pid)return; padVec.on=false; padVec.x=0; padVec.y=0; pid=null;
+    stickEl.style.transform='translate(-50%,-50%)'; };
+  padEl.addEventListener('pointerup',end); padEl.addEventListener('pointercancel',end);
+}
 
 // ================= 入力（パン/ズーム/なぞり敷設） =================
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), gPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-0.55);
@@ -315,7 +387,13 @@ renderer.domElement.addEventListener('pointerdown',e=>{
     return;
   }
   if(mode==='placing'){ drawing=true; paint(e); }
-  else panLast={x:e.clientX,y:e.clientY};
+  else if(mode==='walk'){                            // タップ移動
+    ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+    ray.setFromCamera(ndc,cam);
+    const hit=new THREE.Vector3();
+    if(ray.ray.intersectPlane(gPlane,hit)) walkTarget=hit;
+  }
+  else if(mode==='browse') panLast={x:e.clientX,y:e.clientY};
 });
 renderer.domElement.addEventListener('pointermove',e=>{
   if(!touches.has(e.pointerId)) return;
@@ -359,7 +437,59 @@ function paint(e){
 }
 
 // ================= ループ =================
-renderer.setAnimationLoop(()=>{ renderer.render(scene,cam); });
+const SPEED=6.5, camLook=new THREE.Vector3();
+let last=performance.now();
+renderer.setAnimationLoop((now)=>{
+  const rawDelta=(now-last)/1000;                    // 演出用は実時間（低FPS端末でも所要時間一定）
+  const delta=Math.min(0.05,rawDelta); last=now;     // 移動用は上限つき（コマ落ち時の瞬間移動防止）
+  if(mode==='descend'||mode==='ascend'){             // レンズの切替演出
+    trans.t+=rawDelta/trans.dur;
+    const e=easeIO(Math.min(1,trans.t));
+    cam.position.lerpVectors(trans.fromPos,trans.toPos,e);
+    const lk=new THREE.Vector3().lerpVectors(trans.fromLook,trans.toLook,e);
+    cam.lookAt(lk);
+    if(trans.t>=1){
+      if(mode==='descend'){ mode='walk'; $('pad').classList.add('show'); $('mayorbtn').classList.add('show'); camLook.copy(player.position); }
+      else { mode='browse'; ['build','dive'].forEach(id=>$(id).style.display=''); applyCam(); }
+      trans=null;
+    }
+  }
+  else if(mode==='walk'){                            // 歩き（スライスと同じ心臓）
+    const dir=new THREE.Vector3(); let power=1;
+    if(padVec.on && Math.hypot(padVec.x,padVec.y)>0.12){
+      const fwd=new THREE.Vector3(-WOFF.x,0,-WOFF.z).normalize();
+      const right=new THREE.Vector3(-fwd.z,0,fwd.x);
+      dir.addScaledVector(right,padVec.x).addScaledVector(fwd,-padVec.y);
+      power=Math.min(1,Math.hypot(padVec.x,padVec.y));
+      dir.normalize(); walkTarget=null;
+    } else {
+      if(keys['w']||keys['arrowup'])   { dir.x-=1; dir.z-=1; }
+      if(keys['s']||keys['arrowdown']) { dir.x+=1; dir.z+=1; }
+      if(keys['a']||keys['arrowleft']) { dir.x-=1; dir.z+=1; }
+      if(keys['d']||keys['arrowright']){ dir.x+=1; dir.z-=1; }
+      if(dir.lengthSq()>0){ walkTarget=null; dir.normalize(); }
+      else if(walkTarget){
+        const to=new THREE.Vector3().subVectors(walkTarget,player.position); to.y=0;
+        if(to.length()<0.25) walkTarget=null; else dir.copy(to.normalize());
+      }
+    }
+    if(dir.lengthSq()>0){
+      player.position.addScaledVector(dir,SPEED*power*delta);
+      player.position.x=Math.max(-150,Math.min(150,player.position.x));
+      player.position.z=Math.max(-150,Math.min(COAST(player.position.x)-3,player.position.z));   // 海には入らない
+      const yaw=Math.atan2(dir.x,dir.z);
+      let d2=yaw-player.rotation.y;
+      while(d2>Math.PI)d2-=Math.PI*2; while(d2<-Math.PI)d2+=Math.PI*2;
+      player.rotation.y+=d2*Math.min(1,delta*12);
+    }
+    player.position.y=Math.max(0.5,groundH(player.position.x,player.position.z));
+    const wantPos=new THREE.Vector3().addVectors(player.position,WOFF);
+    cam.position.lerp(wantPos,Math.min(1,delta*4));
+    camLook.lerp(player.position,Math.min(1,delta*6));
+    cam.lookAt(camLook.x,camLook.y+1.0,camLook.z+3.0);
+  }
+  renderer.render(scene,cam);
+});
 </script>
 </body>
 </html>
