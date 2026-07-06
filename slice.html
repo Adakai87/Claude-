@@ -10,12 +10,18 @@
   #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:#fff;font-size:13px;font-weight:600;
         background:rgba(30,60,80,.55);padding:8px 16px;border-radius:18px;pointer-events:none;white-space:nowrap;
         text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  #pad{position:fixed;left:22px;bottom:22px;width:124px;height:124px;border-radius:50%;
+       background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.35);touch-action:none;z-index:10}
+  #stick{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;
+         background:rgba(255,255,255,.55);border:2px solid rgba(255,255,255,.8);
+         transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,30,50,.25)}
 </style>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
 <div id="app"></div>
-<div id="hint">タップした場所へ歩きます（PCはWASD/矢印キーでも）</div>
+<div id="hint">左下のパッドで移動／どこかをタップでもOK（PCはWASD）</div>
+<div id="pad"><div id="stick"></div></div>
 <script type="module">
 import * as THREE from 'three';
 
@@ -198,6 +204,7 @@ let target=null;
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
 const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0), -0.5);   // 街の高さの水平面
 addEventListener('pointerdown', e=>{
+  if(e.target.closest('#pad')) return;                     // パッド操作はタップ移動にしない
   ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
   ray.setFromCamera(ndc, cam);
   const hit=new THREE.Vector3();
@@ -208,6 +215,28 @@ addEventListener('pointerdown', e=>{
   }
 });
 
+// --- バーチャルパッド（左下スティック。倒し具合で歩く速さも変わるアナログ式）---
+const padEl=document.getElementById('pad'), stickEl=document.getElementById('stick');
+const padVec={x:0,y:0,on:false};                            // 画面座標系: x右+ / y下+
+{
+  const R=45; let pid=null;
+  const center=()=>{ const r=padEl.getBoundingClientRect(); return {cx:r.left+r.width/2, cy:r.top+r.height/2}; };
+  const update=e=>{
+    const {cx,cy}=center();
+    let dx=e.clientX-cx, dy=e.clientY-cy;
+    const L=Math.hypot(dx,dy);
+    if(L>R){ dx*=R/L; dy*=R/L; }
+    stickEl.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    padVec.x=dx/R; padVec.y=dy/R;
+  };
+  padEl.addEventListener('pointerdown', e=>{ pid=e.pointerId; padEl.setPointerCapture(pid); padVec.on=true; target=null; update(e); });
+  padEl.addEventListener('pointermove', e=>{ if(e.pointerId===pid && padVec.on) update(e); });
+  const end=e=>{ if(e.pointerId!==pid) return; padVec.on=false; padVec.x=0; padVec.y=0; pid=null;
+    stickEl.style.transform='translate(-50%,-50%)'; };
+  padEl.addEventListener('pointerup', end);
+  padEl.addEventListener('pointercancel', end);
+}
+
 // ================= ゲームループ（道場第1週と同じ心臓！）=================
 const SPEED=6.5;
 const camOff=new THREE.Vector3(-13, 19, -18);   // 北西上空から南東へ＝海がいつも画面に入る構図
@@ -215,21 +244,32 @@ const camLook=new THREE.Vector3();
 let last=performance.now();
 function tick(now){
   const delta=Math.min(0.05,(now-last)/1000); last=now;    // delta秒（道場で学ぶやつ）
-  // --- 入力 → 移動方向 ---
+  // --- 入力 → 移動方向（優先度: パッド > キー > タップ目的地）---
   const dir=new THREE.Vector3();
-  if(keys['w']||keys['arrowup'])    { dir.x-=1; dir.z-=1; }
-  if(keys['s']||keys['arrowdown'])  { dir.x+=1; dir.z+=1; }
-  if(keys['a']||keys['arrowleft'])  { dir.x-=1; dir.z+=1; }
-  if(keys['d']||keys['arrowright']) { dir.x+=1; dir.z-=1; }
-  if(dir.lengthSq()>0){ target=null; dir.normalize(); }
-  else if(target){
-    const to=new THREE.Vector3().subVectors(target, player.position); to.y=0;
-    if(to.length()<0.25) target=null;
-    else dir.copy(to.normalize());
+  let power=1;                                              // パッドの倒し具合＝歩く速さ（アナログ）
+  if(padVec.on && Math.hypot(padVec.x,padVec.y)>0.12){
+    // 画面の上=カメラの向く先、として世界方向へ変換
+    const fwd=new THREE.Vector3(-camOff.x,0,-camOff.z).normalize();
+    const right=new THREE.Vector3(-fwd.z,0,fwd.x);
+    dir.addScaledVector(right, padVec.x).addScaledVector(fwd, -padVec.y);
+    power=Math.min(1, Math.hypot(padVec.x,padVec.y));
+    dir.normalize(); target=null;
+  }
+  else {
+    if(keys['w']||keys['arrowup'])    { dir.x-=1; dir.z-=1; }
+    if(keys['s']||keys['arrowdown'])  { dir.x+=1; dir.z+=1; }
+    if(keys['a']||keys['arrowleft'])  { dir.x-=1; dir.z+=1; }
+    if(keys['d']||keys['arrowright']) { dir.x+=1; dir.z-=1; }
+    if(dir.lengthSq()>0){ target=null; dir.normalize(); }
+    else if(target){
+      const to=new THREE.Vector3().subVectors(target, player.position); to.y=0;
+      if(to.length()<0.25) target=null;
+      else dir.copy(to.normalize());
+    }
   }
   // --- 移動＋向き ---
   if(dir.lengthSq()>0){
-    player.position.addScaledVector(dir, SPEED*delta);
+    player.position.addScaledVector(dir, SPEED*power*delta);
     player.position.x=Math.max(-82, Math.min(82, player.position.x));
     player.position.z=Math.max(-70, Math.min(24, player.position.z));
     const yaw=Math.atan2(dir.x, dir.z);
