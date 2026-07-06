@@ -88,7 +88,7 @@
 <div id="app"></div>
 <div id="cityname">🏙️ マイシティ</div>
 <div id="clock">10:00</div>
-<div id="money">💰 ¥50,000</div>
+<div id="money">💰 ¥2.5億</div>
 <div id="pop">👥 0人</div>
 <button class="btn red" id="reset">🗑️</button>
 <button class="btn" id="dive">🚶 ダイブイン</button>
@@ -147,11 +147,13 @@ scene.add(sun);
 const TOD={tint:[],windows:[]};   // 昼夜が色を触る材質の登録簿
 
 // ================= 経済（フェーズ3: お金と人口） =================
-const COSTS={ road:100, cottage:1000, jh_s:1200, jh_m:2000, mod_s:1500, mod_m:2500,
-  apart:4000, mansion:8000, lux:15000, bakery:2000, cafe:2000, flower:2000, mart:3000,
-  koban:5000, tree:200, park:1500, fountain:3000 };
+const M_=10000, OKU=100000000;                       // 万・億
+const COSTS={ road:1000000, cottage:20000000, jh_s:22000000, jh_m:35000000,
+  mod_s:25000000, mod_m:40000000, apart:60000000, mansion:150000000, lux:300000000,
+  bakery:40000000, cafe:40000000, flower:40000000, mart:60000000,
+  koban:80000000, tree:500000, park:20000000, fountain:50000000 };
 const RES={ cottage:4, jh_s:4, jh_m:6, mod_s:4, mod_m:6, apart:12, lux:5, mansionPerFloor:6 };
-let money=50000;
+let money=250000000;   // 初期資金¥2.5億（最初の街区バスケット×1.2で逆算）
 function calcPop(){
   let p=0;
   for(const b of buildingsRef()){
@@ -161,7 +163,11 @@ function calcPop(){
   return p;
 }
 let buildingsRef=()=>[];                             // buildings定義後に差し替え
-function fmt(n){ return '¥'+n.toLocaleString('ja-JP'); }
+function fmt(n){
+  if(n>=OKU){ const o=n/OKU; return '¥'+(o%1? o.toFixed(1) : o)+'億'; }
+  if(n>=M_){ return '¥'+Math.floor(n/M_).toLocaleString('ja-JP')+'万'; }
+  return '¥'+n.toLocaleString('ja-JP');
+}
 function updateHUD(){
   document.getElementById('money').textContent='💰 '+fmt(money);
   document.getElementById('pop').textContent='👥 '+calcPop()+'人';
@@ -687,7 +693,7 @@ const SAVE_KEY='mycity_v1';
 function saveCity(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v:1, money, road:Array.from(road),
+      v:2, money, road:Array.from(road),
       b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors})),
       h:gameHour
     }));
@@ -696,11 +702,11 @@ function saveCity(){
 function loadCity(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
-    if(!d||d.v!==1) return false;
+    if(!d||(d.v!==1&&d.v!==2)) return false;
     d.road.forEach((v,k)=>{ road[k]=v; });
     rebuildRoads();
     for(const bb of (d.b||[])) placeBuilding(bb.t, bb.i, bb.j, bb.f||3);
-    if(typeof d.money==='number') money=d.money;
+    money = (d.v===2 && typeof d.money==='number') ? d.money : 250000000;
     if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
     return true;
   }catch(e){ return false; }
@@ -729,7 +735,7 @@ function renderItems(tab){
   for(const it of CATALOG[tab]){
     const el=document.createElement('div');
     el.className='card'+(it.dis?' dis':'');
-    const cost = it.id==='road'? '¥100/マス' : it.id==='erase'? '半額返金' : it.id&&it.id.startsWith('bld:')? fmt(COSTS[it.id.slice(4)]||0) : '';
+    const cost = it.id==='road'? '¥100万/マス' : it.id==='erase'? '半額返金' : it.id&&it.id.startsWith('bld:')? fmt(COSTS[it.id.slice(4)]||0) : '';
     el.innerHTML=`<div class="ic">${it.ic}</div><div class="nm">${it.nm}</div>${cost?`<div class="nm" style="color:#a8823a">${cost}</div>`:''}`;
     if(!it.dis) el.onclick=()=>startPlacing(it.id);
     items.appendChild(el);
@@ -851,7 +857,7 @@ function refreshBPanel(){
   const def=BLD_DEFS[b.type];
   $('bptitle').textContent=`${def.ic} ${def.nm}`;
   if(def.up){
-    const cost=3000*(b.floors+1), need=20*b.floors;
+    const cost=50000000*(b.floors-1), need=20*b.floors;
     $('bpbody').textContent=`${b.floors}階建て・住民${RES.mansionPerFloor*b.floors}人 ／ 増築: ${fmt(cost)}・要人口${need}人`;
     $('bpup').style.display='';
     $('bpup').textContent= b.floors>=8 ? '🏆 最上級！' : `⬆️ 増築 ${fmt(cost)}`;
@@ -864,7 +870,7 @@ function refreshBPanel(){
 $('bpup').onclick=()=>{
   const b=selBld; if(!b) return;
   if(b.floors>=8){ toast('🏆 もう最上級です！'); return; }
-  const cost=3000*(b.floors+1), need=20*b.floors;
+  const cost=50000000*(b.floors-1), need=20*b.floors;
   if(calcPop()<need){ toast(`👥 人口が足りない！（あと${need-calcPop()}人）`); return; }
   if(money<cost){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
   money-=cost;
@@ -1045,8 +1051,8 @@ renderer.setAnimationLoop((now)=>{
   const delta=Math.min(0.05,rawDelta); last=now;     // 移動用は上限つき（コマ落ち時の瞬間移動防止）
   const prevHour=Math.floor(gameHour);
   gameHour=(gameHour+delta*24/DAY_SEC)%24;
-  if(Math.floor(gameHour)!==prevHour){                   // 毎時: 税収 = 人口×¥10
-    const inc=calcPop()*10;
+  if(Math.floor(gameHour)!==prevHour){                   // 毎時: 税収 = 人口×¥10万
+    const inc=calcPop()*100000;
     if(inc>0){ money+=inc; updateHUD(); }
   }
   applyTimeOfDay();
