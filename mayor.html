@@ -565,7 +565,7 @@ const HWCARS=[];                                       // ハイウェイを走�
       seg.position.set(mx,0.345,mz);
       seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
       seg.receiveShadow=true; g.add(seg);
-      if(s2<4){                                                                // 外周レールは市街に入る手前まで
+      if(s2<3){                                                                // 外周レールは道路タイルにかかる手前で終了
         const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
         rl.rotation.y=seg.rotation.y;
         rl.position.set(C[0]+(R+1.7)*Math.cos(tm),0.62,C[1]+(R+1.7)*Math.sin(tm)); g.add(rl);
