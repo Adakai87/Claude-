@@ -547,6 +547,7 @@ const HWCARS=[];                                       // ハイウェイを走�
       seg.rotation.x=Math.atan2(pv[1]-hh2,zz-pv[0]);
       seg.receiveShadow=true; g.add(seg);
       for(const sx of [-1.9,1.9]){                                              // ガードレールも坂に連続
+        if(sx>0 && s2>nSeg-2) continue;               // 内側(東)レールはカーブの曲がり口の手前で終了
         const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.6,len+0.55),wall);
         c2.rotation.x=seg.rotation.x;
         c2.position.set(xr+sx,(hh2+pv[1])/2+0.14,(zz+pv[0])/2); g.add(c2);
@@ -607,6 +608,7 @@ const HWCARS=[];                                       // ハイウェイを走�
       seg.rotation.x=Math.atan2(pv2[1]-hh2,zz-pv2[0]);
       seg.receiveShadow=true; g.add(seg);
       for(const sx of [-1.9,1.9]){
+        if(sx>0 && s2<=2) continue;                   // 内側(東)レールはカーブの曲がり口の手前で終了
         const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.6,len+0.55),wall);
         c2.rotation.x=seg.rotation.x;
         c2.position.set(xw+sx,(hh2+pv2[1])/2+0.14,(zz+pv2[0])/2); g.add(c2);
