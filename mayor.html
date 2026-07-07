@@ -273,6 +273,8 @@ const clamp01=v=>Math.min(1,Math.max(0,v));
 const hash=(i,j)=>(((i*73856093^j*19349663)>>>0)%1000)/1000;
 const COAST=x=>96+5*Math.sin(x*0.045)+2.5*Math.sin(x*0.13+2);
 const RIVX=z=>116+13*Math.sin(z*0.018+2.2)+5*Math.sin(z*0.05+0.7);   // 川の中心線（建設エリアの東外側）
+const ssm=u=>{u=Math.max(0,Math.min(1,u));return u*u*(3-2*u);};
+const HWX=z=> -90 - 6*ssm((-z-70)/55) + 4*ssm((z-42)/28);            // 幹線道路の中心線（IC付近は直線、北と南で緩カーブ）
 const RIVW=z=>6.5+1.5*Math.sin(z*0.045)+Math.max(0,(z-85)*0.3);      // 川幅（河口で広がる）
 const sdSea=(x,z)=>COAST(x)-z;
 const sdRiv=(x,z)=>Math.abs(x-RIVX(z))-RIVW(z);
@@ -281,7 +283,7 @@ const rockF=x=>clamp01((Math.sin(x*0.024+1.2)+Math.sin(x*0.055+0.3))*0.9-0.15); 
 function hillH(x,z){                                                 // 外周の丘（建設エリアと水辺では0）
   const m0=clamp01((Math.max(Math.abs(x),Math.abs(z))-92)/26)
            *clamp01((156-Math.max(Math.abs(x),Math.abs(z)))/12)    // マップ外縁では0に戻す（崖の断面が見えないように）
-           *clamp01((Math.abs(x+90)-9)/8);                         // 幹線道路の回廊は平ら
+           *clamp01((Math.abs(x-HWX(z))-9)/8);                      // 幹線道路の回廊は平ら（カーブ追従）
   if(m0<=0) return 0;
   const mSea=clamp01((sdSea(x,z)-16)/14), mRiv=clamp01((sdRiv(x,z)-6.5)/10);
   const n=0.5+0.5*Math.sin(x*0.041+1.7)*Math.sin(z*0.036+0.6);
@@ -387,7 +389,7 @@ let seaMesh=null;                                    // 波アニメ用（ルー
     const bx=-158+gi*4+hash(gi,gj)*3, bz=-158+gj*4+hash(gj,gi)*3;
     const out=Math.max(Math.abs(bx),Math.abs(bz))>90;                // 建設エリアの外だけ
     const s=sdSea(bx,bz), r=sdRiv(bx,bz), hh=hillH(bx,bz);
-    if(Math.abs(bx+90)<9) continue;                                  // 幹線道路の上には生やさない
+    if(Math.abs(bx-HWX(bz))<9) continue;                             // 幹線道路の上には生やさない（カーブ追従）
     if(out && s>15 && r>6){                                          // 森はクランプ状に（一様バラマキは嘘くさい）
       const forest=0.5+0.5*Math.sin(bx*0.03+0.9)*Math.sin(bz*0.027+1.8);
       if(hash(gi*3+1,gj*7+2)<forest*0.55) trees.push([bx,bz,0.75+hash(gi*5,gj*3)*0.85]);
@@ -506,53 +508,138 @@ function makeLamp(x,z,axis,side){                        // axis:0=東西の道(
   glow.rotation.x=-Math.PI/2; glow.position.set(x+ax,0.60,z+az); g.add(glow);
   return g;
 }
-const HWCARS=[];                                       // ハイウェイを走る車（演出）
-{ // ハイウェイの3D（高架式: 高さ6mのデッキ+橋脚。ランプで地上の下町の道へ降りる）
+const HWCARS=[];                                       // ハイウェイを走る車（ランプも使う）
+const RAMP_PATHS=[];                                   // 出口/入口の3D走行経路
+const CLIMBERS=[];                                     // 上りランプを登行中の車
+{ // ハイウェイの3D（高架式・緩カーブ本線・加減速車線・標識・IC・継ぎ目）
   const g=new THREE.Group();
   const asp=new THREE.MeshStandardMaterial({color:0x6e747e,roughness:0.9,map:texRoad});
-  const conc=new THREE.MeshStandardMaterial({color:0xc8c4ba,roughness:0.95});   // コンクリ橋脚
+  const conc=new THREE.MeshStandardMaterial({color:0xc8c4ba,roughness:0.95});
   const white=new THREE.MeshStandardMaterial({color:0xf2f0e8,roughness:0.8});
-  const wall=new THREE.MeshStandardMaterial({color:0xd7dade,roughness:0.85});   // 防音壁
-  const HX=-90, W=11, Z0=-160, Z1=84, DH=6.0;        // DH=デッキの路面高
-  // 高架デッキ
-  const deck=new THREE.Mesh(new THREE.BoxGeometry(W,0.55,Z1-Z0),asp);
-  deck.position.set(HX,DH-0.28,(Z0+Z1)/2); deck.receiveShadow=true; g.add(deck);
-  const skirtN=new THREE.Mesh(new THREE.BoxGeometry(W,1.0,Z1-Z0),conc);         // 桁(デッキ側面のコンクリ)
-  skirtN.position.set(HX,DH-1.05,(Z0+Z1)/2); g.add(skirtN);
-  for(let z=Z0+6;z<Z1-4;z+=9){                        // 中央の白破線
+  const wall=new THREE.MeshStandardMaterial({color:0xd7dade,roughness:0.85});
+  const joint=new THREE.MeshStandardMaterial({color:0x565c66,roughness:0.9});
+  const W=11, Z0=-160, Z1=84, DH=6.0;
+  const hwAng=z=>Math.atan2(HWX(z+4)-HWX(z-4),8);
+  // ---- 本線デッキ（緩カーブ: セグメント分割で曲げる。3枚ごとに橋桁の継ぎ目）----
+  for(let z=Z0;z<Z1;z+=8){
+    const zm=z+4, a=hwAng(zm), x=HWX(zm);
+    const deck=new THREE.Mesh(new THREE.BoxGeometry(W,0.55,8.9),asp);
+    deck.position.set(x,DH-0.28,zm); deck.rotation.y=a; deck.receiveShadow=true; g.add(deck);
+    const sk=new THREE.Mesh(new THREE.BoxGeometry(W,1.0,8.9),conc);
+    sk.position.set(x,DH-1.05,zm); sk.rotation.y=a; g.add(sk);
+    if(((z-Z0)/8)%3===0){
+      const jt=new THREE.Mesh(new THREE.BoxGeometry(W-0.7,0.03,0.34),joint);
+      jt.position.set(x,DH+0.005,zm-4); jt.rotation.y=a; g.add(jt);
+    }
     const d=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.04,3.2),white);
-    d.position.set(HX,DH+0.02,z); g.add(d);
+    d.position.set(x,DH+0.02,zm); d.rotation.y=a; g.add(d);
   }
-  // 橋脚（14mごと。接続口の高架下通路の部分だけ間引く）
+  // ---- 橋脚（接続口の高架下通路は間引く）----
   for(let z=Z0+7;z<Z1-3;z+=14){
     if(ENTRIES.some(e=>Math.abs(z-cz(e[1]))<7)) continue;
+    const x=HWX(z);
     const col=new THREE.Mesh(new THREE.BoxGeometry(1.7,DH-1.4,1.7),conc);
-    col.position.set(HX,(DH-1.4)/2,z); g.add(col);
+    col.position.set(x,(DH-1.4)/2,z); g.add(col);
     const cap=new THREE.Mesh(new THREE.BoxGeometry(W*0.8,0.5,2.2),conc);
-    cap.position.set(HX,DH-1.35,z); g.add(cap);
+    cap.position.set(x,DH-1.35,z); cap.rotation.y=hwAng(z); g.add(cap);
   }
-  // 防音壁（東=降り口、西=上り合流部にそれぞれ切れ目）
-  const zA=cz(ENTRIES[0][1]), zB=cz(ENTRIES[1][1]);
-  for(const [a,b2] of [[Z0,zA-31.2],[zA-26,zB-31.2],[zB-26,Z1]]){
-    if(b2<=a) continue;
-    const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
-    r.position.set(HX+W/2-0.3,DH+0.45,(a+b2)/2); g.add(r);
-    const r2=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
-    r2.position.set(HX-W/2+0.3,DH+0.45,(a+b2)/2); g.add(r2);
+  // ---- 防音壁（IC加減速ゾーンだけ切れ目）----
+  const inGap=z=>ENTRIES.some(e=>{const ze=cz(e[1]);return z>ze-52&&z<ze-26;});
+  for(let z=Z0;z<Z1;z+=8){
+    const zm=z+4, a=hwAng(zm), x=HWX(zm);
+    const nx=Math.cos(a), nz=-Math.sin(a);
+    if(!inGap(zm)) for(const sd of [1,-1]){
+      const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,8.6),wall);
+      r.position.set(x+sd*(W/2-0.3)*nx,DH+0.45,zm+sd*(W/2-0.3)*nz);
+      r.rotation.y=a; g.add(r);
+    }
   }
-  // 降りランプ（S字の坂→クォーターカーブで下町の道へなめらかに合流）
+  // ---- ハイマスト照明 ----
+  for(let z=Z0+14;z<Z1-6;z+=28){
+    const x=HWX(z);
+    const p=new THREE.Mesh(new THREE.BoxGeometry(0.16,4.2,0.16),lampPoleMat);
+    p.position.set(x,DH+2.1,z); g.add(p);
+    const a2=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.13,0.13),lampPoleMat);
+    a2.position.set(x,DH+4.1,z); a2.rotation.y=hwAng(z); g.add(a2);
+    for(const sx of [-1.55,1.55]){
+      const h=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.16,0.3),lampHeadMat);
+      h.position.set(x+sx,DH+4.0,z); g.add(h);
+    }
+  }
+  // ---- ゼブラ導流帯と標識のテクスチャ ----
+  const zebraTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64;
+    const t=c.getContext('2d'); t.strokeStyle='rgba(255,255,255,0.92)'; t.lineWidth=7;
+    for(let k=-64;k<128;k+=16){ t.beginPath(); t.moveTo(k,64); t.lineTo(k+64,0); t.stroke(); }
+    return new THREE.CanvasTexture(c); })();
+  const zebraMat=new THREE.MeshBasicMaterial({map:zebraTex,transparent:true,opacity:0.7,depthWrite:false});
+  function makeBoard(lines,bg,fs){
+    const c=document.createElement('canvas'); c.width=512; c.height=192;
+    const t=c.getContext('2d'); t.fillStyle=bg; t.fillRect(0,0,512,192);
+    t.strokeStyle='rgba(255,255,255,.92)'; t.lineWidth=7; t.strokeRect(10,10,492,172);
+    t.fillStyle='#fff'; t.textAlign='center'; t.textBaseline='middle';
+    t.font='900 '+fs+'px "M PLUS Rounded 1c",sans-serif';
+    for(let i=0;i<lines.length;i++) t.fillText(lines[i],256,96+(i-(lines.length-1)/2)*fs*1.3);
+    return new THREE.CanvasTexture(c);
+  }
+  function addBoard(tex,w2,h2,x,y2,z2){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w2,h2),
+      new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
+    m.position.set(x,y2,z2); g.add(m); return m;
+  }
+  // ---- 門型ガントリー標識（本線をまたぐ緑看板）----
+  { const x=HWX(-118);
+    for(const sd of [-1,1]){
+      const p=new THREE.Mesh(new THREE.BoxGeometry(0.3,4.8,0.3),conc);
+      p.position.set(x+sd*(W/2+0.7),DH+2.4,-118); g.add(p);
+    }
+    const beam=new THREE.Mesh(new THREE.BoxGeometry(W+2.6,0.3,0.3),conc);
+    beam.position.set(x,DH+4.6,-118); beam.rotation.y=hwAng(-118); g.add(beam);
+    addBoard(makeBoard(['\u2b06 \u3068\u306a\u308a\u306e\u4e16\u754c','2km'],'#1e7d46',46),6.6,2.4,x,DH+3.4,-117.8);
+  }
+  const spdTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=128;
+    const t=c.getContext('2d');
+    t.fillStyle='#fff'; t.beginPath(); t.arc(64,64,60,0,7); t.fill();
+    t.strokeStyle='#d23b2f'; t.lineWidth=13; t.beginPath(); t.arc(64,64,51,0,7); t.stroke();
+    t.fillStyle='#223'; t.font='900 54px sans-serif'; t.textAlign='center'; t.textBaseline='middle';
+    t.fillText('40',64,67);
+    return new THREE.CanvasTexture(c); })();
+  // ---- 各IC（出入口ランプ一式）----
   const xr=-83.0, drop=DH-0.56;
-  for(const [ei,ej] of ENTRIES){
+  ENTRIES.forEach(([ei,ej],idx)=>{
     const z=cz(ej);
-    const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);          // デッキから分岐する取り付き
-    top.position.set(HX+W/2+0.9,DH-0.28,z-28.6); g.add(top);
-    const nr=new THREE.Mesh(new THREE.BoxGeometry(4.1,1.0,0.25),wall);          // 取り付き北縁のレール（本線側は防音壁ラインまで）
-    nr.position.set(HX+W/2+1.8,DH+0.45,z-30.9); g.add(nr);
-    const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);          // 取り付き先端(東縁)のレール
-    er.position.set(HX+W/2+3.7,DH+0.45,z-28.75); g.add(er);
-    // なめらかな坂（smoothstep: 上端も下端も丸く折れずに繋がる）
+    // 加減速車線（東=減速/出口、西=加速/入口）+外側レール+ゼブラ
+    for(const sd of [1,-1]){
+      const lx=-90+sd*(W/2+1.6);
+      const lane=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.55,18),asp);
+      lane.position.set(lx,DH-0.28,z-37); lane.receiveShadow=true; g.add(lane);
+      const lsk=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.0,18),conc);
+      lsk.position.set(lx,DH-1.05,z-37); g.add(lsk);
+      const taper=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.55,7.6),asp);
+      taper.rotation.y=sd*0.22; taper.position.set(lx-sd*0.85,DH-0.29,z-49.2); g.add(taper);
+      const rl=new THREE.Mesh(new THREE.BoxGeometry(0.22,1.0,18.6),wall);
+      rl.position.set(lx+sd*1.72,DH+0.45,z-37); g.add(rl);
+      const rt=new THREE.Mesh(new THREE.BoxGeometry(0.22,1.0,8.0),wall);
+      rt.rotation.y=sd*0.22; rt.position.set(lx+sd*1.72-sd*0.95,DH+0.45,z-49.4); g.add(rt);
+      const zb=new THREE.Mesh(new THREE.PlaneGeometry(2.4,4.4),zebraMat);
+      zb.rotation.x=-Math.PI/2; zb.rotation.z=sd*0.12;
+      zb.position.set(-90+sd*(W/2-1.2),DH+0.01,z-28.6); g.add(zb);
+    }
+    // 出口予告板（本線東側・出口の20m手前）
+    { const bx=-90+W/2+2.4;
+      const p=new THREE.Mesh(new THREE.BoxGeometry(0.22,4.2,0.22),conc);
+      p.position.set(bx,DH+2.1,z-60); g.add(p);
+      addBoard(makeBoard(['\u2198 \u51fa\u53e3 '+(idx+1),'\u30de\u30a4\u30b7\u30c6\u30a3IC'],'#1e7d46',40),4.6,1.9,bx,DH+3.4,z-60);
+    }
+    // デッキから分岐する取り付き（東=降り口）
+    const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);
+    top.position.set(-90+W/2+0.9,DH-0.28,z-28.6); g.add(top);
+    const nr=new THREE.Mesh(new THREE.BoxGeometry(4.1,1.0,0.25),wall);
+    nr.position.set(-90+W/2+1.8,DH+0.45,z-30.9); g.add(nr);
+    const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);
+    er.position.set(-90+W/2+3.7,DH+0.45,z-28.75); g.add(er);
+    // なめらかな坂（smoothstep）+色グラデ
     const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
-    const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);                    // 色をだんだん道路色へ
+    const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);
       return new THREE.MeshStandardMaterial({color:segCol.getHex(),roughness:0.88,map:texRoad}); };
     const z0=z-27, z1=z-2.8, nSeg=12;
     const hAt=u=>DH-drop*(u*u*(3-2*u));
@@ -561,67 +648,78 @@ const HWCARS=[];                                       // ハイウェイを走�
       const u=s2/nSeg, zz=z0+(z1-z0)*u, hh2=hAt(u);
       const len=Math.hypot(zz-pv[0],hh2-pv[1]);
       const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),
-        segMat(Math.max(0,(u-0.55)/0.45)*0.5));                                 // 後半から色ブレンド開始
+        segMat(Math.max(0,(u-0.55)/0.45)*0.5));
       seg.position.set(xr,(hh2+pv[1])/2-0.24,(zz+pv[0])/2);
       seg.rotation.x=Math.atan2(pv[1]-hh2,zz-pv[0]);
       seg.receiveShadow=true; g.add(seg);
-      for(const sx of [-1.9,1.9]){                                              // ガードレールも坂に連続
+      for(const sx of [-1.9,1.9]){
         const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.6,len+0.55),wall);
         c2.rotation.x=seg.rotation.x;
         c2.position.set(xr+sx,(hh2+pv[1])/2+0.14,(zz+pv[0])/2); g.add(c2);
       }
       pv=[zz,hh2];
     }
-    // クォーターカーブ（タイルの西端でピタッと終わり、先はタイルのアスファルトに引き継ぐ）
+    // 速度標識40（坂の外側・中腹）
+    { const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.6,0.12),conc);
+      p.position.set(xr-2.6,1.8,z-15); g.add(p);
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.15),
+        new THREE.MeshBasicMaterial({map:spdTex,side:THREE.DoubleSide,transparent:true}));
+      m.position.set(xr-2.6,3.35,z-15); g.add(m);
+    }
+    // クォーターカーブ（タイル西端で終了・幅先細り）
     const R=2.8, C=[xr+R, z-R], aSeg=6;
     for(let s2=0;s2<aSeg;s2++){
       const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
       const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
       const len=R*(Math.PI/2)/aSeg;
-      const w2=3.9-0.7*((s2+1)/aSeg);                                          // 幅も道路幅へ先細り
+      const w2=3.9-0.7*((s2+1)/aSeg);
       const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
-        segMat(0.5+0.5*(s2+1)/aSeg));
+        segMat(0.5+0.5*((s2+1)/aSeg)));
       seg.position.set(mx,0.345,mz);
       seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
       seg.receiveShadow=true; g.add(seg);
-      if(s2<1){                                                                // 外周レールは西へ続く道(高架下)を横切る手前まで
+      if(s2<1){
         const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
         rl.rotation.y=seg.rotation.y;
         rl.position.set(C[0]+(R+1.7)*Math.cos(tm),0.62,C[1]+(R+1.7)*Math.sin(tm)); g.add(rl);
       }
     }
-    // ===== オンランプ（街→高架下をくぐる→西側で北へ旋回→登って北行き車線に合流） =====
+    // ===== オンランプ（街→高架下→西で北へ旋回→登って合流） =====
     const roadMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad});
-    const under=new THREE.Mesh(new THREE.BoxGeometry(15.0,0.45,3.2),roadMat);  // 高架下の通路
+    const under=new THREE.Mesh(new THREE.BoxGeometry(15.0,0.45,3.2),roadMat);
     under.position.set(-87.3,0.345,z); under.receiveShadow=true; g.add(under);
-    for(let dxd=-84;dxd>=-93;dxd-=4){                                          // 通路の白破線
+    for(let dxd=-84;dxd>=-93;dxd-=4){
       const d2=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.03,0.26),white);
       d2.position.set(dxd,0.58,z); g.add(d2);
     }
-    const C2=[-94.2, z-2.8], R2=2.8, xw=-97.0;                                 // 西側クォーターカーブ（西向き→北向き）
+    // IC名の青看板（地上・入口そば）
+    { const p=new THREE.Mesh(new THREE.BoxGeometry(0.18,2.6,0.18),conc);
+      p.position.set(-86.5,1.8,z+3.6); g.add(p);
+      addBoard(makeBoard(['\u30de\u30a4\u30b7\u30c6\u30a3IC','\u5165\u53e3'],'#2b6fb8',44),3.6,1.4,-86.5,3.4,z+3.6);
+    }
+    const C2=[-94.2, z-2.8], R2=2.8, xw=-97.0;
     for(let s2=0;s2<aSeg;s2++){
       const tm2=Math.PI/2+(Math.PI/2)*((s2+0.5)/aSeg);
       const mx=C2[0]+R2*Math.cos(tm2), mz=C2[1]+R2*Math.sin(tm2);
       const len=R2*(Math.PI/2)/aSeg;
       const w2=3.2+0.7*((s2+1)/aSeg);
       const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
-        segMat(1-0.5*((s2+1)/aSeg)));                                          // 道路色→ハイウェイ色へ(前半)
+        segMat(1-0.5*((s2+1)/aSeg)));
       seg.position.set(mx,0.345,mz);
       seg.rotation.y=Math.atan2(-Math.sin(tm2),Math.cos(tm2));
       seg.receiveShadow=true; g.add(seg);
-      if(s2>1){                                                                // 外周レール
+      if(s2>1){
         const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
         rl.rotation.y=seg.rotation.y;
         rl.position.set(C2[0]+(R2+1.7)*Math.cos(tm2),0.62,C2[1]+(R2+1.7)*Math.sin(tm2)); g.add(rl);
       }
     }
-    // 登り坂（南=地上 → 北=デッキ高。降り坂の鏡像）
     let pv2=[z-2.8,0.56];
     for(let s2=1;s2<=nSeg;s2++){
       const u=s2/nSeg, zz=(z-2.8)+((z-27)-(z-2.8))*u, hh2=0.56+drop*(u*u*(3-2*u));
       const len=Math.hypot(zz-pv2[0],hh2-pv2[1]);
       const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),
-        segMat(0.5*(1-u)));                                                    // 登るほどハイウェイ色へ(後半)
+        segMat(0.5*(1-u)));
       seg.position.set(xw,(hh2+pv2[1])/2-0.24,(zz+pv2[0])/2);
       seg.rotation.x=Math.atan2(pv2[1]-hh2,zz-pv2[0]);
       seg.receiveShadow=true; g.add(seg);
@@ -632,32 +730,29 @@ const HWCARS=[];                                       // ハイウェイを走�
       }
       pv2=[zz,hh2];
     }
-    // デッキへの合流取り付き（西側）
     const top2=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);
-    top2.position.set(HX-W/2-0.9,DH-0.28,z-28.6); g.add(top2);
+    top2.position.set(-90-W/2-0.9,DH-0.28,z-28.6); g.add(top2);
     const nr2=new THREE.Mesh(new THREE.BoxGeometry(4.1,1.0,0.25),wall);
-    nr2.position.set(HX-W/2-1.8,DH+0.45,z-30.9); g.add(nr2);
+    nr2.position.set(-90-W/2-1.8,DH+0.45,z-30.9); g.add(nr2);
     const wr2=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);
-    wr2.position.set(HX-W/2-3.7,DH+0.45,z-28.75); g.add(wr2);
-  }
-  // 青看板（デッキの高さに合わせて高く）
-  const pole=new THREE.Mesh(new THREE.BoxGeometry(0.3,9.2,0.3),conc);
-  pole.position.set(HX+W/2+1.4,4.6,Z0+24); g.add(pole);
-  const board=new THREE.Mesh(new THREE.BoxGeometry(0.2,2.4,5.6),
-    new THREE.MeshStandardMaterial({color:0x2b6fb8}));
-  board.position.set(HX+W/2+1.4,8.6,Z0+24); g.add(board);
-  for(let z=Z0+14;z<Z1-6;z+=28){                       // ハイマスト照明（両側に頭を出す）
-    const p=new THREE.Mesh(new THREE.BoxGeometry(0.16,4.2,0.16),lampPoleMat);
-    p.position.set(HX,DH+2.1,z); g.add(p);
-    const a=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.13,0.13),lampPoleMat);
-    a.position.set(HX,DH+4.1,z); g.add(a);
-    for(const sx of [-1.55,1.55]){
-      const h=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.16,0.3),lampHeadMat);
-      h.position.set(HX+sx,DH+4.0,z); g.add(h);
-    }
-  }
-  { // 走行車（上下線を流れる演出）
-    const cols=[0xd94f3f,0x3f7fd2,0xf2c14e,0xe8e6e0,0x59b26a,0x8a67c9];
+    wr2.position.set(-90-W/2-3.7,DH+0.45,z-28.75); g.add(wr2);
+    // ---- この ICの走行経路（車が実際に使う）----
+    const down=[[-82.9,DH,z-46],[-82.9,DH,z-30],[-83.0,DH,z-27.5]];
+    for(let s3=1;s3<=12;s3++){ const u=s3/12;
+      down.push([-83.0, 0.56+(DH-0.56)*(1-u*u*(3-2*u)), (z-27)+24.2*u]); }
+    for(let s3=1;s3<=6;s3++){ const th=Math.PI-(Math.PI/2)*(s3/6);
+      down.push([-80.2+2.8*Math.cos(th),0.56,(z-2.8)+2.8*Math.sin(th)]); }
+    down.push([-78,0.56,z]);
+    const up=[[-78,0.56,z],[-88,0.56,z],[-94.2,0.56,z]];
+    for(let s3=1;s3<=6;s3++){ const th=Math.PI/2+(Math.PI/2)*(s3/6);
+      up.push([-94.2+2.8*Math.cos(th),0.56,(z-2.8)+2.8*Math.sin(th)]); }
+    for(let s3=1;s3<=12;s3++){ const u=s3/12;
+      up.push([-97.0, 0.56+(DH-0.56)*(u*u*(3-2*u)), (z-2.8)-24.2*u]); }
+    up.push([-97.1,DH,z-33],[-97.1,DH,z-44],[HWX(z-54)-2.4,DH,z-54]);
+    RAMP_PATHS.push({z, ej, down, up});
+  });
+  // ---- 本線走行車 ----
+  { const cols=[0xd94f3f,0x3f7fd2,0xf2c14e,0xe8e6e0,0x59b26a,0x8a67c9];
     for(let k=0;k<6;k++){
       const cg=new THREE.Group();
       const body=new THREE.Mesh(new THREE.BoxGeometry(1.55,0.55,3.1),
@@ -666,10 +761,10 @@ const HWCARS=[];                                       // ハイウェイを走�
       const cab=new THREE.Mesh(new THREE.BoxGeometry(1.35,0.5,1.5),
         new THREE.MeshStandardMaterial({color:0x24303c,roughness:0.2,metalness:0.3}));
       cab.position.set(0,0.9,-0.1); cg.add(cab);
-      const dir=k<3?-1:1;                              // 北行き/南行き
+      const dir=k<3?-1:1;
       cg.rotation.y=dir>0?0:Math.PI;
       scene.add(cg);
-      HWCARS.push({mesh:cg, dir, x:HX+2.4*dir, z:Z0+((k*83)%(Z1-Z0)), y:DH});
+      HWCARS.push({mesh:cg, dir, z:Z0+((k*83)%(Z1-Z0)), y:DH, mode:null});
     }
   }
   g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
@@ -807,19 +902,74 @@ function stepTrucks(dt){
     if(dx||dz) tr.mesh.rotation.y=Math.atan2(dx,dz);
   }
 }
+function stepPath(o,dt,speed){                       // 3D折れ線に沿って進む（ランプ走行用）
+  let rem=dt*speed;
+  while(rem>0&&!o.done){
+    const a=o.path[o.seg], b2=o.path[o.seg+1];
+    const len=Math.hypot(b2[0]-a[0],b2[1]-a[1],b2[2]-a[2])||0.01;
+    const left=(1-o.t)*len;
+    if(rem<left){ o.t+=rem/len; rem=0; }
+    else { rem-=left; o.seg++; o.t=0;
+      if(o.seg>=o.path.length-1){ o.done=true; o.seg=o.path.length-2; o.t=1; } }
+  }
+  const a=o.path[o.seg], b2=o.path[o.seg+1];
+  o.mesh.position.set(a[0]+(b2[0]-a[0])*o.t, a[1]+(b2[1]-a[1])*o.t, a[2]+(b2[2]-a[2])*o.t);
+  const dx=b2[0]-a[0], dzz=b2[2]-a[2];
+  if(dx||dzz) o.mesh.rotation.y=Math.atan2(dx,dzz);
+}
 function stepCars(dt){
-  for(const c of CARS){
+  for(let ci=CARS.length-1;ci>=0;ci--){
+    const c=CARS[ci];
     c.t+=dt*c.speed/CS;
-    if(c.t>=1){ c.prev=c.from; c.from=c.to; c.to=carNext(c); c.t=0; }
+    if(c.t>=1){
+      c.prev=c.from; c.from=c.to;
+      const rp=RAMP_PATHS.find(r=>c.from[0]===0&&c.from[1]===r.ej);
+      if(rp && Math.random()<0.35){                  // 接続口に来た街の車は時々ハイウェイへ
+        CLIMBERS.push({mesh:c.mesh,path:rp.up,seg:0,t:0,done:false});
+        CARS.splice(ci,1); continue;
+      }
+      c.to=carNext(c); c.t=0;
+    }
     const fx=cx(c.from[0]), fz=cz(c.from[1]), dx=cx(c.to[0])-fx, dz=cz(c.to[1])-fz;
     const len=Math.hypot(dx,dz)||1, ox=dz/len*0.95, oz=-dx/len*0.95;   // 左側通行
     c.mesh.position.set(fx+dx*c.t+ox, 0.56, fz+dz*c.t+oz);
     if(dx||dz) c.mesh.rotation.y=Math.atan2(dx,dz);
   }
-  for(const h of HWCARS){                            // ハイウェイの流れ（端でループ）
+  for(let li=CLIMBERS.length-1;li>=0;li--){          // 上りランプ走行中
+    const cl=CLIMBERS[li];
+    stepPath(cl,dt,8);
+    if(cl.done){
+      if(HWCARS.length<10){
+        cl.mesh.rotation.y=Math.PI;
+        HWCARS.push({mesh:cl.mesh, dir:-1, z:cl.path[cl.path.length-1][2], y:6.0, mode:null});
+      } else scene.remove(cl.mesh);
+      CLIMBERS.splice(li,1);
+    }
+  }
+  for(const h of HWCARS){                            // 本線の流れ（南行きは時々ICで降りる）
+    if(h.mode==='down'){
+      stepPath(h,dt,9);
+      if(h.done){
+        CARS.push({mesh:h.mesh, from:h.entryCell, to:h.entryCell, t:1, prev:null,
+          speed:6.5, k:(Math.random()*8)|0});
+        h.mesh=makeCar((Math.random()*8)|0); scene.add(h.mesh);   // 本線には代わりの車が北から
+        h.mode=null; h.done=false; h.seg=0; h.t=0; h.z=-156; h.dir=1;
+      }
+      continue;
+    }
     h.z+=h.dir*15*dt;
+    if(h.dir>0){
+      const rp=RAMP_PATHS.find(r=>Math.abs(h.z-(r.z-47))<dt*15+0.4);
+      if(rp && isRoadCell(1,rp.ej) && Math.random()<0.5){          // 街に道があれば降りてみる
+        h.mode='down'; h.path=rp.down; h.seg=0; h.t=0; h.done=false;
+        h.entryCell=[0,rp.ej];
+        continue;
+      }
+    }
     if(h.z>82) h.z=-156; if(h.z<-158) h.z=80;
-    h.mesh.position.set(h.x,h.y,h.z);
+    const x=HWX(h.z)+2.4*h.dir;
+    h.mesh.position.set(x,h.y,h.z);
+    h.mesh.rotation.y=Math.atan2(HWX(h.z+2*h.dir)-HWX(h.z),2*h.dir);
   }
 }
 
@@ -1386,7 +1536,8 @@ window.__dbg={ roadSet:(i,j,v)=>{ road[j*N+i]=v?1:0; rebuildRoads(); },
   conn:(i,j)=>CONN[j*N+i], pop:()=>calcPop(), dayN:()=>day,
   occ:(ix)=>occOf(buildings[ix]), nb:()=>buildings.length,
   trucks:()=>TRUCKS.length, truckQ:()=>TRUCKQ.length,
-  truckPos:()=>TRUCKS.map(t=>({s:t.state, at:t.path[t.idx]})) };
+  truckPos:()=>TRUCKS.map(t=>({s:t.state, at:t.path[t.idx]})),
+  cars:()=>CARS.length, hw:()=>HWCARS.map(h=>h.mode||'run'), climbers:()=>CLIMBERS.length };
 function npcAnchorFor(n,h){                            // 生活スケジュール: 時間帯→今いるべき場所
   if(h>=6.5&&h<16) return n.work;                      // 出勤〜勤務
   if(h>=16&&h<22.2) return n.home;                     // 帰宅〜家の近所
