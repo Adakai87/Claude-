@@ -588,7 +588,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
       zc=end;
     }
   }
-  wallRun(1, ENTRIES.map((e,i2)=>{const ze=cz(e[1]);return i2===0? [ze-87,ze-61] : [ze-80,ze-54];}));   // 北ICは減速車線を7m北へ移設済み。切れ目の南端は取り付きの南縁(ze-61.2)と面一
+  wallRun(1, ENTRIES.map((e,i2)=>{const ze=cz(e[1]);return i2===0? [ze-87,ze-53] : [ze-80,ze-54];}));   // 北ICの壁は導流帯の島(ノーズ)の後ろから再開
 
   wallRun(-1, [[zeA0-52,zeA0-26]]);
   // ---- ハイマスト照明 ----
@@ -604,18 +604,14 @@ const CLIMBERS=[];                                     // 上りランプを登�
     }
   }
   // ---- ゼブラ導流帯と標識のテクスチャ ----
-  const goreTex=(()=>{ // ゴア部の導流帯: 白縁取りの三角形+内側に斜めストライプ（実物準拠）
+  const goreTex=(()=>{ // ゴア部(導流帯)の塗り: 白縁+進行方向に直交する太バー。くさび先端でUVが圧縮されても歪まない
     const c=document.createElement('canvas'); c.width=128; c.height=256;
     const t=c.getContext('2d');
-    t.beginPath(); t.moveTo(64,6); t.lineTo(10,250); t.lineTo(118,250); t.closePath();
-    t.save(); t.clip();
-    t.strokeStyle='rgba(255,255,255,0.95)'; t.lineWidth=9;
-    for(let k=-256;k<256;k+=26){ t.beginPath(); t.moveTo(k,256); t.lineTo(k+256,0); t.stroke(); }
-    t.restore();
-    t.lineWidth=8; t.strokeStyle='rgba(255,255,255,0.95)';
-    t.beginPath(); t.moveTo(64,6); t.lineTo(10,250); t.lineTo(118,250); t.closePath(); t.stroke();
+    t.fillStyle='rgba(255,255,255,0.95)';
+    for(let k=26;k<250;k+=44) t.fillRect(0,k,128,20);
+    t.lineWidth=18; t.strokeStyle='rgba(255,255,255,0.95)'; t.strokeRect(0,0,128,256);
     return new THREE.CanvasTexture(c); })();
-  const goreMat=new THREE.MeshBasicMaterial({map:goreTex,transparent:true,depthWrite:false});
+  const goreMat=new THREE.MeshBasicMaterial({map:goreTex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
   function makeBoard(lines,bg,fs){
     const c=document.createElement('canvas'); c.width=512; c.height=192;
     const t=c.getContext('2d'); t.fillStyle=bg; t.fillRect(0,0,512,192);
@@ -671,6 +667,36 @@ const CLIMBERS=[];                                     // 上りランプを登�
     geo.setIndex(idx); geo.computeVertexNormals();
     return geo;
   }
+  function wedgeGeo(eA,eB,thick){                      // 2本の縁線(同数の点列)で張る座面+側面。ゴア部(導流帯の島)に使う
+    const n2=eA.length, pos=[], uv=[], idx=[];
+    for(let i=0;i<n2;i++){
+      const A=eA[i], B=eB[i];
+      pos.push(A[0],A[1],A[2], B[0],B[1],B[2], A[0],A[1]-thick,A[2], B[0],B[1]-thick,B[2]);
+      uv.push(0,i/(n2-1), 1,i/(n2-1), 0,i/(n2-1), 1,i/(n2-1));
+    }
+    for(let i=0;i<n2-1;i++){
+      const a0=i*4, b0=(i+1)*4;
+      idx.push(a0,b0,a0+1, a0+1,b0,b0+1,
+               a0,a0+2,b0, b0,a0+2,b0+2,
+               a0+1,b0+1,a0+3, b0+1,b0+3,a0+3,
+               a0+2,a0+3,b0+2, b0+2,a0+3,b0+3);
+    }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    return geo;
+  }
+  function goreIsland(eW,eE,nx2,ny2,nz2){              // 導流帯の島: くさび形の躯体+ゼブラ塗装スキン+ノーズ緩衝クッション(舗装が割れる端に置く)
+    const body=new THREE.Mesh(wedgeGeo(eW,eE,0.5),
+      new THREE.MeshStandardMaterial({color:0x6e747e,roughness:0.9,side:THREE.DoubleSide}));
+    body.receiveShadow=true; g.add(body);
+    const up2=pts=>pts.map(p2=>[p2[0],p2[1]+0.02,p2[2]]);
+    g.add(new THREE.Mesh(wedgeGeo(up2(eW),up2(eE),0.01),goreMat));
+    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.62,0.7),
+      new THREE.MeshStandardMaterial({color:0xf2a13c,roughness:0.6}));
+    nose.position.set(nx2,ny2,nz2); g.add(nose);
+  }
   // ---- 各IC（トランペット型: 降り=延長直結ランプ / 上り=西側ループ→側道橋で合流）----
   const xr=-83.0, drop=DH-0.56;
   ENTRIES.forEach(([ei,ej],idx)=>{
@@ -695,13 +721,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
         const bd=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.03,1.8),white);
         bd.position.set(-90+sd*(W/2),DH+0.02,base+dz2); g.add(bd);
       }
-      const zb=new THREE.Mesh(new THREE.PlaneGeometry(1.9,5.2),goreMat);   // 導流帯=分岐直前の路面(境界線上)
-      zb.rotation.x=-Math.PI/2;
-      zb.position.set(-90+sd*(W/2),DH+0.015, sd>0? (eastLoop? z-63.2 : z-56.2) : z-29.2); g.add(zb);
-      const nose=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.62,0.8),
-        new THREE.MeshStandardMaterial({color:0xf2a13c,roughness:0.6}));   // ノーズの緩衝クッション
-      nose.position.set(-90+sd*(W/2),DH+0.32, sd>0? (eastLoop? z-65.6 : z-58.6) : z-32.4); g.add(nose);
-    }
+    }   // 導流帯(ゼブラ)はここでは作らない: 現場ごとの縁線からくさび形の島を生成する(goreIsland)
     // 出口予告板
     { const bx=-80.6;                                 // 柱は地面から立てる
       const p=new THREE.Mesh(new THREE.BoxGeometry(0.26,DH+4.4,0.26),conc);
@@ -738,6 +758,11 @@ const CLIMBERS=[];                                     // 上りランプを登�
       }
       pv=[zz,hh2];
     }
+    { // 導流帯の島(南IC): 並走したままランプが下がる分流。取り付き上の細いくさび+ノーズは壁の切り始めを守る位置
+      const zsS=[z-59.0,z-57.9,z-56.8,z-55.8,z-54.7];
+      const exS=[-84.48,-84.31,-84.13,-83.92,-83.7];
+      goreIsland(zsS.map(zz=>[-84.5,6.01,zz]), zsS.map((zz,q)=>[exS[q],6.01,zz]), -84.3,6.34,z-55.0);
+    }
     } else {                                            // ---- 東ループ(北IC): 取り付き→左旋回で東へ→270°降下→西点で南向きに着地→側帯道路 ----
       const EC=[-72.5, z-62], ER=9;                     // 街区の北の空き地(z<-80)に収まる中心・半径
       const dpts=[[-83.0,0,z-61.0],[-82.6,0,z-58.2],[-81.6,0,z-55.7],[-79.6,0,z-53.9],[-77.0,0,z-53.1]];   // 接近路: 南向きのまま取り付きを出て左旋回で東向きへ(yは後で埋める)
@@ -764,8 +789,20 @@ const CLIMBERS=[];                                     // 上りランプを登�
         let dx=b4[0]-a3[0], dz2=b4[2]-a3[2]; const L2=Math.hypot(dx,dz2)||1; dx/=L2; dz2/=L2;
         return [p2[0]+dz2*off, p2[1]+dy, p2[2]-dx*off];
       });
-      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,2.15,0.55),0.09,0.6),wallD2));   // 両側ガードレール(導線の外側のみ)
-      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,-2.15,0.55),0.09,0.6),wallD2));
+      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,2.15,0.55),0.09,0.6),wallD2));   // 外側(東)レールは取り付きから連続
+      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,-2.15,0.55).slice(2),0.09,0.6),wallD2));   // 内側(西)レールはノーズから先だけ。手前は導流帯=塗装の領域
+      { // 導流帯の島(北IC): 本線縁線(x-84.5)とランプ西縁の間に開くくさびを、実際の縁線から生成
+        const wEd=offPath(dpts,-2.15,0).slice(0,5);
+        const wAt=zz=>{ for(let q=0;q<wEd.length-1;q++){ const a4=wEd[q],b5=wEd[q+1];
+            if((zz-a4[2])*(zz-b5[2])<=0){ const t3=(zz-a4[2])/((b5[2]-a4[2])||1e-6);
+              return [a4[0]+(b5[0]-a4[0])*t3, a4[1]+(b5[1]-a4[1])*t3]; } }
+          const l4=wEd[wEd.length-1]; return [l4[0],l4[1]]; };
+        const zsN=[z-57.8,z-56.7,z-55.6,z-54.5,z-53.4];
+        const eE2=zsN.map(zz=>{ const w3=wAt(zz); return [Math.max(w3[0],-84.48), w3[1]+0.02, zz]; });
+        goreIsland(zsN.map(zz=>[-84.5,6.01,zz]), eE2, -83.35,6.26,z-53.75);
+        const sl=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.03,8.0),white);   // ゴア手前は破線→実線に(実物の文法)
+        sl.position.set(-84.5,DH+0.02,z-61.8); g.add(sl);
+      }
       for(let k2=6;k2<dpts.length-2;k2+=5){
         const p2=dpts[k2];
         if(p2[1]>2.2){
@@ -868,8 +905,16 @@ const CLIMBERS=[];                                     // 上りランプを登�
       const tsk=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.9,8.6),conc);
       tsk.rotation.y=-0.21; tsk.position.set(-97.85,DH-1.0,z-29.8); g.add(tsk);
       for(const rr of [-2.15,2.15]){
-        const rl=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.6,8.6),wall);
-        rl.rotation.y=-0.21; rl.position.set(-97.85+rr,DH+0.28,z-29.8); g.add(rl);
+        const ln2= rr>0? 4.8 : 8.6;                    // 東側レールは導流帯の島の手前まで(レールが塗装を貫かないように)
+        const rl=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.6,ln2),wall);
+        rl.rotation.y=-0.21;
+        rl.position.set(-97.85+rr+(rr>0?0.40:0),DH+0.28,z-29.8-(rr>0?1.86:0)); g.add(rl);
+      }
+      { // 導流帯の島(西・合流): 本線西縁(x-95.5)と渡り線東縁の間の隙間を島で埋める。下流(北)へ細り、ノーズは上流端
+        const zsW=[z-33.5,z-31.6,z-29.7,z-27.8,z-26.0];
+        const bxW=zz=>{ const t3=((zz-z)+25.1)/(-8.45); return -96.6+1.8*t3; };   // 渡り線の東縁x(z線形: 南端-96.6→北端-94.8)
+        const eWw=zsW.map(zz=>[Math.min(bxW(zz),-95.52),6.01,zz]);
+        goreIsland(eWw, zsW.map(zz=>[-95.5,6.01,zz]), -95.95,6.34,z-26.4);
       }
     }
     }
