@@ -534,7 +534,7 @@ const HWCARS=[];                                       // ハイウェイを走�
     const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
     const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);                    // 色をだんだん道路色へ
       return new THREE.MeshStandardMaterial({color:segCol.getHex(),roughness:0.88,map:texRoad}); };
-    const z0=z-27, z1=z-5, nSeg=12;
+    const z0=z-27, z1=z-2.8, nSeg=12;
     const hAt=u=>DH-drop*(u*u*(3-2*u));
     let pv=[z0,hAt(0)];
     for(let s2=1;s2<=nSeg;s2++){
@@ -552,20 +552,23 @@ const HWCARS=[];                                       // ハイウェイを走�
       }
       pv=[zz,hh2];
     }
-    // クォーターカーブ（南向き→東向きへ弧を描いて接続口のタイル中心へ。色は道路色へ溶ける）
-    const C=[xr+5, z-5], R=5, aSeg=6;
+    // クォーターカーブ（タイルの西端でピタッと終わり、先はタイルのアスファルトに引き継ぐ）
+    const R=2.8, C=[xr+R, z-R], aSeg=6;
     for(let s2=0;s2<aSeg;s2++){
       const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
       const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
       const len=R*(Math.PI/2)/aSeg;
-      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.9),
+      const w2=3.9-0.7*((s2+1)/aSeg);                                          // 幅も道路幅へ先細り
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
         segMat(0.5+0.5*(s2+1)/aSeg));
-      seg.position.set(mx,0.33,mz);
+      seg.position.set(mx,0.345,mz);
       seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
       seg.receiveShadow=true; g.add(seg);
-      const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.9),wall);  // カーブ外周のガードレール
-      rl.rotation.y=seg.rotation.y;
-      rl.position.set(C[0]+(R+1.85)*Math.cos(tm),0.62,C[1]+(R+1.85)*Math.sin(tm)); g.add(rl);
+      if(s2<4){                                                                // 外周レールは市街に入る手前まで
+        const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
+        rl.rotation.y=seg.rotation.y;
+        rl.position.set(C[0]+(R+1.7)*Math.cos(tm),0.62,C[1]+(R+1.7)*Math.sin(tm)); g.add(rl);
+      }
     }
   }
   // 青看板（デッキの高さに合わせて高く）
