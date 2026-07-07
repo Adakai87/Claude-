@@ -567,11 +567,18 @@ const CLIMBERS=[];                                     // 上りランプを登�
     }
   }
   // ---- ゼブラ導流帯と標識のテクスチャ ----
-  const zebraTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64;
-    const t=c.getContext('2d'); t.strokeStyle='rgba(255,255,255,0.92)'; t.lineWidth=7;
-    for(let k=-64;k<128;k+=16){ t.beginPath(); t.moveTo(k,64); t.lineTo(k+64,0); t.stroke(); }
+  const goreTex=(()=>{ // ゴア部の導流帯: 白縁取りの三角形+内側に斜めストライプ（実物準拠）
+    const c=document.createElement('canvas'); c.width=128; c.height=256;
+    const t=c.getContext('2d');
+    t.beginPath(); t.moveTo(64,6); t.lineTo(10,250); t.lineTo(118,250); t.closePath();
+    t.save(); t.clip();
+    t.strokeStyle='rgba(255,255,255,0.95)'; t.lineWidth=9;
+    for(let k=-256;k<256;k+=26){ t.beginPath(); t.moveTo(k,256); t.lineTo(k+256,0); t.stroke(); }
+    t.restore();
+    t.lineWidth=8; t.strokeStyle='rgba(255,255,255,0.95)';
+    t.beginPath(); t.moveTo(64,6); t.lineTo(10,250); t.lineTo(118,250); t.closePath(); t.stroke();
     return new THREE.CanvasTexture(c); })();
-  const zebraMat=new THREE.MeshBasicMaterial({map:zebraTex,transparent:true,opacity:0.7,depthWrite:false});
+  const goreMat=new THREE.MeshBasicMaterial({map:goreTex,transparent:true,depthWrite:false});
   function makeBoard(lines,bg,fs){
     const c=document.createElement('canvas'); c.width=512; c.height=192;
     const t=c.getContext('2d'); t.fillStyle=bg; t.fillRect(0,0,512,192);
@@ -620,9 +627,13 @@ const CLIMBERS=[];                                     // 上りランプを登�
       rl.position.set(lx+sd*1.72,DH+0.45,z-37); g.add(rl);
       const rt=new THREE.Mesh(new THREE.BoxGeometry(0.22,1.0,8.0),wall);
       rt.rotation.y=sd*0.22; rt.position.set(lx+sd*1.72-sd*0.95,DH+0.45,z-49.4); g.add(rt);
-      const zb=new THREE.Mesh(new THREE.PlaneGeometry(2.4,4.4),zebraMat);
-      zb.rotation.x=-Math.PI/2; zb.rotation.z=sd*0.12;
-      zb.position.set(-90+sd*(W/2-1.2),DH+0.01,z-28.6); g.add(zb);
+      for(let dz2=-45.5;dz2<=-29.5;dz2+=3.4){          // 本線と加減速車線の境界の白破線
+        const bd=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.03,1.8),white);
+        bd.position.set(-90+sd*(W/2),DH+0.02,z+dz2); g.add(bd);
+      }
+      const zb=new THREE.Mesh(new THREE.PlaneGeometry(2.0,5.0),goreMat);   // 三角の導流帯（先端=進行方向の上流）
+      zb.rotation.x=-Math.PI/2;
+      zb.position.set(-90+sd*(W/2+0.35),DH+0.015,z-28.6); g.add(zb);
     }
     // 出口予告板（本線東側・出口の20m手前）
     { const bx=-90+W/2+2.4;
