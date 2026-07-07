@@ -165,6 +165,26 @@ const RENT=new Set(['cottage','jh_s','jh_m','mod_s','mod_m','apart','mansion','l
                     'bakery','cafe','flower','mart']);   // 賃料が入る建物（公共・装飾は対象外）
 let money=250000000;   // 初期資金¥2.5億（最初の街区バスケット×1.2で逆算）
 let day=1;
+// ---- 建物ライフサイクル（着工日sdだけ保存し、状態は日数差から計算する） ----
+const BUILD_DAYS={ cottage:3, jh_s:3, mod_s:3, jh_m:4, mod_m:4, apart:4,
+  mansion:5, lux:5, bakery:3, cafe:3, flower:3, mart:4, koban:3,
+  tree:0, park:2, fountain:2 };                        // 工事日数（ユーザー決定: 小3/中4/大5）
+function stageOf(b){                                   // site=整地 → frame=工事囲い → done=完成
+  const dur=BUILD_DAYS[b.type]||0; if(!dur) return 'done';
+  const el=day-(b.sd??-999);
+  if(el>=dur) return 'done';
+  return el<Math.max(1,Math.round(dur*0.4)) ? 'site' : 'frame';
+}
+function occOf(b){                                     // 入居済み人数（一軒家=一気、集合住宅=順次）
+  const dur=BUILD_DAYS[b.type]||0;
+  const el=day-(b.sd??-999)-dur;                       // 完成からの日数
+  if(el<0) return 0;
+  const cap= b.type==='mansion' ? RES.mansionPerFloor*b.floors : (RES[b.type]||0);
+  if(!cap) return 0;
+  if(b.type==='apart')   return Math.min(cap, 4*el);                    // 4人/日
+  if(b.type==='mansion') return Math.min(cap, RES.mansionPerFloor*el);  // 1フロア/日
+  return el>=1 ? cap : 0;                              // 一軒家は完成の翌日に一気に入居
+}
 function bldInvested(b){                             // 建設費＋増築の累計投資額（賃料の元本）
   let c=COSTS[b.type]||0;
   if(b.type==='mansion'&&b.floors>3) c+=50000000*(((b.floors-2)*(b.floors-1))/2-1);
@@ -172,13 +192,26 @@ function bldInvested(b){                             // 建設費＋増築の累
 }
 function calcDaily(){
   let rent=0;
-  for(const b of buildingsRef()) if(RENT.has(b.type)) rent+=bldInvested(b)*RENT_RATE;
+  for(const b of buildingsRef()){
+    if(!RENT.has(b.type)) continue;
+    if(stageOf(b)!=='done') continue;                  // 工事中は収入ゼロ
+    const cap= b.type==='mansion' ? RES.mansionPerFloor*b.floors : (RES[b.type]||0);
+    if(cap>0){ const o=occOf(b); if(o>0) rent+=bldInvested(b)*RENT_RATE*(o/cap); }   // 入居率に比例
+    else rent+=bldInvested(b)*RENT_RATE;               // 商業はお披露目=開店から満額
+  }
   rent=Math.round(rent);
   const tax=calcPop()*TAX_PER_RES;
   return {rent, tax, total:rent+tax};
 }
 function newDay(){                                   // 0時: 賃料＋住民税を1日分まとめて入金
   day++;
+  let fin=0;                                         // 工事の進行と完成チェック
+  for(const b of buildingsRef()){
+    const prev=b.vstage;
+    refreshBuildingVisual(b);
+    if(prev&&prev!=='done'&&b.vstage==='done') fin++;
+  }
+  rebuildNPCs();                                     // 入居が進むと歩く住民も増える
   const d=calcDaily();
   if(d.total>0){
     money+=d.total;
@@ -186,14 +219,12 @@ function newDay(){                                   // 0時: 賃料＋住民税
   }else{
     toast(`🌅 Day ${day} スタート`);
   }
+  if(fin) setTimeout(()=>toast(`🎉 工事完了！新しい建物がお披露目です（${fin}件）`),1900);
   updateHUD(); saveCity();
 }
-function calcPop(){
+function calcPop(){                                    // 人口=実際に入居した人数
   let p=0;
-  for(const b of buildingsRef()){
-    if(b.type==='mansion') p+=RES.mansionPerFloor*b.floors;
-    else p+=RES[b.type]||0;
-  }
+  for(const b of buildingsRef()) p+=occOf(b);
   return p;
 }
 let buildingsRef=()=>[];                             // buildings定義後に差し替え
@@ -721,14 +752,10 @@ function buildMesh(type, ghost=false, floors=3){
   return g;
 }
 function bldCenter(def,i,j){ return [ cx(i)+CS*(def.fw-1)/2, cz(j)+CS*(def.fd-1)/2 ]; }
-function placeBuilding(type,i,j,floors=3){
+function placeBuilding(type,i,j,floors=3,sd=null){
   const def=BLD_DEFS[type];
   const dir=nearRoadDir(i,j,def.fw,def.fd)||[0,1];
-  const g=buildMesh(type,false,floors);
   const [x,z]=bldCenter(def,i,j);
-  g.position.set(x,0.5,z);
-  g.rotation.y = def.noRoad ? ((i*7+j*13)%4)*(Math.PI/2) : Math.atan2(dir[0],dir[1]);
-  scene.add(g);
   for(let a=0;a<def.fw;a++)for(let b=0;b<def.fd;b++) bld[(j+b)*N+(i+a)]=1;
   let solid=null;
   if(!def.walkIn){
@@ -736,10 +763,62 @@ function placeBuilding(type,i,j,floors=3){
     solid={x0:x-def.fw*CS/2+m,x1:x+def.fw*CS/2-m,z0:z-def.fd*CS/2+(def.slim?1.3:0.4),z1:z+def.fd*CS/2-(def.slim?1.3:0.4)};
     SOLIDS.push(solid);
   }
-  const entry={type,i,j,floors,group:g,solid};
+  const entry={type,i,j,floors,solid, sd:(sd==null?day:sd), group:null, vstage:null,
+    rotY: def.noRoad ? ((i*7+j*13)%4)*(Math.PI/2) : Math.atan2(dir[0],dir[1])};
   buildings.push(entry);
-  if(typeof rebuildNPCs==='function') rebuildNPCs();   // 住民を更新（新しい家から人が出てくる）
+  refreshBuildingVisual(entry);                        // 着工日に応じて工事現場 or 完成形を表示
+  if(typeof rebuildNPCs==='function') rebuildNPCs();
   return entry;
+}
+// 工事現場の見た目（site=整地フェンス / frame=工事シート囲い+クレーン）
+function buildSite(def,stage){
+  const g=new THREE.Group();
+  const w=def.fw*CS, d=def.fd*CS;
+  const dirt=new THREE.Mesh(new THREE.BoxGeometry(w-0.4,0.16,d-0.4),
+    new THREE.MeshStandardMaterial({color:0xb08a5e,roughness:1}));
+  dirt.position.y=0.08; g.add(dirt);
+  const fm=new THREE.MeshStandardMaterial({color:0xeceff2,roughness:0.8});
+  const pm=new THREE.MeshStandardMaterial({color:0x93a0ab});
+  const fh=1.8;
+  for(const [px,pz,sx,sz] of [[0,-d/2+0.08,w-0.1,0.12],[0,d/2-0.08,w-0.1,0.12],
+                              [-w/2+0.08,0,0.12,d-0.1],[w/2-0.08,0,0.12,d-0.1]]){
+    const f=new THREE.Mesh(new THREE.BoxGeometry(sx,fh,sz),fm);
+    f.position.set(px,fh/2,pz); g.add(f);
+  }
+  for(const [px,pz] of [[-w/2+0.08,-d/2+0.08],[w/2-0.08,-d/2+0.08],[-w/2+0.08,d/2-0.08],[w/2-0.08,d/2-0.08]]){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(0.22,fh+0.4,0.22),pm);
+    p.position.set(px,(fh+0.4)/2,pz); g.add(p);
+  }
+  if(stage==='frame'){
+    const hh=def.up?8.5:(def.fw>=3?5.5:4.4);           // 建物の輪郭を覆う工事シート
+    const sheet=new THREE.Mesh(new THREE.BoxGeometry(w*0.78,hh,d*0.78),
+      new THREE.MeshStandardMaterial({color:0xe2e7ec,roughness:0.9}));
+    sheet.position.y=hh/2+0.1; g.add(sheet);
+    const band=new THREE.Mesh(new THREE.BoxGeometry(w*0.79,0.5,d*0.79),
+      new THREE.MeshStandardMaterial({color:0x4a7fc9}));
+    band.position.y=hh-0.4; g.add(band);
+    const pole=new THREE.Mesh(new THREE.BoxGeometry(0.24,hh+2.6,0.24),
+      new THREE.MeshStandardMaterial({color:0xe8a41f}));
+    pole.position.set(w*0.36,(hh+2.6)/2,d*0.36); g.add(pole);
+    const armL=Math.min(4,w*0.9);
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(armL,0.22,0.24),
+      new THREE.MeshStandardMaterial({color:0xe8a41f}));
+    arm.position.set(w*0.36-armL*0.4,hh+2.5,d*0.36); g.add(arm);
+  }
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  return g;
+}
+function refreshBuildingVisual(b){
+  const st=stageOf(b);
+  if(b.vstage===st && b.group) return;
+  if(b.group) scene.remove(b.group);
+  const def=BLD_DEFS[b.type];
+  b.group = st==='done' ? buildMesh(b.type,false,b.floors) : buildSite(def,st);
+  const [x,z]=bldCenter(def,b.i,b.j);
+  b.group.position.set(x,0.5,z);
+  b.group.rotation.y = st==='done' ? b.rotY : 0;
+  scene.add(b.group);
+  b.vstage=st;
 }
 // マンションの増築（追加工事）
 function upgradeBuilding(b){
@@ -860,6 +939,7 @@ function rebuildNPCs(){
   let k=0;
   for(const b of buildings){
     if(!(b.type in RES || b.type==='mansion')) continue;   // 住民は住宅から
+    if(occOf(b)<=0) continue;                              // まだ入居していない家からは出てこない
     const cell=homeRoadCell(b); if(!cell) continue;
     if(npcs.length>=24) break;                             // 表示上限（軽さ優先）
     const mesh=makeNPC(k);
@@ -903,8 +983,8 @@ const SAVE_KEY='mycity_v1';
 function saveCity(){
   try{
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v:3, money, day, road:Array.from(road),
-      b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors})),
+      v:4, money, day, road:Array.from(road),
+      b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors,sd:x.sd})),
       h:gameHour
     }));
   }catch(e){}
@@ -912,13 +992,14 @@ function saveCity(){
 function loadCity(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
-    if(!d||(d.v!==1&&d.v!==2&&d.v!==3)) return false;
+    if(!d||![1,2,3,4].includes(d.v)) return false;
+    money = (d.v>=2 && typeof d.money==='number') ? d.money : 250000000;
+    if(typeof d.day==='number') day=d.day;             // ※建物より先に読む（着工日→状態の計算に使う）
+    if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
     d.road.forEach((v,k)=>{ road[k]=v; });
     rebuildRoads();
-    for(const bb of (d.b||[])) placeBuilding(bb.t, bb.i, bb.j, bb.f||3);
-    money = (d.v>=2 && typeof d.money==='number') ? d.money : 250000000;
-    if(typeof d.day==='number') day=d.day;
-    if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
+    for(const bb of (d.b||[]))
+      placeBuilding(bb.t, bb.i, bb.j, bb.f||3, (d.v>=4&&typeof bb.sd==='number')? bb.sd : day-99);   // 旧セーブは完成扱い
     return true;
   }catch(e){ return false; }
 }
@@ -1068,6 +1149,19 @@ function refreshBPanel(){
   const b=selBld; if(!b) return;
   const def=BLD_DEFS[b.type];
   $('bptitle').textContent=`${def.ic} ${def.nm}`;
+  if(stageOf(b)!=='done'){                             // 工事中の表示
+    const left=BUILD_DAYS[b.type]-(day-b.sd);
+    $('bpbody').textContent=`🏗️ 工事中（完成まであと${left}日）`;
+    $('bpup').style.display='none';
+    return;
+  }
+  const cap= b.type==='mansion' ? RES.mansionPerFloor*b.floors : (RES[b.type]||0);
+  const occ=occOf(b);
+  if(cap>0 && occ<cap){                                // 入居中の表示
+    $('bpbody').textContent=`🚚 入居中 ${occ}/${cap}人（毎日ふえていきます）`;
+    $('bpup').style.display='none';
+    return;
+  }
   if(def.up){
     const cost=50000000*(b.floors-1), need=20*b.floors;
     $('bpbody').textContent=`${b.floors}階建て・住民${RES.mansionPerFloor*b.floors}人 ／ 増築: ${fmt(cost)}・要人口${need}人`;
