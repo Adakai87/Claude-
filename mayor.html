@@ -933,39 +933,94 @@ function homeRoadCell(b){                              // 家の外周から接�
   }
   return null;
 }
+const WORKPLACES=new Set(['bakery','cafe','flower','mart','koban']);
+function pathTo(from,to){                              // 道路グリッド上のBFS経路探索
+  const key=c=>c[1]*N+c[0];
+  if(key(from)===key(to)) return [];
+  const prev=new Map(); const q=[from]; prev.set(key(from),null);
+  while(q.length){
+    const c=q.shift();
+    if(key(c)===key(to)){
+      const path=[]; let k=c;
+      while(k && key(k)!==key(from)){ path.push(k); k=prev.get(key(k)); }
+      return path.reverse();
+    }
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nc=[c[0]+d[0],c[1]+d[1]];
+      if(!isRoadCell(nc[0],nc[1])||prev.has(key(nc))) continue;
+      prev.set(key(nc),c); q.push(nc);
+    }
+  }
+  return null;                                         // つながっていない
+}
 function rebuildNPCs(){
   for(const n of npcs) npcGroup.remove(n.mesh);
   npcs.length=0;
+  const roadCells=[];                                  // 「郊外勤務」用の遠い道路マス候補
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++) if(road[j*N+i]) roadCells.push([i,j]);
+  const works=buildings.filter(b=>WORKPLACES.has(b.type)&&stageOf(b)==='done')
+    .map(b=>homeRoadCell(b)).filter(Boolean);          // 職場（完成済みの店・施設の前）
   let k=0;
   for(const b of buildings){
-    if(!(b.type in RES || b.type==='mansion')) continue;   // 住民は住宅から
-    if(occOf(b)<=0) continue;                              // まだ入居していない家からは出てこない
-    const cell=homeRoadCell(b); if(!cell) continue;
-    if(npcs.length>=24) break;                             // 表示上限（軽さ優先）
+    if(!(b.type in RES || b.type==='mansion')) continue;
+    if(occOf(b)<=0) continue;                          // 入居前の家からは出てこない
+    const home=homeRoadCell(b); if(!home) continue;
+    if(npcs.length>=24) break;
+    let work= works.length ? works[k%works.length] : null;
+    if(!work && roadCells.length){                     // 店がまだ無ければ遠くの道路へ「通勤」
+      for(let t2=0;t2<6;t2++){ const c=roadCells[(k*31+t2*17)%roadCells.length];
+        if(Math.abs(c[0]-home[0])+Math.abs(c[1]-home[1])>=6){ work=c; break; } }
+      work=work||home;
+    }
     const mesh=makeNPC(k);
-    npcs.push({mesh, from:cell, to:cell, t:1, prev:null,
-      side:(k%2?1:-1)*(0.9+(k%3)*0.25),                    // 道の端を歩く（左右ばらけ）
+    npcs.push({mesh, home, work:work||home, from:home, to:home, t:1, prev:null,
+      anchor:null, path:[],
+      side:(k%2?1:-1)*(0.9+(k%3)*0.25),
       speed:1.0+((k*29)%10)/14, k});
     npcGroup.add(mesh);
     k++;
   }
 }
-function npcNext(n){
+function npcWander(n){                                 // 拠点(anchor)の周り2マスをうろうろ
   const cand=[[1,0],[-1,0],[0,1],[0,-1]]
     .map(d=>[n.from[0]+d[0],n.from[1]+d[1]])
     .filter(c=>isRoadCell(c[0],c[1]));
   if(!cand.length) return n.from;
-  const fwd=cand.filter(c=>!(n.prev&&c[0]===n.prev[0]&&c[1]===n.prev[1]));
-  const pool=fwd.length?fwd:cand;                      // 行き止まりだけUターン
-  return pool[Math.floor(Math.random()*pool.length)];
+  let pool=cand;
+  if(n.anchor){
+    const near=cand.filter(c=>Math.abs(c[0]-n.anchor[0])+Math.abs(c[1]-n.anchor[1])<=2);
+    if(near.length) pool=near;
+  }
+  const fwd=pool.filter(c=>!(n.prev&&c[0]===n.prev[0]&&c[1]===n.prev[1]));
+  const p2=fwd.length?fwd:pool;
+  return p2[Math.floor(Math.random()*p2.length)];
+}
+window.__npcs=npcs;                                    // デバッグ観測用（テストが内部状態を見る窓）
+function npcAnchorFor(n,h){                            // 生活スケジュール: 時間帯→今いるべき場所
+  if(h>=6.5&&h<16) return n.work;                      // 出勤〜勤務
+  if(h>=16&&h<22.2) return n.home;                     // 帰宅〜家の近所
+  return null;                                         // 就寝
 }
 function stepNPCs(dt,now){
-  const h=gameHour%24, active=h>6.3&&h<22.2;
+  const h=gameHour%24;
   for(const n of npcs){
-    n.mesh.visible = active || n.k%7===0;              // 夜はほぼ帰宅（たまに夜ふかし）
-    if(!n.mesh.visible) continue;
+    const anchor=npcAnchorFor(n,h);
+    const awake= anchor!==null || n.k%7===0;           // 夜は就寝（夜ふかし枠だけ徘徊）
+    n.mesh.visible=awake;
+    if(!awake){                                        // 寝ている間に家へ戻しておく（朝は家から出発）
+      n.from=n.home; n.to=n.home; n.t=1; n.path=[]; n.anchor=null;
+      continue;
+    }
     n.t+=dt*n.speed/CS;
-    if(n.t>=1){ n.prev=n.from; n.from=n.to; n.to=npcNext(n); n.t=0; }
+    if(n.t>=1){
+      n.prev=n.from; n.from=n.to;
+      if(anchor && (!n.anchor||anchor[0]!==n.anchor[0]||anchor[1]!==n.anchor[1])){
+        n.anchor=anchor;                               // 目的地が変わった→経路を引き直す
+        n.path=pathTo(n.from,anchor)||[];
+      }
+      n.to = (n.path&&n.path.length) ? n.path.shift() : npcWander(n);
+      n.t=0;
+    }
     const fx=cx(n.from[0]), fz=cz(n.from[1]), dx=cx(n.to[0])-fx, dz=cz(n.to[1])-fz;
     const len=Math.hypot(dx,dz)||1, ox=-dz/len*n.side, oz=dx/len*n.side;
     n.mesh.position.set(fx+dx*n.t+ox, 0.55+Math.abs(Math.sin(now*0.009+n.k*2))*0.05, fz+dz*n.t+oz);
