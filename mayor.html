@@ -504,21 +504,22 @@ const HWCARS=[];                                       // ハイウェイを走�
     const d=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.04,3.2),white);
     d.position.set(HX,DH+0.02,z); g.add(d);
   }
-  // 橋脚（14mごと）
+  // 橋脚（14mごと。接続口の高架下通路の部分だけ間引く）
   for(let z=Z0+7;z<Z1-3;z+=14){
+    if(ENTRIES.some(e=>Math.abs(z-cz(e[1]))<7)) continue;
     const col=new THREE.Mesh(new THREE.BoxGeometry(1.7,DH-1.4,1.7),conc);
     col.position.set(HX,(DH-1.4)/2,z); g.add(col);
     const cap=new THREE.Mesh(new THREE.BoxGeometry(W*0.8,0.5,2.2),conc);
     cap.position.set(HX,DH-1.35,z); g.add(cap);
   }
-  // 防音壁（西は通し、東はランプ合流部だけ切れ目）
+  // 防音壁（東=降り口、西=上り合流部にそれぞれ切れ目）
   const zA=cz(ENTRIES[0][1]), zB=cz(ENTRIES[1][1]);
-  const ww=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,Z1-Z0),wall);
-  ww.position.set(HX-W/2+0.3,DH+0.45,(Z0+Z1)/2); g.add(ww);
   for(const [a,b2] of [[Z0,zA-31.2],[zA-26,zB-31.2],[zB-26,Z1]]){
     if(b2<=a) continue;
     const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
     r.position.set(HX+W/2-0.3,DH+0.45,(a+b2)/2); g.add(r);
+    const r2=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
+    r2.position.set(HX-W/2+0.3,DH+0.45,(a+b2)/2); g.add(r2);
   }
   // 降りランプ（S字の坂→クォーターカーブで下町の道へなめらかに合流）
   const xr=-83.0, drop=DH-0.56;
@@ -570,6 +571,55 @@ const HWCARS=[];                                       // ハイウェイを走�
         rl.position.set(C[0]+(R+1.7)*Math.cos(tm),0.62,C[1]+(R+1.7)*Math.sin(tm)); g.add(rl);
       }
     }
+    // ===== オンランプ（街→高架下をくぐる→西側で北へ旋回→登って北行き車線に合流） =====
+    const roadMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad});
+    const under=new THREE.Mesh(new THREE.BoxGeometry(15.0,0.45,3.2),roadMat);  // 高架下の通路
+    under.position.set(-87.3,0.345,z); under.receiveShadow=true; g.add(under);
+    for(let dxd=-84;dxd>=-93;dxd-=4){                                          // 通路の白破線
+      const d2=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.03,0.26),white);
+      d2.position.set(dxd,0.58,z); g.add(d2);
+    }
+    const C2=[-94.2, z-2.8], R2=2.8, xw=-97.0;                                 // 西側クォーターカーブ（西向き→北向き）
+    for(let s2=0;s2<aSeg;s2++){
+      const tm2=Math.PI/2+(Math.PI/2)*((s2+0.5)/aSeg);
+      const mx=C2[0]+R2*Math.cos(tm2), mz=C2[1]+R2*Math.sin(tm2);
+      const len=R2*(Math.PI/2)/aSeg;
+      const w2=3.2+0.7*((s2+1)/aSeg);
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
+        segMat(1-0.5*((s2+1)/aSeg)));                                          // 道路色→ハイウェイ色へ(前半)
+      seg.position.set(mx,0.345,mz);
+      seg.rotation.y=Math.atan2(-Math.sin(tm2),Math.cos(tm2));
+      seg.receiveShadow=true; g.add(seg);
+      if(s2>1){                                                                // 外周レール
+        const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
+        rl.rotation.y=seg.rotation.y;
+        rl.position.set(C2[0]+(R2+1.7)*Math.cos(tm2),0.62,C2[1]+(R2+1.7)*Math.sin(tm2)); g.add(rl);
+      }
+    }
+    // 登り坂（南=地上 → 北=デッキ高。降り坂の鏡像）
+    let pv2=[z-2.8,0.56];
+    for(let s2=1;s2<=nSeg;s2++){
+      const u=s2/nSeg, zz=(z-2.8)+((z-27)-(z-2.8))*u, hh2=0.56+drop*(u*u*(3-2*u));
+      const len=Math.hypot(zz-pv2[0],hh2-pv2[1]);
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),
+        segMat(0.5*(1-u)));                                                    // 登るほどハイウェイ色へ(後半)
+      seg.position.set(xw,(hh2+pv2[1])/2-0.24,(zz+pv2[0])/2);
+      seg.rotation.x=Math.atan2(pv2[1]-hh2,zz-pv2[0]);
+      seg.receiveShadow=true; g.add(seg);
+      for(const sx of [-1.9,1.9]){
+        const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.6,len+0.55),wall);
+        c2.rotation.x=seg.rotation.x;
+        c2.position.set(xw+sx,(hh2+pv2[1])/2+0.14,(zz+pv2[0])/2); g.add(c2);
+      }
+      pv2=[zz,hh2];
+    }
+    // デッキへの合流取り付き（西側）
+    const top2=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);
+    top2.position.set(HX-W/2-0.9,DH-0.28,z-28.6); g.add(top2);
+    const nr2=new THREE.Mesh(new THREE.BoxGeometry(4.1,1.0,0.25),wall);
+    nr2.position.set(HX-W/2-1.8,DH+0.45,z-30.9); g.add(nr2);
+    const wr2=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);
+    wr2.position.set(HX-W/2-3.7,DH+0.45,z-28.75); g.add(wr2);
   }
   // 青看板（デッキの高さに合わせて高く）
   const pole=new THREE.Mesh(new THREE.BoxGeometry(0.3,9.2,0.3),conc);
