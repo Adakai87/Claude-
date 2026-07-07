@@ -72,6 +72,13 @@
   #money{top:100px;color:var(--gold)} #pop{top:142px} #daily{top:184px;color:#8fe8a0}
   #skip{position:fixed;left:178px;top:56px;padding:6px 13px;font-size:13px;border-radius:16px}
   #reset{position:fixed;left:12px;top:228px;width:38px;height:38px;border-radius:50%;font-size:16px;padding:0;opacity:.85}
+  #share{position:fixed;left:12px;top:274px;width:38px;height:38px;border-radius:50%;font-size:15px;padding:0;opacity:.85}
+  #sharepanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--navy);
+    border:2.5px solid rgba(255,255,255,.85);border-radius:18px;padding:16px;width:min(420px,92vw);
+    box-shadow:0 6px 20px rgba(10,40,80,.5);display:none;z-index:20;text-align:center}
+  #sharepanel.show{display:block}
+  #sharetext{width:100%;height:110px;border-radius:10px;border:2px solid rgba(255,255,255,.4);
+    background:#0d2846;color:#cfe4f4;font-size:10px;font-family:monospace;padding:8px;resize:none;box-sizing:border-box}
   #bpanel{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);border-radius:18px;
     padding:12px 18px;border:2.5px solid rgba(255,255,255,.85);text-align:center;display:none;min-width:220px}
   #bpanel.show{display:block}
@@ -96,6 +103,18 @@
 <div id="pop">👥 0人</div>
 <div id="daily">📈 ¥0/日</div>
 <button class="btn red" id="reset">🗑️</button>
+<button class="btn" id="share">📋</button>
+<div id="sharepanel">
+  <div style="color:#fff;font-weight:900;font-size:15px;margin-bottom:8px">📋 街のデータ共有</div>
+  <textarea id="sharetext" spellcheck="false"></textarea>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+    <button class="btn green" id="shcopy">📤 コピー</button>
+    <button class="btn" id="shload">📥 読み込む</button>
+    <button class="btn red" id="shclose" style="width:44px;border-radius:50%;padding:0">✕</button>
+  </div>
+  <div style="color:#8fa8c7;font-size:11px;font-weight:700;margin-top:8px;line-height:1.5">
+    コピーしてチャットに貼れば開発者が同じ街を再現できます。<br>貼り付けて「読み込む」でバックアップ復元もOK。</div>
+</div>
 <button class="btn" id="dive">🚶 ダイブイン</button>
 <button class="btn" id="build">🔨</button>
 
@@ -1625,6 +1644,27 @@ $('reset').onclick=()=>{
   if(confirm('街を最初から作り直しますか？（保存データを消します）')){
     localStorage.removeItem(SAVE_KEY); location.reload();
   }
+};
+// 街のデータ共有（コピーで開発者に渡す／貼り付けて復元）
+$('share').onclick=()=>{
+  saveCity();
+  $('sharetext').value=localStorage.getItem(SAVE_KEY)||'';
+  $('sharepanel').classList.add('show');
+};
+$('shclose').onclick=()=>$('sharepanel').classList.remove('show');
+$('shcopy').onclick=async()=>{
+  const t=$('sharetext'); t.select(); t.setSelectionRange(0,999999);
+  try{ await navigator.clipboard.writeText(t.value); toast('📤 コピーしました！チャットに貼って共有できます'); }
+  catch(e){ document.execCommand('copy'); toast('📤 コピーしました！'); }
+};
+$('shload').onclick=()=>{
+  const v=$('sharetext').value.trim();
+  try{
+    const d=JSON.parse(v);
+    if(!d||![1,2,3,4].includes(d.v)) throw 0;
+    if(!confirm('貼り付けたデータで街を上書きしますか？（今の街は消えます）')) return;
+    localStorage.setItem(SAVE_KEY,v); location.reload();
+  }catch(e){ toast('❌ データの形式が正しくないみたい'); }
 };
 $('dive').onclick=diveIn;
 $('mayorbtn').onclick=ascend;
