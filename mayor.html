@@ -526,6 +526,10 @@ const HWCARS=[];                                       // ハイウェイを走�
     const z=cz(ej);
     const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);          // デッキから分岐する取り付き
     top.position.set(HX+W/2+0.9,DH-0.28,z-28.6); g.add(top);
+    const nr=new THREE.Mesh(new THREE.BoxGeometry(5.9,1.0,0.25),wall);          // 取り付き北縁のレール
+    nr.position.set(HX+W/2+0.9,DH+0.45,z-30.9); g.add(nr);
+    const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);          // 取り付き先端(東縁)のレール
+    er.position.set(HX+W/2+3.7,DH+0.45,z-28.75); g.add(er);
     // なめらかな坂（smoothstep: 上端も下端も丸く折れずに繋がる）
     const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
     const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);                    // 色をだんだん道路色へ
