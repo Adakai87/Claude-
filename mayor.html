@@ -181,6 +181,8 @@ function occOf(b){                                     // 入居済み人数（�
   if(el<0) return 0;
   const cap= b.type==='mansion' ? RES.mansionPerFloor*b.floors : (RES[b.type]||0);
   if(!cap) return 0;
+  const rc=homeRoadCell(b);
+  if(!rc || !CONN[rc[1]*N+rc[0]]) return 0;            // 幹線道路に未接続=別世界から移住が来られない
   if(b.type==='apart')   return Math.min(cap, 4*el);                    // 4人/日
   if(b.type==='mansion') return Math.min(cap, RES.mansionPerFloor*el);  // 1フロア/日
   return el>=1 ? cap : 0;                              // 一軒家は完成の翌日に一気に入居
@@ -255,7 +257,8 @@ const sdLand=(x,z)=>Math.min(sdSea(x,z), sdRiv(x,z));                // 水辺�
 const rockF=x=>clamp01((Math.sin(x*0.024+1.2)+Math.sin(x*0.055+0.3))*0.9-0.15);   // 岩場海岸ゾーン(0..1)
 function hillH(x,z){                                                 // 外周の丘（建設エリアと水辺では0）
   const m0=clamp01((Math.max(Math.abs(x),Math.abs(z))-92)/26)
-           *clamp01((156-Math.max(Math.abs(x),Math.abs(z)))/12);   // マップ外縁では0に戻す（崖の断面が見えないように）
+           *clamp01((156-Math.max(Math.abs(x),Math.abs(z)))/12)    // マップ外縁では0に戻す（崖の断面が見えないように）
+           *clamp01((Math.abs(x+90)-9)/8);                         // 幹線道路の回廊は平ら
   if(m0<=0) return 0;
   const mSea=clamp01((sdSea(x,z)-16)/14), mRiv=clamp01((sdRiv(x,z)-6.5)/10);
   const n=0.5+0.5*Math.sin(x*0.041+1.7)*Math.sin(z*0.036+0.6);
@@ -361,6 +364,7 @@ let seaMesh=null;                                    // 波アニメ用（ルー
     const bx=-158+gi*4+hash(gi,gj)*3, bz=-158+gj*4+hash(gj,gi)*3;
     const out=Math.max(Math.abs(bx),Math.abs(bz))>90;                // 建設エリアの外だけ
     const s=sdSea(bx,bz), r=sdRiv(bx,bz), hh=hillH(bx,bz);
+    if(Math.abs(bx+90)<9) continue;                                  // 幹線道路の上には生やさない
     if(out && s>15 && r>6){                                          // 森はクランプ状に（一様バラマキは嘘くさい）
       const forest=0.5+0.5*Math.sin(bx*0.03+0.9)*Math.sin(bz*0.027+1.8);
       if(hash(gi*3+1,gj*7+2)<forest*0.55) trees.push([bx,bz,0.75+hash(gi*5,gj*3)*0.85]);
@@ -410,6 +414,55 @@ const cx=i=>-GH+i*CS+CS/2, cz=j=>-GH+j*CS+CS/2;
 const inGrid=(i,j)=>i>=0&&j>=0&&i<N&&j<N;
 const buildable=(i,j)=> inGrid(i,j) && sdLand(cx(i),cz(j))>10;   // 浜と海はNG(赤)
 
+// ---- 幹線道路（西端・別世界とつながるハイウェイ）----
+const ENTRIES=[[0,12],[0,26]];                       // 接続口（撤去不可の道路マス）
+const isEntry=(i,j)=>ENTRIES.some(e=>e[0]===i&&e[1]===j);
+const CONN=new Uint8Array(N*N);                      // 幹線道路に繋がっている道路マス=1
+function recomputeConn(){                            // 接続口からBFSで塗る
+  CONN.fill(0);
+  const q=[];
+  for(const [ei,ej] of ENTRIES) if(road[ej*N+ei]){ CONN[ej*N+ei]=1; q.push([ei,ej]); }
+  while(q.length){
+    const [i,j]=q.pop();
+    for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const ii=i+dx, jj=j+dz;
+      if(inGrid(ii,jj)&&road[jj*N+ii]&&!CONN[jj*N+ii]){ CONN[jj*N+ii]=1; q.push([ii,jj]); }
+    }
+  }
+}
+{ // ハイウェイの3D（南北に貫き、北の山の向こう=別世界へ消える）
+  const g=new THREE.Group();
+  const asp=new THREE.MeshStandardMaterial({color:0x6e747e,roughness:0.9});
+  const white=new THREE.MeshStandardMaterial({color:0xf2f0e8,roughness:0.8});
+  const rail=new THREE.MeshStandardMaterial({color:0xb9c0c8,roughness:0.5,metalness:0.3});
+  const HX=-90, W=11, Z0=-160, Z1=84;
+  const strip=new THREE.Mesh(new THREE.BoxGeometry(W,0.5,Z1-Z0),asp);
+  strip.position.set(HX,0.30,(Z0+Z1)/2); strip.receiveShadow=true; g.add(strip);
+  for(let z=Z0+6;z<Z1-4;z+=9){
+    const d=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.04,3.2),white);
+    d.position.set(HX,0.58,z); g.add(d);
+  }
+  const wr=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.55,Z1-Z0),rail);   // 西側ガードレール
+  wr.position.set(HX-W/2+0.3,0.82,(Z0+Z1)/2); g.add(wr);
+  const zA=cz(ENTRIES[0][1]), zB=cz(ENTRIES[1][1]);
+  for(const [a,b2] of [[Z0,zA-4],[zA+4,zB-4],[zB+4,Z1]]){   // 東側はランプの切れ目つき
+    if(b2<=a) continue;
+    const r=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.55,b2-a),rail);
+    r.position.set(HX+W/2-0.3,0.82,(a+b2)/2); g.add(r);
+  }
+  for(const [ei,ej] of ENTRIES){                     // 接続ランプ（ハイウェイ→接続口）
+    const ramp=new THREE.Mesh(new THREE.BoxGeometry(7.5,0.5,5),asp);
+    ramp.position.set(-81.5,0.28,cz(ej)); ramp.receiveShadow=true; g.add(ramp);
+  }
+  const pole=new THREE.Mesh(new THREE.BoxGeometry(0.25,4.6,0.25),rail);
+  pole.position.set(HX+W/2+1.2,2.3,Z0+24); g.add(pole);
+  const board=new THREE.Mesh(new THREE.BoxGeometry(0.2,2.2,5.4),
+    new THREE.MeshStandardMaterial({color:0x2b6fb8}));   // 青看板「別世界へ」
+  board.position.set(HX+W/2+1.2,4.2,Z0+24); g.add(board);
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  scene.add(g);
+}
+
 // ================= 道路の描画（オートタイル） =================
 const roadGroup=new THREE.Group(); scene.add(roadGroup);
 const asMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85});
@@ -439,6 +492,7 @@ function rebuildRoads(){
     if(mask===0b0011||mask===0b0001||mask===0b0010){ const d=new THREE.Mesh(new THREE.BoxGeometry(CS*0.34,0.02,0.28),dashMat); d.position.set(x,Y+0.06,z); roadGroup.add(d); }
     if(mask===0b1100||mask===0b0100||mask===0b1000){ const d=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.02,CS*0.34),dashMat); d.position.set(x,Y+0.06,z); roadGroup.add(d); }
   }
+  recomputeConn();                                   // 道路が変わるたびに幹線道路との接続を再計算
 }
 
 // ================= 建物（敷地サイズ可変・道路沿いにのみ建つ） =================
@@ -996,6 +1050,10 @@ function npcWander(n){                                 // 拠点(anchor)の周�
   return p2[Math.floor(Math.random()*p2.length)];
 }
 window.__npcs=npcs;                                    // デバッグ観測用（テストが内部状態を見る窓）
+window.__dbg={ roadSet:(i,j,v)=>{ road[j*N+i]=v?1:0; rebuildRoads(); },
+  place:(t,i,j)=>{ const e=placeBuilding(t,i,j); saveCity(); return !!e; },
+  conn:(i,j)=>CONN[j*N+i], pop:()=>calcPop(), dayN:()=>day,
+  occ:(ix)=>occOf(buildings[ix]), nb:()=>buildings.length };
 function npcAnchorFor(n,h){                            // 生活スケジュール: 時間帯→今いるべき場所
   if(h>=6.5&&h<16) return n.work;                      // 出勤〜勤務
   if(h>=16&&h<22.2) return n.home;                     // 帰宅〜家の近所
@@ -1136,8 +1194,8 @@ $('confirm').onclick=()=>{
     if(!pay(cost)){ toast('💸 お金が足りない！（'+fmt(cost)+'）'); return; }
     placeBuilding(tool.slice(4), ...ghostAt);
     saveCity(); updateHUD();
-    const res = ghostType==='mansion'? RES.mansionPerFloor*3 : RES[ghostType]||0;
-    toast( res>0 ? `🏠 建設！ ${res}人が入居しました` : '🔨 建設しました！' );
+    const dur=BUILD_DAYS[ghostType]||0;
+    toast( dur>0 ? `🏗️ 着工！ 完成まで${dur}日` : '🌳 設置しました！' );
     ghostValid=false; ghostPlate.material=plateNG;
     return;
   }
@@ -1212,6 +1270,14 @@ function refreshBPanel(){
   }
   const cap= b.type==='mansion' ? RES.mansionPerFloor*b.floors : (RES[b.type]||0);
   const occ=occOf(b);
+  if(cap>0){
+    const rc=homeRoadCell(b);
+    if(!rc || !CONN[rc[1]*N+rc[0]]){                   // 幹線道路未接続の警告
+      $('bpbody').textContent='⚠️ 幹線道路に未接続（別世界から移住が来られません）';
+      $('bpup').style.display='none';
+      return;
+    }
+  }
   if(cap>0 && occ<cap){                                // 入居中の表示
     $('bpbody').textContent=`🚚 入居中 ${occ}/${cap}人（毎日ふえていきます）`;
     $('bpup').style.display='none';
@@ -1359,6 +1425,7 @@ function paint(e){
 }
 function paintCell(i,j){
   if(tool==='erase'){
+    if(isEntry(i,j)){ toast('🛣️ 幹線道路の接続口は撤去できないよ'); return; }
     if(inGrid(i,j)&&road[j*N+i]){ pending.add(i+','+j); redrawPreview(); updateConfirm(); }
     else if(inGrid(i,j)&&bld[j*N+i]){                       // 建物の撤去は即時
       const idx=buildings.findIndex(b=>{ const def=BLD_DEFS[b.type];
@@ -1422,6 +1489,12 @@ function applyTimeOfDay(){
 
 // 起動時にロード（保存があれば街が蘇る）
 if(loadCity()) toast('🏙️ おかえりなさい、市長！');
+for(const [ei,ej] of ENTRIES) road[ej*N+ei]=1;       // 幹線道路の接続口は常に存在
+rebuildRoads();
+setTimeout(()=>{                                     // 未接続の家があればヒント
+  if(buildings.some(b=>(b.type in RES||b.type==='mansion') && stageOf(b)==='done' && occOf(b)===0))
+    toast('🛣️ 幹線道路（西の高速）に道をつないで移住者を呼ぼう！');
+},2600);
 updateHUD();
 
 // ================= ループ =================
