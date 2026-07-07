@@ -518,6 +518,10 @@ const CLIMBERS=[];                                     // 上りランプを登�
   const white=new THREE.MeshStandardMaterial({color:0xf2f0e8,roughness:0.8});
   const wall=new THREE.MeshStandardMaterial({color:0xd7dade,roughness:0.85});
   const joint=new THREE.MeshStandardMaterial({color:0x565c66,roughness:0.9});
+  const ropeMat=new THREE.MeshStandardMaterial({color:0x9aa2ab,roughness:0.4,metalness:0.5});
+  const postMat=new THREE.MeshStandardMaterial({color:0xe8e6e0,roughness:0.6});
+  const reflMat=new THREE.MeshStandardMaterial({color:0xff8c3a,emissive:0xff7a2a,emissiveIntensity:0.06});
+  TOD.windows.push(reflMat);                           // デリニエーター(視線誘導標)は夜に光る
   const W=11, Z0=-160, Z1=84, DH=6.0;
   const hwAng=z=>Math.atan2(HWX(z+4)-HWX(z-4),8);
   // ---- 本線デッキ（緩カーブ: セグメント分割で曲げる。3枚ごとに橋桁の継ぎ目）----
@@ -531,8 +535,21 @@ const CLIMBERS=[];                                     // 上りランプを登�
       const jt=new THREE.Mesh(new THREE.BoxGeometry(W-0.7,0.03,0.34),joint);
       jt.position.set(x,DH+0.005,zm-4); jt.rotation.y=a; g.add(jt);
     }
-    const d=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.04,3.2),white);
-    d.position.set(x,DH+0.02,zm); d.rotation.y=a; g.add(d);
+    const nx2=Math.cos(a), nz2=-Math.sin(a);
+    for(const sd of [1,-1]){                           // 車道外側線(白実線・路肩との境界)
+      const el=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.03,8.9),white);
+      el.position.set(x+sd*(W/2-1.05)*nx2,DH+0.02,zm+sd*(W/2-1.05)*nz2);
+      el.rotation.y=a; g.add(el);
+    }
+    for(const ry of [0.42,0.68]){                      // 中央はワイヤーロープ式防護柵(暫定2車線の実物準拠)
+      const rope=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,8.95),ropeMat);
+      rope.position.set(x,DH+ry,zm); rope.rotation.y=a; g.add(rope);
+    }
+    for(let pz=-3;pz<=3;pz+=3){
+      const zz2=zm+pz;
+      const post=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.82,0.09),postMat);
+      post.position.set(HWX(zz2),DH+0.41,zz2); g.add(post);
+    }
   }
   // ---- 橋脚（接続口の高架下通路は間引く）----
   for(let z=Z0+7;z<Z1-3;z+=14){
@@ -552,6 +569,8 @@ const CLIMBERS=[];                                     // 上りランプを登�
       const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,8.6),wall);
       r.position.set(x+sd*(W/2-0.3)*nx,DH+0.45,zm+sd*(W/2-0.3)*nz);
       r.rotation.y=a; g.add(r);
+      const rf=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.13),reflMat);   // 視線誘導標
+      rf.position.set(x+sd*(W/2-0.3)*nx,DH+1.02,zm+sd*(W/2-0.3)*nz); g.add(rf);
     }
   }
   // ---- ハイマスト照明 ----
@@ -817,6 +836,21 @@ function rebuildRoads(){
       const side=((i+j)&1)?1:-1;
       if(mask===0b0011) roadGroup.add(makeLamp(x, z+side*(CS/2-0.35), 0, side));
       else              roadGroup.add(makeLamp(x+side*(CS/2-0.35), z, 1, side));
+    }
+    // 交差点(3方向以上)に横断歩道+停止線（実物準拠: バーは進行方向に平行・停止線は左車線側）
+    const arms=((mask&1)?1:0)+((mask&2)?1:0)+((mask&4)?1:0)+((mask&8)?1:0);
+    if(arms>=3){
+      dirs.forEach(([dx,dz],k)=>{
+        if(!(mask&(1<<k))) return;
+        for(let o=-3;o<=3;o++){
+          const cw=new THREE.Mesh(new THREE.BoxGeometry(dx?1.35:0.24,0.02,dx?0.24:1.35),dashMat);
+          cw.position.set(x+dx*2.0+(dx?0:o*0.44), Y+0.075, z+dz*2.0+(dz?0:o*0.44));
+          roadGroup.add(cw);
+        }
+        const sl=new THREE.Mesh(new THREE.BoxGeometry(dx?0.18:1.45,0.02,dx?1.45:0.18),dashMat);
+        sl.position.set(x+dx*3.1-dz*0.8, Y+0.075, z+dz*3.1+dx*0.8);
+        roadGroup.add(sl);
+      });
     }
   }
   recomputeConn();                                   // 道路が変わるたびに幹線道路との接続を再計算
