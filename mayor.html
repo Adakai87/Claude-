@@ -515,26 +515,46 @@ const HWCARS=[];                                       // ハイウェイを走�
   const zA=cz(ENTRIES[0][1]), zB=cz(ENTRIES[1][1]);
   const ww=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,Z1-Z0),wall);
   ww.position.set(HX-W/2+0.3,DH+0.45,(Z0+Z1)/2); g.add(ww);
-  for(const [a,b2] of [[Z0,zA-27],[zA-19,zB-27],[zB-19,Z1]]){
+  for(const [a,b2] of [[Z0,zA-32],[zA-26,zB-32],[zB-26,Z1]]){
     if(b2<=a) continue;
     const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
     r.position.set(HX+W/2-0.3,DH+0.45,(a+b2)/2); g.add(r);
   }
-  // 降りランプ（デッキ→地上へ坂道→接続口）
-  const drop=DH-0.55, run=22, theta=Math.atan2(drop,run);
+  // 降りランプ（S字の坂→クォーターカーブで下町の道へなめらかに合流）
+  const xr=-83.0, drop=DH-0.56;
   for(const [ei,ej] of ENTRIES){
     const z=cz(ej);
-    const top=new THREE.Mesh(new THREE.BoxGeometry(5.6,0.55,4.6),asp);          // デッキから分岐する取り付き
-    top.position.set(HX+W/2+0.9,DH-0.28,z-25); g.add(top);
-    const slope=new THREE.Mesh(new THREE.BoxGeometry(4.6,0.5,Math.hypot(run,drop)+1),asp);
-    slope.rotation.x=theta;                                                      // +zへ降りる坂
-    slope.position.set(-83.2,(DH+0.55)/2-0.05,z-12.4); slope.receiveShadow=true; g.add(slope);
-    for(const sx of [-83.2-2.2,-83.2+2.2]){                                      // 坂の縁石
-      const k=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.45,Math.hypot(run,drop)+1),wall);
-      k.rotation.x=theta; k.position.set(sx,(DH+0.55)/2+0.22,z-12.4); g.add(k);
+    const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);          // デッキから分岐する取り付き
+    top.position.set(HX+W/2+0.9,DH-0.28,z-28.6); g.add(top);
+    // なめらかな坂（smoothstep: 上端も下端も丸く折れずに繋がる）
+    const z0=z-27, z1=z-5, nSeg=12;
+    const hAt=u=>DH-drop*(u*u*(3-2*u));
+    let pv=[z0,hAt(0)];
+    for(let s2=1;s2<=nSeg;s2++){
+      const u=s2/nSeg, zz=z0+(z1-z0)*u, hh2=hAt(u);
+      const len=Math.hypot(zz-pv[0],hh2-pv[1]);
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),asp);
+      seg.position.set(xr,(hh2+pv[1])/2-0.24,(zz+pv[0])/2);
+      seg.rotation.x=Math.atan2(pv[1]-hh2,zz-pv[0]);
+      seg.receiveShadow=true; g.add(seg);
+      for(const sx of [-1.9,1.9]){                                              // 縁石も坂に追従
+        const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.38,len+0.55),wall);
+        c2.rotation.x=seg.rotation.x;
+        c2.position.set(xr+sx,(hh2+pv[1])/2+0.04,(zz+pv[0])/2); g.add(c2);
+      }
+      pv=[zz,hh2];
     }
-    const stub=new THREE.Mesh(new THREE.BoxGeometry(7.5,0.5,6),asp);             // 地上の取り付き→接続口
-    stub.position.set(-81.5,0.28,z); stub.receiveShadow=true; g.add(stub);
+    // クォーターカーブ（南向き→東向きへ弧を描いて接続口のタイル中心へ）
+    const C=[xr+5, z-5], R=5, aSeg=6;
+    for(let s2=0;s2<aSeg;s2++){
+      const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
+      const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
+      const len=R*(Math.PI/2)/aSeg;
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.9),asp);
+      seg.position.set(mx,0.33,mz);
+      seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
+      seg.receiveShadow=true; g.add(seg);
+    }
   }
   // 青看板（デッキの高さに合わせて高く）
   const pole=new THREE.Mesh(new THREE.BoxGeometry(0.3,9.2,0.3),conc);
@@ -591,7 +611,9 @@ function rebuildRoads(){
     const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
     let mask=0;
     dirs.forEach(([dx,dz],k)=>{
-      if(inGrid(i+dx,j+dz)&&road[(j+dz)*N+i+dx]){
+      const nbr=inGrid(i+dx,j+dz)&&road[(j+dz)*N+i+dx];
+      const virt=isEntry(i,j)&&dx===-1;                // 接続口は西(ランプ側)へ道が開く
+      if(nbr||virt){
         mask|=1<<k;
         const c=new THREE.Mesh(new THREE.BoxGeometry(dx?CS*0.24:CS*0.78,0.06,dz?CS*0.24:CS*0.78), asMat);
         c.position.set(x+dx*CS*0.44, Y+0.02, z+dz*CS*0.44); roadGroup.add(c);
