@@ -274,9 +274,9 @@ const hash=(i,j)=>(((i*73856093^j*19349663)>>>0)%1000)/1000;
 const COAST=x=>96+5*Math.sin(x*0.045)+2.5*Math.sin(x*0.13+2);
 const RIVX=z=>116+13*Math.sin(z*0.018+2.2)+5*Math.sin(z*0.05+0.7);   // 川の中心線（建設エリアの東外側）
 const ssm=u=>{u=Math.max(0,Math.min(1,u));return u*u*(3-2*u);};
-// 幹線道路の中心線。【契約】IC構造物の全範囲 z∈[-112,+52]（減速車線の北端〜ループ南端+余白）は必ず直線。
+// 幹線道路の中心線。【契約】IC構造物の全範囲 z∈[-120,+52]（北IC減速車線の北端〜ループ南端+余白）は必ず直線。
 // カーブはその外側だけ。ランプや車線を伸ばす時はこの範囲も一緒に広げること。
-const HWX=z=> -90 - 6*ssm((-z-112)/40) + 4*ssm((z-52)/26);
+const HWX=z=> -90 - 6*ssm((-z-120)/40) + 4*ssm((z-52)/26);
 const RIVW=z=>6.5+1.5*Math.sin(z*0.045)+Math.max(0,(z-85)*0.3);      // 川幅（河口で広がる）
 const sdSea=(x,z)=>COAST(x)-z;
 const sdRiv=(x,z)=>Math.abs(x-RIVX(z))-RIVW(z);
@@ -286,8 +286,8 @@ function hillH(x,z){                                                 // 外周�
   const m0=clamp01((Math.max(Math.abs(x),Math.abs(z))-92)/26)
            *clamp01((156-Math.max(Math.abs(x),Math.abs(z)))/12)    // マップ外縁では0に戻す（崖の断面が見えないように）
            *clamp01((Math.abs(x-HWX(z))-9)/8)                      // 幹線道路の回廊は平ら（カーブ追従）
-           *clamp01((Math.hypot(x+108,z+19)-19)/8)                  // ループランプの敷地(IC1)
-           *clamp01((Math.hypot(x+108,z-37)-19)/8);                 // ループランプの敷地(IC2)
+           *clamp01((Math.hypot(x+108,z+19)-19)/8)                  // 西ループの敷地(北IC上り)
+           *clamp01((Math.hypot(x+72.5,z+92)-17)/8);                // 東ループの敷地(北IC下り)
   if(m0<=0) return 0;
   const mSea=clamp01((sdSea(x,z)-16)/14), mRiv=clamp01((sdRiv(x,z)-6.5)/10);
   const n=0.5+0.5*Math.sin(x*0.041+1.7)*Math.sin(z*0.036+0.6);
@@ -394,7 +394,7 @@ let seaMesh=null;                                    // 波アニメ用（ルー
     const out=Math.max(Math.abs(bx),Math.abs(bz))>90;                // 建設エリアの外だけ
     const s=sdSea(bx,bz), r=sdRiv(bx,bz), hh=hillH(bx,bz);
     if(Math.abs(bx-HWX(bz))<9) continue;                             // 幹線道路の上には生やさない（カーブ追従）
-    if(Math.hypot(bx+108,bz+19)<21 || Math.hypot(bx+108,bz-37)<21) continue;   // ループランプの敷地
+    if(Math.hypot(bx+108,bz+19)<21 || Math.hypot(bx+72.5,bz+92)<19) continue;   // ループランプの敷地(西/東)
     if(out && s>15 && r>6){                                          // 森はクランプ状に（一様バラマキは嘘くさい）
       const forest=0.5+0.5*Math.sin(bx*0.03+0.9)*Math.sin(bz*0.027+1.8);
       if(hash(gi*3+1,gj*7+2)<forest*0.55) trees.push([bx,bz,0.75+hash(gi*5,gj*3)*0.85]);
@@ -566,22 +566,31 @@ const CLIMBERS=[];                                     // 上りランプを登�
     const cap=new THREE.Mesh(new THREE.BoxGeometry(W*0.8,0.5,2.2),conc);
     cap.position.set(x,DH-1.35,z); cap.rotation.y=hwAng(z); g.add(cap);
   }
-  // ---- 防音壁（IC加減速ゾーンだけ切れ目）----
-  const gapE=z=>ENTRIES.some(e=>{const ze=cz(e[1]);return z>ze-80&&z<ze-54;});
+  // ---- 防音壁（切れ目の境界でぴったり切断。開口部へのはみ出し/欠けゼロ）----
   const zeA0=cz(ENTRIES[0][1]);
-  const gapW=z=>z>zeA0-52&&z<zeA0-26;   // 西の切れ目は北IC(入口あり)のみ
-  for(let z=Z0;z<Z1;z+=8){
-    const zm=z+4, a=hwAng(zm), x=HWX(zm);
-    const nx=Math.cos(a), nz=-Math.sin(a);
-    for(const sd of [1,-1]){
-      if(sd>0?gapE(zm):gapW(zm)) continue;
-      const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,8.6),wall);
-      r.position.set(x+sd*(W/2-0.3)*nx,DH+0.45,zm+sd*(W/2-0.3)*nz);
-      r.rotation.y=a; g.add(r);
-      const rf=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.13),reflMat);   // 視線誘導標
-      rf.position.set(x+sd*(W/2-0.3)*nx,DH+1.02,zm+sd*(W/2-0.3)*nz); g.add(rf);
+  function wallRun(sd,gaps){
+    let zc=Z0;
+    while(zc<Z1){
+      const cur=gaps.find(g2=>zc>=g2[0]&&zc<g2[1]);
+      if(cur){ zc=cur[1]; continue; }
+      let end=Z1;
+      for(const g2 of gaps) if(g2[0]>=zc) end=Math.min(end,g2[0]);
+      for(let a2=zc;a2<end;a2+=10){
+        const b3=Math.min(a2+10,end), zm=(a2+b3)/2, ln=b3-a2;
+        const aA=hwAng(zm), x=HWX(zm);
+        const nx=Math.cos(aA), nz=-Math.sin(aA);
+        const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,ln+0.12),wall);
+        r.position.set(x+sd*(W/2-0.3)*nx,DH+0.45,zm+sd*(W/2-0.3)*nz);
+        r.rotation.y=aA; g.add(r);
+        const rf=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.13,0.13),reflMat);
+        rf.position.set(x+sd*(W/2-0.3)*nx,DH+1.02,zm+sd*(W/2-0.3)*nz); g.add(rf);
+      }
+      zc=end;
     }
   }
+  wallRun(1, ENTRIES.map((e,i2)=>{const ze=cz(e[1]);return i2===0? [ze-87,ze-61] : [ze-80,ze-54];}));   // 北ICは減速車線を7m北へ移設済み。切れ目の南端は取り付きの南縁(ze-61.2)と面一
+
+  wallRun(-1, [[zeA0-52,zeA0-26]]);
   // ---- ハイマスト照明 ----
   for(let z=Z0+14;z<Z1-6;z+=28){
     const x=HWX(z);
@@ -667,10 +676,11 @@ const CLIMBERS=[];                                     // 上りランプを登�
   ENTRIES.forEach(([ei,ej],idx)=>{
     const z=cz(ej);
     const hasOn = idx===0;                             // 南ICは出口専用ハーフIC（上り入口は北ICに集約。IC同士の干渉防止）
+    const eastLoop = idx===0;                          // 北ICの下りは東ループ式(街区の北の空き地に設置)。南ICは直線のまま
     // 加減速車線（東=減速(北へ延長) / 西=加速）+境界破線+外側レール+ゼブラ
     for(const sd of (hasOn?[1,-1]:[1])){
       const lx=-90+sd*(W/2+1.6);
-      const base= sd>0? z-65 : z-37;
+      const base= sd>0? (eastLoop? z-72 : z-65) : z-37;   // 東ループICは減速車線を7m北へ(接近路が南向きのままループ南点に入るための助走)
       const lane=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.55,18),asp);
       lane.position.set(lx,DH-0.28,base); lane.receiveShadow=true; g.add(lane);
       const lsk=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.0,18),conc);
@@ -687,10 +697,10 @@ const CLIMBERS=[];                                     // 上りランプを登�
       }
       const zb=new THREE.Mesh(new THREE.PlaneGeometry(1.9,5.2),goreMat);   // 導流帯=分岐直前の路面(境界線上)
       zb.rotation.x=-Math.PI/2;
-      zb.position.set(-90+sd*(W/2),DH+0.015, sd>0? z-56.2 : z-29.2); g.add(zb);
+      zb.position.set(-90+sd*(W/2),DH+0.015, sd>0? (eastLoop? z-63.2 : z-56.2) : z-29.2); g.add(zb);
       const nose=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.62,0.8),
         new THREE.MeshStandardMaterial({color:0xf2a13c,roughness:0.6}));   // ノーズの緩衝クッション
-      nose.position.set(-90+sd*(W/2),DH+0.32, sd>0? z-58.6 : z-32.4); g.add(nose);
+      nose.position.set(-90+sd*(W/2),DH+0.32, sd>0? (eastLoop? z-65.6 : z-58.6) : z-32.4); g.add(nose);
     }
     // 出口予告板
     { const bx=-80.6;                                 // 柱は地面から立てる
@@ -700,13 +710,16 @@ const CLIMBERS=[];                                     // 上りランプを登�
     }
     // 降り口の取り付き
     const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);
-    top.position.set(-90+W/2+0.9,DH-0.28,z-56.6); g.add(top);
+    top.position.set(-90+W/2+0.9,DH-0.28, eastLoop? z-63.6 : z-56.6); g.add(top);
     const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);   // 北側は車の進入路のためレール無し(導線監査済み)
-    er.position.set(-90+W/2+3.7,DH+0.45,z-56.75); g.add(er);
+    er.position.set(-90+W/2+3.7,DH+0.45, eastLoop? z-63.75 : z-56.75); g.add(er);
     // なめらかな坂（1.5倍延長・勾配15%・幅4.4）+色グラデ
     const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
     const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);
       return new THREE.MeshStandardMaterial({color:segCol.getHex(),roughness:0.88,map:texRoad}); };
+    const cxr = eastLoop? -82.0 : xr;                  // タイルへの最終カーブの基準線(東ループは側帯道路x=-82から)
+    let loopPts=null;                                  // 東ループの点列(見た目と走行経路で同じものを使い、ズレを構造的に防ぐ)
+    if(!eastLoop){                                      // ---- 直線坂(南IC) ----
     const z0=z-55, z1=z-2.8, nSeg=20;
     const hAt=u=>DH-drop*(u*u*(3-2*u));
     let pv=[z0,hAt(0)];
@@ -725,26 +738,69 @@ const CLIMBERS=[];                                     // 上りランプを登�
       }
       pv=[zz,hh2];
     }
+    } else {                                            // ---- 東ループ(北IC): 取り付き→左旋回で東へ→270°降下→西点で南向きに着地→側帯道路 ----
+      const EC=[-72.5, z-62], ER=9;                     // 街区の北の空き地(z<-80)に収まる中心・半径
+      const dpts=[[-83.0,0,z-61.0],[-82.6,0,z-58.2],[-81.6,0,z-55.7],[-79.6,0,z-53.9],[-77.0,0,z-53.1]];   // 接近路: 南向きのまま取り付きを出て左旋回で東向きへ(yは後で埋める)
+      for(let k2=0;k2<=24;k2++){                        // ループ南点(θ=π/2)から時計回りに270°: 東→北→西点で南向き=進行方向が反転しない
+        const th=Math.PI/2-(1.5*Math.PI)*(k2/24);
+        dpts.push([EC[0]+ER*Math.cos(th),0,EC[1]+ER*Math.sin(th)]);
+      }
+      dpts.push([-81.8,0,z-58.8],[-82.0,0,z-55.5]);     // 西点から側帯道路(x=-82)へすり付け
+      let lens=[0];                                     // 弧長で滑らかに降下(接近路+ループ全体で勾配約9%)
+      for(let k2=1;k2<dpts.length;k2++)
+        lens.push(lens[k2-1]+Math.hypot(dpts[k2][0]-dpts[k2-1][0],dpts[k2][2]-dpts[k2-1][2]));
+      const Ltot=lens[lens.length-1];
+      for(let k2=0;k2<dpts.length;k2++){
+        const u=lens[k2]/Ltot;
+        dpts[k2][1]=0.56+(DH-0.56)*(1-u*u*(3-2*u));
+      }
+      loopPts=dpts;
+      const loopMat2=new THREE.MeshStandardMaterial({color:0x79808a,roughness:0.88,map:texRoad,side:THREE.DoubleSide});
+      const lm2=new THREE.Mesh(ribbonGeo(dpts,2.2,0.5),loopMat2);
+      lm2.receiveShadow=true; lm2.castShadow=true; g.add(lm2);
+      const wallD2=new THREE.MeshStandardMaterial({color:0xd7dade,roughness:0.85,side:THREE.DoubleSide});
+      const offPath=(pts,off,dy)=>pts.map((p2,i3)=>{
+        const a3=pts[Math.max(0,i3-1)], b4=pts[Math.min(pts.length-1,i3+1)];
+        let dx=b4[0]-a3[0], dz2=b4[2]-a3[2]; const L2=Math.hypot(dx,dz2)||1; dx/=L2; dz2/=L2;
+        return [p2[0]+dz2*off, p2[1]+dy, p2[2]-dx*off];
+      });
+      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,2.15,0.55),0.09,0.6),wallD2));   // 両側ガードレール(導線の外側のみ)
+      g.add(new THREE.Mesh(ribbonGeo(offPath(dpts,-2.15,0.55),0.09,0.6),wallD2));
+      for(let k2=6;k2<dpts.length-2;k2+=5){
+        const p2=dpts[k2];
+        if(p2[1]>2.2){
+          const pc=new THREE.Mesh(new THREE.BoxGeometry(1.1,p2[1]-0.35,1.1),conc);
+          pc.position.set(p2[0],(p2[1]-0.35)/2,p2[2]); g.add(pc);
+        }
+      }
+      const roadMat2=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad});
+      const band=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.45,(z-2.8)-(z-55.5)+0.6),roadMat2);   // 側帯道路(ループ出口からグリッド西縁の接続口まで南下)
+      band.position.set(-82,0.345,((z-55.5)+(z-2.8))/2); band.receiveShadow=true; g.add(band);
+      for(let dz3=z-50;dz3<z-6;dz3+=6){
+        const d3=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.03,1.3),white);
+        d3.position.set(-82,0.58,dz3); g.add(d3);
+      }
+    }
     // 速度標識40（坂の外側・中腹）
     { const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.6,0.12),conc);
-      p.position.set(xr-2.9,1.8,z-28); g.add(p);
+      p.position.set(eastLoop?-60.2:xr-2.9,1.8,eastLoop?z-62:z-28); g.add(p);
       const m=new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.15),
         new THREE.MeshBasicMaterial({map:spdTex,side:THREE.DoubleSide,transparent:true}));
-      m.position.set(xr-2.9,3.35,z-28); g.add(m);
+      m.position.set(eastLoop?-60.2:xr-2.9,3.35,eastLoop?z-62:z-28); g.add(m);
     }
     // クォーターカーブ（タイル西端で終了・幅4.4→3.4に先細り）
-    const R=2.8, C=[xr+R, z-R], aSeg=6;
+    const R=2.8, C=[cxr+R, z-R], aSeg=6;
     for(let s2=0;s2<aSeg;s2++){
       const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
       const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
       const len=R*(Math.PI/2)/aSeg;
-      const w2=4.4-1.0*((s2+1)/aSeg);
+      const w2= eastLoop? 3.4 : 4.4-1.0*((s2+1)/aSeg);
       const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
         segMat(0.5+0.5*((s2+1)/aSeg)));
       seg.position.set(mx,0.345,mz);
       seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
       seg.receiveShadow=true; g.add(seg);
-      if(s2<1){
+      if(s2<1 && !eastLoop){   // 東ループ側は高架下道路との交差点なので外周レール無し
         const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
         rl.rotation.y=seg.rotation.y;
         rl.position.set(C[0]+(R+1.9)*Math.cos(tm),0.62,C[1]+(R+1.9)*Math.sin(tm)); g.add(rl);
@@ -818,11 +874,17 @@ const CLIMBERS=[];                                     // 上りランプを登�
     }
     }
     // ---- 走行経路 ----
-    const down=[[-82.9,DH,z-74],[-82.9,DH,z-58],[-83.0,DH,z-55.5]];
-    for(let s3=1;s3<=20;s3++){ const u=s3/20;
-      down.push([-83.0, 0.56+(DH-0.56)*(1-u*u*(3-2*u)), (z-55)+52.2*u]); }
+    const down= eastLoop? [[-82.9,DH,z-79],[-82.9,DH,z-66]]
+                        : [[-82.9,DH,z-74],[-82.9,DH,z-58],[-83.0,DH,z-55.5]];
+    if(eastLoop){
+      for(const p2 of loopPts) down.push([p2[0],p2[1],p2[2]]);   // 見た目のリボンと完全に同じ点列
+      down.push([-82,0.56,z-40],[-82,0.56,z-2.8]);
+    } else {
+      for(let s3=1;s3<=20;s3++){ const u=s3/20;
+        down.push([-83.0, 0.56+(DH-0.56)*(1-u*u*(3-2*u)), (z-55)+52.2*u]); }
+    }
     for(let s3=1;s3<=6;s3++){ const th=Math.PI-(Math.PI/2)*(s3/6);
-      down.push([-80.2+2.8*Math.cos(th),0.56,(z-2.8)+2.8*Math.sin(th)]); }
+      down.push([cxr+2.8+2.8*Math.cos(th),0.56,(z-2.8)+2.8*Math.sin(th)]); }
     down.push([-78,0.56,z]);
     let up=null;
     if(hasOn){
@@ -831,7 +893,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
         up.push([-109.6+11*Math.cos(th), 0.56+(DH-0.56)*(u*u*(3-2*u)), (z+11)+11*Math.sin(th)]); }
       up.push([-98.6,DH,z+4],[-98.6,DH,z-26],[-97.1,DH,z-34],[HWX(z-54)-2.4,DH,z-54]);
     }
-    RAMP_PATHS.push({z, ej, down, up});
+    RAMP_PATHS.push({z, ej, down, up, trig: eastLoop? z-81 : z-76});   // 本線からの離脱地点(減速車線の北端)
   });
   // ---- 本線走行車 ----
   { const cols=[0xd94f3f,0x3f7fd2,0xf2c14e,0xe8e6e0,0x59b26a,0x8a67c9];
@@ -1056,7 +1118,7 @@ function stepCars(dt){
     }
     h.z+=h.dir*15*dt;
     if(h.dir>0){
-      const rp=RAMP_PATHS.find(r=>Math.abs(h.z-(r.z-76))<dt*15+0.4);
+      const rp=RAMP_PATHS.find(r=>Math.abs(h.z-r.trig)<dt*15+0.4);
       if(rp && isRoadCell(1,rp.ej) && Math.random()<0.5){          // 街に道があれば降りてみる
         h.mode='down'; h.path=rp.down; h.seg=0; h.t=0; h.done=false;
         h.entryCell=[0,rp.ej];
@@ -1635,6 +1697,7 @@ window.__dbg={ roadSet:(i,j,v)=>{ road[j*N+i]=v?1:0; rebuildRoads(); },
   trucks:()=>TRUCKS.length, truckQ:()=>TRUCKQ.length,
   truckPos:()=>TRUCKS.map(t=>({s:t.state, at:t.path[t.idx]})),
   cars:()=>CARS.length, hw:()=>HWCARS.map(h=>h.mode||'run'), climbers:()=>CLIMBERS.length,
+  hwPos:()=>HWCARS.map(h=>({m:h.mode||'run',seg:h.seg,x:+h.mesh.position.x.toFixed(1),y:+h.mesh.position.y.toFixed(1),z:+h.mesh.position.z.toFixed(1)})),
   cam:(x,z,d,p,yw)=>{ target.x=x; target.z=z; dist=d; pitch=p; yaw=yw||0; applyCam(); },
   railInfo:(ids)=>ids.map(i2=>{const r=RAILS[i2]; if(!r) return null;
     const p2=r.geometry.parameters;
