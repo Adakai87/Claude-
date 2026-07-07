@@ -206,6 +206,7 @@ function calcDaily(){
   return {rent, tax, total:rent+tax};
 }
 function newDay(){                                   // 0時: 賃料＋住民税を1日分まとめて入金
+  const prevOcc=buildingsRef().map(b=>occOf(b));     // 入居の増加検知用（引っ越しトラック）
   day++;
   let fin=0;                                         // 工事の進行と完成チェック
   for(const b of buildingsRef()){
@@ -213,6 +214,9 @@ function newDay(){                                   // 0時: 賃料＋住民税
     refreshBuildingVisual(b);
     if(prev&&prev!=='done'&&b.vstage==='done') fin++;
   }
+  buildingsRef().forEach((b,ix)=>{                   // 今日入居が増えた家へ引っ越しトラック
+    if(occOf(b)>prevOcc[ix]) queueTruck(homeRoadCell(b));
+  });
   rebuildNPCs();                                     // 入居が進むと歩く住民も増える
   const d=calcDaily();
   if(d.total>0){
@@ -642,6 +646,60 @@ function carNext(c){
   const fwd=cand.filter(cc=>!(c.prev&&cc[0]===c.prev[0]&&cc[1]===c.prev[1]));
   const pool=fwd.length?fwd:cand;
   return pool[Math.floor(Math.random()*pool.length)];
+}
+// ---- 引っ越しトラック（入居が発生した日にハイウェイから家まで走ってくる演出） ----
+const TRUCKS=[], TRUCKQ=[];
+function makeTruck(){
+  const g=new THREE.Group();
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.15,1.2),
+    new THREE.MeshStandardMaterial({color:0x3f6fb8,roughness:0.4,metalness:0.15}));
+  cab.position.set(0,0.75,1.75); cab.castShadow=true; g.add(cab);
+  const cargo=new THREE.Mesh(new THREE.BoxGeometry(1.75,1.7,3.1),
+    new THREE.MeshStandardMaterial({color:0xf2efe6,roughness:0.7}));
+  cargo.position.set(0,1.05,-0.45); cargo.castShadow=true; g.add(cargo);
+  const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.78,0.34,3.12),
+    new THREE.MeshStandardMaterial({color:0xe8a41f}));
+  stripe.position.set(0,0.85,-0.45); g.add(stripe);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,4.4),
+    new THREE.MeshStandardMaterial({color:0x2a2e33}));
+  base.position.set(0,0.18,0.15); g.add(base);
+  return g;
+}
+function queueTruck(goal){ if(goal) TRUCKQ.push(goal); }
+function stepTrucks(dt){
+  const h=gameHour%24;
+  while(TRUCKS.length<3 && TRUCKQ.length && h>6.8 && h<19.5){   // 日中だけ出発
+    const goal=TRUCKQ.shift();
+    let best=null;
+    for(const [ei,ej] of ENTRIES){                    // 近い方の接続口から
+      const p2=pathTo([ei,ej],goal);
+      if(p2 && (!best || p2.length<best.length)) best=[[ei,ej],...p2];
+    }
+    if(!best || best.length<2) continue;
+    const mesh=makeTruck(); scene.add(mesh);
+    TRUCKS.push({mesh, path:best, idx:0, t:0, state:'go', stay:0});
+  }
+  for(let ti=TRUCKS.length-1;ti>=0;ti--){
+    const tr=TRUCKS[ti];
+    if(tr.state==='stay'){                            // 家の前で荷降ろし
+      tr.stay-=dt;
+      if(tr.stay<=0){ tr.path.reverse(); tr.idx=0; tr.t=0; tr.state='back'; }
+      continue;
+    }
+    tr.t+=dt*7/CS;
+    if(tr.t>=1){
+      tr.idx++; tr.t=0;
+      if(tr.idx>=tr.path.length-1){
+        if(tr.state==='go'){ tr.state='stay'; tr.stay=12; continue; }   // 12秒荷降ろし
+        scene.remove(tr.mesh); TRUCKS.splice(ti,1); continue;           // 帰宅完了
+      }
+    }
+    const a=tr.path[tr.idx], b2=tr.path[Math.min(tr.idx+1,tr.path.length-1)];
+    const fx=cx(a[0]), fz=cz(a[1]), dx=cx(b2[0])-fx, dz=cz(b2[1])-fz;
+    const len=Math.hypot(dx,dz)||1, ox=dz/len*0.95, oz=-dx/len*0.95;
+    tr.mesh.position.set(fx+dx*tr.t+ox, 0.56, fz+dz*tr.t+oz);
+    if(dx||dz) tr.mesh.rotation.y=Math.atan2(dx,dz);
+  }
 }
 function stepCars(dt){
   for(const c of CARS){
@@ -1178,14 +1236,17 @@ function rebuildNPCs(){
   for(let j=0;j<N;j++)for(let i=0;i<N;i++) if(road[j*N+i]) roadCells.push([i,j]);
   const works=buildings.filter(b=>WORKPLACES.has(b.type)&&stageOf(b)==='done')
     .map(b=>homeRoadCell(b)).filter(Boolean);          // 職場（完成済みの店・施設の前）
+  const parks=buildings.filter(b=>(b.type==='park'||b.type==='fountain')&&stageOf(b)==='done')
+    .map(b=>homeRoadCell(b)).filter(Boolean);          // 憩いの場（公園・噴水の前）
   let k=0;
   for(const b of buildings){
     if(!(b.type in RES || b.type==='mansion')) continue;
     if(occOf(b)<=0) continue;                          // 入居前の家からは出てこない
     const home=homeRoadCell(b); if(!home) continue;
     if(npcs.length>=24) break;
-    let work= works.length ? works[k%works.length] : null;
-    if(!work && roadCells.length){                     // 店がまだ無ければ遠くの道路へ「通勤」
+    let work= (k%4===3 && parks.length) ? parks[k%parks.length] : null;   // 4人に1人は公園派（日中は公園で過ごす）
+    if(!work) work= works.length ? works[k%works.length] : null;
+    if(!work && roadCells.length){                     // 店も公園も無ければ遠くの道路へ「通勤」
       for(let t2=0;t2<6;t2++){ const c=roadCells[(k*31+t2*17)%roadCells.length];
         if(Math.abs(c[0]-home[0])+Math.abs(c[1]-home[1])>=6){ work=c; break; } }
       work=work||home;
@@ -1217,7 +1278,9 @@ window.__npcs=npcs;                                    // デバッグ観測用�
 window.__dbg={ roadSet:(i,j,v)=>{ road[j*N+i]=v?1:0; rebuildRoads(); },
   place:(t,i,j)=>{ const e=placeBuilding(t,i,j); saveCity(); return !!e; },
   conn:(i,j)=>CONN[j*N+i], pop:()=>calcPop(), dayN:()=>day,
-  occ:(ix)=>occOf(buildings[ix]), nb:()=>buildings.length };
+  occ:(ix)=>occOf(buildings[ix]), nb:()=>buildings.length,
+  trucks:()=>TRUCKS.length, truckQ:()=>TRUCKQ.length,
+  truckPos:()=>TRUCKS.map(t=>({s:t.state, at:t.path[t.idx]})) };
 function npcAnchorFor(n,h){                            // 生活スケジュール: 時間帯→今いるべき場所
   if(h>=6.5&&h<16) return n.work;                      // 出勤〜勤務
   if(h>=16&&h<22.2) return n.home;                     // 帰宅〜家の近所
@@ -1674,6 +1737,7 @@ renderer.setAnimationLoop((now)=>{
   if(seaMesh) seaMesh.position.y=0.02+0.05*Math.sin(now*0.0011);   // 波: 水面がゆっくり上下→波打ち際が動く
   stepNPCs(delta,now);                                 // 住民の散歩（両レンズ共通）
   stepCars(delta);                                     // 街の車+ハイウェイの流れ
+  stepTrucks(delta);                                   // 引っ越しトラック（別世界からの移住）
 
   applyTimeOfDay();
   if(now-lastSave>10000){ saveCity(); lastSave=now; }   // 時刻も10秒ごとに保存
