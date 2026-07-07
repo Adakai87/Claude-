@@ -515,7 +515,7 @@ const HWCARS=[];                                       // ハイウェイを走�
   const zA=cz(ENTRIES[0][1]), zB=cz(ENTRIES[1][1]);
   const ww=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,Z1-Z0),wall);
   ww.position.set(HX-W/2+0.3,DH+0.45,(Z0+Z1)/2); g.add(ww);
-  for(const [a,b2] of [[Z0,zA-32],[zA-26,zB-32],[zB-26,Z1]]){
+  for(const [a,b2] of [[Z0,zA-31.2],[zA-26,zB-31.2],[zB-26,Z1]]){
     if(b2<=a) continue;
     const r=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,b2-a),wall);
     r.position.set(HX+W/2-0.3,DH+0.45,(a+b2)/2); g.add(r);
@@ -527,33 +527,41 @@ const HWCARS=[];                                       // ハイウェイを走�
     const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);          // デッキから分岐する取り付き
     top.position.set(HX+W/2+0.9,DH-0.28,z-28.6); g.add(top);
     // なめらかな坂（smoothstep: 上端も下端も丸く折れずに繋がる）
+    const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
+    const segMat=t2=>{ segCol.copy(hwyCol).lerp(roadCol,t2);                    // 色をだんだん道路色へ
+      return new THREE.MeshStandardMaterial({color:segCol.getHex(),roughness:0.88,map:texRoad}); };
     const z0=z-27, z1=z-5, nSeg=12;
     const hAt=u=>DH-drop*(u*u*(3-2*u));
     let pv=[z0,hAt(0)];
     for(let s2=1;s2<=nSeg;s2++){
       const u=s2/nSeg, zz=z0+(z1-z0)*u, hh2=hAt(u);
       const len=Math.hypot(zz-pv[0],hh2-pv[1]);
-      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),asp);
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.55),
+        segMat(Math.max(0,(u-0.55)/0.45)*0.5));                                 // 後半から色ブレンド開始
       seg.position.set(xr,(hh2+pv[1])/2-0.24,(zz+pv[0])/2);
       seg.rotation.x=Math.atan2(pv[1]-hh2,zz-pv[0]);
       seg.receiveShadow=true; g.add(seg);
-      for(const sx of [-1.9,1.9]){                                              // 縁石も坂に追従
-        const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.38,len+0.55),wall);
+      for(const sx of [-1.9,1.9]){                                              // ガードレールも坂に連続
+        const c2=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.6,len+0.55),wall);
         c2.rotation.x=seg.rotation.x;
-        c2.position.set(xr+sx,(hh2+pv[1])/2+0.04,(zz+pv[0])/2); g.add(c2);
+        c2.position.set(xr+sx,(hh2+pv[1])/2+0.14,(zz+pv[0])/2); g.add(c2);
       }
       pv=[zz,hh2];
     }
-    // クォーターカーブ（南向き→東向きへ弧を描いて接続口のタイル中心へ）
+    // クォーターカーブ（南向き→東向きへ弧を描いて接続口のタイル中心へ。色は道路色へ溶ける）
     const C=[xr+5, z-5], R=5, aSeg=6;
     for(let s2=0;s2<aSeg;s2++){
       const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
       const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
       const len=R*(Math.PI/2)/aSeg;
-      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.9),asp);
+      const seg=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.45,len+0.9),
+        segMat(0.5+0.5*(s2+1)/aSeg));
       seg.position.set(mx,0.33,mz);
       seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
       seg.receiveShadow=true; g.add(seg);
+      const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.9),wall);  // カーブ外周のガードレール
+      rl.rotation.y=seg.rotation.y;
+      rl.position.set(C[0]+(R+1.85)*Math.cos(tm),0.62,C[1]+(R+1.85)*Math.sin(tm)); g.add(rl);
     }
   }
   // 青看板（デッキの高さに合わせて高く）
