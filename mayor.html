@@ -174,7 +174,7 @@ const TOD={tint:[],windows:[],glow:[]};   // 昼夜が色を触る材質の登�
 
 // ================= 経済（フェーズ3: お金と人口） =================
 const M_=10000, OKU=100000000;                       // 万・億
-const COSTS={ road:1000000, cottage:20000000, jh_s:22000000, jh_m:35000000,
+const COSTS={ road:1000000, curveM:1500000, cottage:20000000, jh_s:22000000, jh_m:35000000,
   mod_s:25000000, mod_m:40000000, apart:60000000, mansion:150000000, lux:300000000,
   bakery:40000000, cafe:40000000, flower:40000000, mart:60000000,
   koban:80000000, tree:500000, park:20000000, fountain:50000000 };
@@ -513,6 +513,64 @@ function makeLamp(x,z,axis,side){                        // axis:0=東西の道(
   glow.rotation.x=-Math.PI/2; glow.position.set(x+ax,0.60,z+az); g.add(glow);
   return g;
 }
+// ---- 点列→路面生成の共有工具（大原則: 道路はすべてスプライン点列から連続生成する） ----
+function ribbonGeo(pts,wHalf,thick){                   // なめらか曲面リボン（中心線の点列→一体メッシュ）
+  const n=pts.length, pos=[], uv=[], idx=[];
+  for(let i=0;i<n;i++){
+    const a=pts[Math.max(0,i-1)], b2=pts[Math.min(n-1,i+1)];
+    let dx=b2[0]-a[0], dz=b2[2]-a[2]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
+    const nx=dz, nz=-dx, p=pts[i], u=i*0.35;
+    pos.push(p[0]+nx*wHalf,p[1],p[2]+nz*wHalf,  p[0]-nx*wHalf,p[1],p[2]-nz*wHalf,
+             p[0]+nx*wHalf,p[1]-thick,p[2]+nz*wHalf,  p[0]-nx*wHalf,p[1]-thick,p[2]-nz*wHalf);
+    uv.push(u,0, u,1, u,0, u,1);
+  }
+  for(let i=0;i<n-1;i++){
+    const a0=i*4, b0=(i+1)*4;
+    idx.push(a0,b0,a0+1, a0+1,b0,b0+1,
+             a0,a0+2,b0, b0,a0+2,b0+2,
+             a0+1,b0+1,a0+3, b0+1,b0+3,a0+3,
+             a0+2,a0+3,b0+2, b0+2,a0+3,b0+3);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  return geo;
+}
+function wedgeGeo(eA,eB,thick,planUV){                 // 2本の縁線(同数の点列)で張る座面+側面。planUV指定時はUV=世界座標/planUV(縞の等間隔タイリング用)
+  const n2=eA.length, pos=[], uv=[], idx=[];
+  for(let i=0;i<n2;i++){
+    const A=eA[i], B=eB[i];
+    pos.push(A[0],A[1],A[2], B[0],B[1],B[2], A[0],A[1]-thick,A[2], B[0],B[1]-thick,B[2]);
+    if(planUV) uv.push(A[0]/planUV,A[2]/planUV, B[0]/planUV,B[2]/planUV, A[0]/planUV,A[2]/planUV, B[0]/planUV,B[2]/planUV);
+    else uv.push(0,i/(n2-1), 1,i/(n2-1), 0,i/(n2-1), 1,i/(n2-1));
+  }
+  for(let i=0;i<n2-1;i++){
+    const a0=i*4, b0=(i+1)*4;
+    idx.push(a0,b0,a0+1, a0+1,b0,b0+1,
+             a0,a0+2,b0, b0,a0+2,b0+2,
+             a0+1,b0+1,a0+3, b0+1,b0+3,a0+3,
+             a0+2,a0+3,b0+2, b0+2,a0+3,b0+3);
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  return geo;
+}
+function offLine(pts,o0,o1,dy){                        // 中心点列の横オフセット線(幅すり付け対応)
+  const n2=pts.length;
+  return pts.map((p2,i)=>{
+    const a=pts[Math.max(0,i-1)], b=pts[Math.min(n2-1,i+1)];
+    let dx=b[0]-a[0], dz=b[2]-a[2]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
+    const o=o0+(o1-o0)*(i/(n2-1));
+    return [p2[0]+dz*o, p2[1]+(dy||0), p2[2]-dx*o];
+  });
+}
+function taperGeo(pts,h0,h1,thick){                    // 幅がすり付く路面(実物の幅員漸変)
+  return wedgeGeo(offLine(pts,-h0,-h1,0), offLine(pts,h0,h1,0), thick);
+}
+
 const HWCARS=[];                                       // ハイウェイを走る車（ランプも使う）
 const RAILS=[];                                        // ガードレール登録簿（導線監査用・箱型）
 const RAILPL=[];                                       // リボン型レールの中心点列登録簿（導線監査用）
@@ -661,63 +719,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
     t.fillStyle='#223'; t.font='900 54px sans-serif'; t.textAlign='center'; t.textBaseline='middle';
     t.fillText('40',64,67);
     return new THREE.CanvasTexture(c); })();
-  // なめらか曲面リボン（中心線の点列→一体メッシュ。ループのカクカク解消）
-  function ribbonGeo(pts,wHalf,thick){
-    const n=pts.length, pos=[], uv=[], idx=[];
-    for(let i=0;i<n;i++){
-      const a=pts[Math.max(0,i-1)], b2=pts[Math.min(n-1,i+1)];
-      let dx=b2[0]-a[0], dz=b2[2]-a[2]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
-      const nx=dz, nz=-dx, p=pts[i], u=i*0.35;
-      pos.push(p[0]+nx*wHalf,p[1],p[2]+nz*wHalf,  p[0]-nx*wHalf,p[1],p[2]-nz*wHalf,
-               p[0]+nx*wHalf,p[1]-thick,p[2]+nz*wHalf,  p[0]-nx*wHalf,p[1]-thick,p[2]-nz*wHalf);
-      uv.push(u,0, u,1, u,0, u,1);
-    }
-    for(let i=0;i<n-1;i++){
-      const a0=i*4, b0=(i+1)*4;
-      idx.push(a0,b0,a0+1, a0+1,b0,b0+1,
-               a0,a0+2,b0, b0,a0+2,b0+2,
-               a0+1,b0+1,a0+3, b0+1,b0+3,a0+3,
-               a0+2,a0+3,b0+2, b0+2,a0+3,b0+3);
-    }
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-    geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-    geo.setIndex(idx); geo.computeVertexNormals();
-    return geo;
-  }
-  function wedgeGeo(eA,eB,thick,planUV){               // 2本の縁線(同数の点列)で張る座面+側面。planUV指定時はUV=世界座標/planUV(縞の等間隔タイリング用)
-    const n2=eA.length, pos=[], uv=[], idx=[];
-    for(let i=0;i<n2;i++){
-      const A=eA[i], B=eB[i];
-      pos.push(A[0],A[1],A[2], B[0],B[1],B[2], A[0],A[1]-thick,A[2], B[0],B[1]-thick,B[2]);
-      if(planUV) uv.push(A[0]/planUV,A[2]/planUV, B[0]/planUV,B[2]/planUV, A[0]/planUV,A[2]/planUV, B[0]/planUV,B[2]/planUV);
-      else uv.push(0,i/(n2-1), 1,i/(n2-1), 0,i/(n2-1), 1,i/(n2-1));
-    }
-    for(let i=0;i<n2-1;i++){
-      const a0=i*4, b0=(i+1)*4;
-      idx.push(a0,b0,a0+1, a0+1,b0,b0+1,
-               a0,a0+2,b0, b0,a0+2,b0+2,
-               a0+1,b0+1,a0+3, b0+1,b0+3,a0+3,
-               a0+2,a0+3,b0+2, b0+2,a0+3,b0+3);
-    }
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-    geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-    geo.setIndex(idx); geo.computeVertexNormals();
-    return geo;
-  }
-  function offLine(pts,o0,o1,dy){                      // 中心点列の横オフセット線(幅すり付け対応)
-    const n2=pts.length;
-    return pts.map((p2,i)=>{
-      const a=pts[Math.max(0,i-1)], b=pts[Math.min(n2-1,i+1)];
-      let dx=b[0]-a[0], dz=b[2]-a[2]; const L=Math.hypot(dx,dz)||1; dx/=L; dz/=L;
-      const o=o0+(o1-o0)*(i/(n2-1));
-      return [p2[0]+dz*o, p2[1]+(dy||0), p2[2]-dx*o];
-    });
-  }
-  function taperGeo(pts,h0,h1,thick){                  // 幅がすり付く路面(実物の幅員漸変)
-    return wedgeGeo(offLine(pts,-h0,-h1,0), offLine(pts,h0,h1,0), thick);
-  }
+  // （ribbonGeo/wedgeGeo/offLine/taperGeo は共有工具としてモジュール直下へ移設。ここからも同じものを使う）
   // ==== RoadNet生成層: ランプ・橋の見た目は「中心線×断面プロファイル」から一括生成する。部品の手置きは禁止 ====
   // (Cities:Skylinesと同じ思想。路面+桁+縁線+一体型高欄+継ぎ目+橋脚が1つのコードパスから出るので、二重・欠け・食い違いが構造的に起きない)
   const RNP={ ramp:{deckT:0.5, skirtIn:0.35, skirtH:0.7, para:0.62, lineIn:0.42, pierW:0.85, pierGap:9, seam:12} };
@@ -1006,11 +1008,102 @@ const roadGroup=new THREE.Group(); scene.add(roadGroup);
 const asMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad});
 const swMat=new THREE.MeshStandardMaterial({color:0xd9d2c0,roughness:0.95,map:texWalk});
 const dashMat=new THREE.MeshStandardMaterial({color:0xf7f5ec,roughness:0.8});
+
+// ================= カーブ道路 v1（自由座標の制御点→Catmull-Romスプライン→リボン一体生成） =================
+// 見た目はリボン、論理は通過セルをroad[]=1でクレーム（接続判定・建物隣接・車/住民が既存系のまま機能する）
+const CURVES=[];                                     // {pts:[[x,z],..], cells:[key,..], group, len, cost}
+const CURVECELLS=new Map();                          // "i,j" → クレーム数（rebuildRoadsのタイル描画をスキップ）
+const curveRoot=new THREE.Group(); scene.add(curveRoot);
+const curveAspMat=new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad,side:THREE.DoubleSide});
+const curveConcMat=new THREE.MeshStandardMaterial({color:0xc8c4ba,roughness:0.95,side:THREE.DoubleSide});
+const curveWhiteMat=new THREE.MeshStandardMaterial({color:0xf2f0e8,roughness:0.8,side:THREE.DoubleSide});
+function curveSample(ptsXZ,step){                    // 制御点→等弧長サンプル（yは地面に沿い、谷は軽く均す）
+  const crv=new THREE.CatmullRomCurve3(ptsXZ.map(p=>new THREE.Vector3(p[0],0,p[1])),false,'catmullrom',0.5);
+  const len=crv.getLength();
+  const n=Math.max(4,Math.ceil(len/(step||0.5)));
+  const sp=crv.getSpacedPoints(n);
+  const hs=sp.map(v=>groundH(v.x,v.z));
+  const sm=hs.map((h,i)=>{ let s=0,c=0;               // 移動平均で縦断をなめらかに（急な窪みは盛土で越える）
+    for(let k=-4;k<=4;k++){ const q=i+k; if(q>=0&&q<hs.length){ s+=hs[q]; c++; } }
+    return s/c; });
+  const cp=sp.map((v,i)=>[v.x, Math.max(hs[i],sm[i])+0.065, v.z]);
+  return {cp,len};
+}
+function curvePassCells(cp){                         // 通過セル列（斜め跨ぎは中継マスを足して4近傍連続を保証）
+  const keys=[], seen=new Set(); let pi=null,pj=null;
+  for(const p of cp){
+    const i=ci(p[0]), j=cj(p[2]);
+    if(!inGrid(i,j)){ pi=i; pj=j; continue; }
+    if(pi!==null && i!==pi && j!==pj && inGrid(i,pj)){
+      const k2=i+','+pj; if(!seen.has(k2)){ seen.add(k2); keys.push(k2); }
+    }
+    const k=i+','+j; if(!seen.has(k)){ seen.add(k); keys.push(k); }
+    pi=i; pj=j;
+  }
+  return keys;
+}
+function curveCheck(ptsXZ){                          // 建設可否の監査（エリア外・幹線構造物・浜海・資金）
+  if(!ptsXZ||ptsXZ.length<2) return {ok:false,len:0,cost:0,msg:'点が足りない'};
+  const {cp,len}=curveSample(ptsXZ,1.0);
+  const cost=Math.round(len)*COSTS.curveM;
+  for(const p of cp) if(p[0]<-79) return {ok:false,len,cost,msg:'幹線道路の構造物と交差'};   // 高架領域を先に監査
+  for(const p of cp) if(Math.abs(p[0])>78||Math.abs(p[2])>78) return {ok:false,len,cost,msg:'建設エリア外'};
+  for(const k of curvePassCells(cp)){
+    const [i,j]=k.split(',').map(Number);
+    if(!buildable(i,j)) return {ok:false,len,cost,msg:'浜・海には通せない'};
+  }
+  if(money<cost) return {ok:false,len,cost,msg:'資金不足（'+fmt(cost)+'）'};
+  return {ok:true,len,cost,msg:''};
+}
+function buildCurve(ptsXZ){                          // 路面リボン+盛土+両縁白線+中央破線を点列から一括生成
+  const {cp,len}=curveSample(ptsXZ,0.5);
+  const g=new THREE.Group();
+  const slab=new THREE.Mesh(ribbonGeo(cp,1.7,0.5),curveAspMat);
+  slab.receiveShadow=true; g.add(slab);
+  g.add(new THREE.Mesh(ribbonGeo(cp.map(p=>[p[0],p[1]-0.5,p[2]]),1.45,0.6),curveConcMat));   // 盛土（谷では路面下を支える）
+  for(const s of [-1,1])                             // 両側の白縁線
+    g.add(new THREE.Mesh(ribbonGeo(offLine(cp,s*1.45,s*1.45,0.018),0.07,0.02),curveWhiteMat));
+  { let acc=0, next=2.0;                             // 中央破線（直線区間相当の約4mピッチ）
+    for(let i=1;i<cp.length;i++){
+      acc+=Math.hypot(cp[i][0]-cp[i-1][0],cp[i][2]-cp[i-1][2]);
+      if(acc>=next){ next+=4;
+        const d=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.02,1.4),dashMat);
+        d.position.set(cp[i][0],cp[i][1]+0.02,cp[i][2]);
+        d.rotation.y=Math.atan2(cp[i][0]-cp[i-1][0],cp[i][2]-cp[i-1][2]); g.add(d);
+      }
+    }
+  }
+  curveRoot.add(g);
+  const cells=[];
+  for(const k of curvePassCells(cp)){
+    const [i,j]=k.split(',').map(Number);
+    if(road[j*N+i] && !CURVECELLS.has(k)) continue;  // 既存の通常道路マスは奪わない（=接続点として残す）
+    CURVECELLS.set(k,(CURVECELLS.get(k)||0)+1);
+    road[j*N+i]=1; cells.push(k);
+  }
+  const cv={pts:ptsXZ.map(p=>[+(+p[0]).toFixed(2),+(+p[1]).toFixed(2)]), cells, group:g,
+            len, cost:Math.round(len)*COSTS.curveM};
+  CURVES.push(cv);
+  return cv;
+}
+function removeCurve(cv){                            // カーブ一括撤去（クレームを返上し半額を返す）
+  const ix=CURVES.indexOf(cv); if(ix<0) return 0;
+  curveRoot.remove(cv.group);
+  for(const k of cv.cells){
+    const c=CURVECELLS.get(k)||0;
+    if(c<=1){ CURVECELLS.delete(k); const [i,j]=k.split(',').map(Number); road[j*N+i]=0; }
+    else CURVECELLS.set(k,c-1);
+  }
+  CURVES.splice(ix,1);
+  return Math.floor(cv.cost/2);
+}
+
 function rebuildRoads(){
   roadGroup.clear();
   const Y=0.52;
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){
     if(!road[j*N+i]) continue;
+    if(CURVECELLS.has(i+','+j)) continue;            // カーブ道路のセル: 論理は道路・見た目はリボンに任せる
     const x=cx(i), z=cz(j);
     const sw=new THREE.Mesh(new THREE.BoxGeometry(CS,0.05,CS), swMat);
     sw.position.set(x,Y,z); sw.receiveShadow=true; roadGroup.add(sw);
@@ -1656,6 +1749,27 @@ function flashNG(i,j){
   setTimeout(()=>{ prevGroup.remove(m); },350);
 }
 
+// カーブ道路のプレビュー（制御点マーカー+半透明ゴーストリボン。緑=OK/赤=NG）
+const curvePts=[];                                   // 敷設中の制御点 [[x,z],...]（グリッド非吸着の自由座標）
+const curveGhost=new THREE.Group(); scene.add(curveGhost);
+const curveGhostOK=new THREE.MeshBasicMaterial({color:0x6fe06a,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false});
+const curveGhostNG=new THREE.MeshBasicMaterial({color:0xff5a4a,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false});
+const curveDotMat=new THREE.MeshBasicMaterial({color:0xffc63f});
+let curveStat={ok:false,len:0,cost:0,msg:''};
+function redrawCurveGhost(){
+  curveGhost.clear();
+  for(const p of curvePts){
+    const d=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,0.24,14),curveDotMat);
+    d.position.set(p[0],groundH(p[0],p[1])+0.78,p[1]); curveGhost.add(d);
+  }
+  curveStat = curvePts.length>=2 ? curveCheck(curvePts) : {ok:false,len:0,cost:0,msg:''};
+  if(curvePts.length>=2){
+    const {cp}=curveSample(curvePts,1.0);
+    curveGhost.add(new THREE.Mesh(ribbonGeo(cp.map(p=>[p[0],p[1]+0.1,p[2]]),1.7,0.05),
+      curveStat.ok? curveGhostOK : curveGhostNG));
+  }
+}
+
 // ================= カメラ（パン＋ピンチズーム＋俯瞰角） =================
 const target=new THREE.Vector3(0,0,20);
 let dist=95;
@@ -1783,6 +1897,11 @@ window.__dbg={ roadSet:(i,j,v)=>{ road[j*N+i]=v?1:0; rebuildRoads(); },
   trucks:()=>TRUCKS.length, truckQ:()=>TRUCKQ.length,
   truckPos:()=>TRUCKS.map(t=>({s:t.state, at:t.path[t.idx]})),
   cars:()=>CARS.length, hw:()=>HWCARS.map(h=>h.mode||'run'), climbers:()=>CLIMBERS.length,
+  curves:()=>CURVES.length, curveCells:()=>Array.from(CURVECELLS.keys()), moneyN:()=>money,
+  curveAdd:(pts)=>{ const cv=buildCurve(pts); rebuildRoads(); rebuildNPCs(); saveCity(); return cv.cells.length; },
+  carAt:()=>CARS.map(c=>c.from.join(',')), npcAt:()=>npcs.map(n2=>n2.from.join(',')),
+  proj:(x,y2,z)=>{ const v=new THREE.Vector3(x,y2,z).project(cam);
+    return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]; },
   hwPos:()=>HWCARS.map(h=>({m:h.mode||'run',seg:h.seg,x:+h.mesh.position.x.toFixed(1),y:+h.mesh.position.y.toFixed(1),z:+h.mesh.position.z.toFixed(1)})),
   cam:(x,z,d,p,yw)=>{ target.x=x; target.z=z; dist=d; pitch=p; yaw=yw||0; applyCam(); },
   railInfo:(ids)=>ids.map(i2=>{const r=RAILS[i2]; if(!r) return null;
@@ -1866,8 +1985,11 @@ addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 const SAVE_KEY='mycity_v1';
 function saveCity(){
   try{
+    const roadArr=Array.from(road);                    // カーブ専有セルは保存から除く（ロード時にカーブが再クレームする）
+    for(const k of CURVECELLS.keys()){ const [i,j]=k.split(',').map(Number); roadArr[j*N+i]=0; }
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v:4, money, day, road:Array.from(road),
+      v:5, money, day, road:roadArr,
+      curves:CURVES.map(c=>({pts:c.pts})),
       b:buildings.map(x=>({t:x.type,i:x.i,j:x.j,f:x.floors,sd:x.sd})),
       h:gameHour
     }));
@@ -1876,11 +1998,13 @@ function saveCity(){
 function loadCity(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
-    if(!d||![1,2,3,4].includes(d.v)) return false;
+    if(!d||![1,2,3,4,5].includes(d.v)) return false;
     money = (d.v>=2 && typeof d.money==='number') ? d.money : 250000000;
     if(typeof d.day==='number') day=d.day;             // ※建物より先に読む（着工日→状態の計算に使う）
     if(q.get('t')===null && typeof d.h==='number') gameHour=d.h;
     d.road.forEach((v,k)=>{ road[k]=v; });
+    for(const cd of (d.curves||[]))                    // v5: カーブ道路を再生成（セル再クレーム含む）。v4以前はcurves無し=[]
+      if(cd&&Array.isArray(cd.pts)&&cd.pts.length>=2) buildCurve(cd.pts);
     rebuildRoads();
     for(const bb of (d.b||[]))
       placeBuilding(bb.t, bb.i, bb.j, bb.f||3, (d.v>=4&&typeof bb.sd==='number')? bb.sd : day-99);   // 旧セーブは完成扱い
@@ -1897,7 +2021,7 @@ const menu=$('menu'), items=$('items');
 const toast=(msg)=>{ const t=$('toast'); t.textContent=msg; t.style.opacity=1; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1600); };
 
 const CATALOG={
-  road:[ {id:'road',ic:'🛣️',nm:'ふつうの道'}, {id:'erase',ic:'🧹',nm:'撤去'}, {id:'stone',ic:'🧱',nm:'石畳(準備中)',dis:true} ],
+  road:[ {id:'road',ic:'🛣️',nm:'ふつうの道'}, {id:'curve',ic:'🛣',nm:'カーブ道路'}, {id:'erase',ic:'🧹',nm:'撤去'}, {id:'stone',ic:'🧱',nm:'石畳(準備中)',dis:true} ],
   home:[ {id:'bld:cottage',ic:'🏠',nm:'コテージ'}, {id:'bld:jh_s',ic:'⛩️',nm:'和風・小'}, {id:'bld:jh_m',ic:'🏯',nm:'和風・中'},
          {id:'bld:mod_s',ic:'🏢',nm:'モダン・小'}, {id:'bld:mod_m',ic:'🏡',nm:'モダン・中'},
          {id:'bld:apart',ic:'🏘️',nm:'アパート'}, {id:'bld:mansion',ic:'🏬',nm:'マンション'},
@@ -1911,7 +2035,7 @@ function renderItems(tab){
   for(const it of CATALOG[tab]){
     const el=document.createElement('div');
     el.className='card'+(it.dis?' dis':'');
-    const cost = it.id==='road'? '¥100万/マス' : it.id==='erase'? '半額返金' : it.id&&it.id.startsWith('bld:')? fmt(COSTS[it.id.slice(4)]||0) : '';
+    const cost = it.id==='road'? '¥100万/マス' : it.id==='curve'? '¥150万/m' : it.id==='erase'? '半額返金' : it.id&&it.id.startsWith('bld:')? fmt(COSTS[it.id.slice(4)]||0) : '';
     el.innerHTML=`<div class="ic">${it.ic}</div><div class="nm">${it.nm}</div>${cost?`<div class="nm" style="color:#a8823a">${cost}</div>`:''}`;
     if(!it.dis) el.onclick=()=>startPlacing(it.id);
     items.appendChild(el);
@@ -1931,13 +2055,15 @@ function startPlacing(id){
     $('modetext').textContent='場所をタップして配置しよう';
     showGhost(id.slice(4));
   } else {
-    $('modetext').textContent = id==='erase' ? '消したい所をなぞろう' : '道路をなぞって敷こう';
+    $('modetext').textContent = id==='erase' ? '消したい所をなぞろう'
+      : id==='curve' ? '点を打つ→✓で建設（2〜8点）' : '道路をなぞって敷こう';
   }
   updateConfirm();
 }
 function exitPlacing(toMenu=true){
   mode= toMenu?'menu':'browse'; tool=null;
   hideGhost();
+  curvePts.length=0; redrawCurveGhost();
   pending.clear(); redrawPreview();
   $('modebar').classList.remove('show'); $('modeframe').classList.remove('show'); $('confirm').classList.remove('show');
   if(toMenu) menu.classList.add('show');
@@ -1949,11 +2075,28 @@ function updateConfirm(){
     if(ghostAt){ c.classList.add('show'); c.textContent='✓ 建てる'; } else c.classList.remove('show');
     return;
   }
+  if(tool==='curve'){
+    if(curvePts.length>=2){ c.classList.add('show');
+      c.textContent=`✓ 建設（${Math.round(curveStat.len)}m ${fmt(curveStat.cost)}）`; }
+    else c.classList.remove('show');
+    return;
+  }
   if(pending.size>0){ c.classList.add('show');
     c.textContent = tool==='erase' ? `✓ 撤去（${pending.size}マス）` : `✓ 建設（${pending.size}マス ${fmt(pending.size*COSTS.road)}）`; }
   else c.classList.remove('show');
 }
 $('confirm').onclick=()=>{
+  if(tool==='curve'){
+    if(curvePts.length<2) return;
+    const st=curveCheck(curvePts);
+    if(!st.ok){ toast('❌ '+(st.msg||'ここには通せないよ')); return; }
+    if(!pay(st.cost)){ toast('💸 お金が足りない！（'+fmt(st.cost)+'）'); return; }
+    buildCurve(curvePts.slice());
+    curvePts.length=0; redrawCurveGhost();
+    rebuildRoads(); rebuildNPCs(); updateConfirm(); saveCity();
+    toast(`🛣 カーブ道路 完成！（${Math.round(st.len)}m -${fmt(st.cost)}）`);
+    return;
+  }
   if(tool&&tool.startsWith('bld:')){
     if(!ghostAt) return;
     if(!ghostValid){
@@ -2099,7 +2242,7 @@ $('shload').onclick=()=>{
   const v=$('sharetext').value.trim();
   try{
     const d=JSON.parse(v);
-    if(!d||![1,2,3,4].includes(d.v)) throw 0;
+    if(!d||![1,2,3,4,5].includes(d.v)) throw 0;
     if(!confirm('貼り付けたデータで街を上書きしますか？（今の街は消えます）')) return;
     localStorage.setItem(SAVE_KEY,v); location.reload();
   }catch(e){ toast('❌ データの形式が正しくないみたい'); }
@@ -2206,9 +2349,26 @@ function lineCells(a,b2){
   for(let t=1;t<=steps;t++) cells.push([a[0]+Math.round(di*t/steps), a[1]+Math.round(dj*t/steps)]);
   return cells;
 }
+function addCurvePoint(e){                           // タップ位置を自由座標のまま制御点に（グリッド非吸着）
+  ndc.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(ndc,cam);
+  const hit=new THREE.Vector3();
+  if(!ray.ray.intersectPlane(gPlane,hit)) return;
+  if(curvePts.length>=8){ toast('🛑 制御点は8点まで。✓で建設しよう'); return; }
+  const last=curvePts[curvePts.length-1];
+  if(last && Math.hypot(hit.x-last[0],hit.z-last[1])<2) return;   // 連打の重複点は無視
+  curvePts.push([hit.x,hit.z]);
+  redrawCurveGhost(); updateConfirm();
+}
 function paint(e){
   const c=pickCell(e); if(!c) return;
   const {i,j}=c;
+  if(tool==='curve'){                                // タップ1回=制御点1つ（なぞりでは増やさない）
+    if(strokeLast) return;
+    strokeLast=[i,j];
+    addCurvePoint(e);
+    return;
+  }
   if(tool&&tool.startsWith('bld:')){ moveGhost(i,j); updateConfirm(); return; }
   const targets = strokeLast ? lineCells(strokeLast,[i,j]) : [[i,j]];
   strokeLast=[i,j];
@@ -2218,6 +2378,12 @@ function paint(e){
 function paintCell(i,j){
   if(tool==='erase'){
     if(isEntry(i,j)){ toast('🛣️ 幹線道路の接続口は撤去できないよ'); return; }
+    if(CURVECELLS.has(i+','+j)){                          // カーブ道路はセルをタップで一括撤去（半額返金）
+      const cv=CURVES.find(c2=>c2.cells.includes(i+','+j));
+      if(cv){ const refund=removeCurve(cv); money+=refund; updateHUD();
+        rebuildRoads(); rebuildNPCs(); saveCity(); toast('🧹 カーブ道路を撤去！ +'+fmt(refund)); }
+      return;
+    }
     if(inGrid(i,j)&&road[j*N+i]){ pending.add(i+','+j); redrawPreview(); updateConfirm(); }
     else if(inGrid(i,j)&&bld[j*N+i]){                       // 建物の撤去は即時
       const idx=buildings.findIndex(b=>{ const def=BLD_DEFS[b.type];
