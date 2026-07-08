@@ -543,9 +543,21 @@ const CLIMBERS=[];                                     // 上りランプを登�
     const slab=new THREE.Mesh(ribbonGeo(cl(-0.005),W/2,0.55),aspR);
     slab.receiveShadow=true; g.add(slab);
     g.add(new THREE.Mesh(ribbonGeo(cl(-0.55),W/2-0.35,1.05),concR));   // 箱桁(わずかに内側へ絞る)
-    for(const sd of [1,-1]){                           // 車道外側線(白実線・路肩との境界)
-      const p=[]; for(let z=Z0;z<=Z1;z+=2) p.push([HWX(z)+sd*(W/2-1.05),DH+0.022,z]);
-      g.add(new THREE.Mesh(ribbonGeo(p,0.08,0.03),whiteR));
+    { // 車道外側線(白実線): ICの分合流区間では途切れさせ、導流帯の縁線に役目を渡す(実物の文法。素通しの直線は嘘)
+      const zeA=cz(ENTRIES[0][1]), zeB=cz(ENTRIES[1][1]);
+      const lg={'1':[[zeA-94,zeA-52.6],[zeB-80,zeB-54]], '-1':[[zeA-52,zeA-26]]};
+      for(const sd of [1,-1]){
+        let zc=Z0;
+        while(zc<Z1){
+          const cur=lg[sd].find(g2=>zc>=g2[0]&&zc<g2[1]);
+          if(cur){ zc=cur[1]; continue; }
+          let end=Z1; for(const g2 of lg[sd]) if(g2[0]>=zc) end=Math.min(end,g2[0]);
+          const p=[]; for(let z2=zc;z2<end;z2+=2) p.push([HWX(z2)+sd*(W/2-1.05),DH+0.022,z2]);
+          p.push([HWX(end)+sd*(W/2-1.05),DH+0.022,end]);
+          g.add(new THREE.Mesh(ribbonGeo(p,0.08,0.03),whiteR));
+          zc=end;
+        }
+      }
     }
     for(const ry of [0.42,0.68])                       // 中央はワイヤーロープ式防護柵(暫定2車線の実物準拠)
       g.add(new THREE.Mesh(ribbonGeo(cl(ry),0.028,0.05),ropeR));
@@ -590,7 +602,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
       zc=end;
     }
   }
-  wallRun(1, ENTRIES.map((e,i2)=>{const ze=cz(e[1]);return i2===0? [ze-94,ze-52] : [ze-80,ze-54];}));   // 北ICの壁は導流帯の島(ノーズ)の後ろから再開
+  wallRun(1, ENTRIES.map((e,i2)=>{const ze=cz(e[1]);return i2===0? [ze-94,ze-52.6] : [ze-80,ze-54];}));   // 北ICの壁は導流帯の島の基部と面一に再開
 
   wallRun(-1, [[zeA0-52,zeA0-26]]);
   // ---- ハイマスト照明 ----
@@ -743,7 +755,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
         g.add(new THREE.Mesh(ribbonGeo(eOut.map((p2,q)=>[p2[0]-sd*0.32,DH+0.022,zsL[q]]),0.07,0.02),whiteR));   // 車線の外側線
       }
       { // 車線外側レール: 壁の線から剥がれて車線縁を沿う「1本の連続リボン」(直方体2枚の板を並べない)
-        const rpts=[[HWX(base-16.4)+sd*(W/2-0.3),DH+0.95,base-16.4],
+        const rpts=[[HWX(base-15)+sd*(W/2-0.3),DH+0.95,base-15],   // 壁の切れ目ちょうどから剥がれる(壁との二重を排除)
                     [lx+sd*1.72,DH+0.95,base-8.2],
                     [lx+sd*1.72,DH+0.95, base+(sd>0?9.3:3.1)]];
         g.add(new THREE.Mesh(ribbonGeo(rpts,0.11,1.0),wallR)); RAILPL.push(rpts);
@@ -760,9 +772,9 @@ const CLIMBERS=[];                                     // 上りランプを登�
       addBoard(makeBoard(['\u2198 \u51fa\u53e3 '+(idx+1),'\u30de\u30a4\u30b7\u30c6\u30a3IC'],'#1e7d46',40),4.6,1.9,bx,DH+3.4,bz2);
     }
     // 降り口の取り付きは車線のくさびに統合済み
-    if(!eastLoop){ // 南ICのみ: 取り付き東縁の短レール(北ICは接近路リボンに統合)
-      const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);
-      er.position.set(-90+W/2+3.7,DH+0.45,z-56.75); g.add(er);
+    if(!eastLoop){ // 南ICのみ: 取り付き東縁の短レール(坂の縁レール開始位置の手前で終える=二重を排除)
+      const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,3.8),wall);
+      er.position.set(-90+W/2+3.7,DH+0.45,z-57.1); g.add(er);
     }
     // なめらかな坂（1.5倍延長・勾配15%・幅4.4）+色グラデ
     const hwyCol=new THREE.Color(0x6e747e), roadCol=new THREE.Color(0x8a9098), segCol=new THREE.Color();
@@ -834,7 +846,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
         let dx=b4[0]-a3[0], dz2=b4[2]-a3[2]; const L2=Math.hypot(dx,dz2)||1; dx/=L2; dz2/=L2;
         return [p2[0]+dz2*off, p2[1]+dy, p2[2]-dx*off];
       });
-      const eRail=[[-80.82,DH+0.55,z-73.3], ...offPath(dpts,2.15,0.55)];   // 取り付き東縁から途切れず1本で
+      const eRail=[[-81.1,DH+0.55,z-69.6], ...offPath(dpts,2.15,0.55)];   // 車線レールの終端から受け継ぐ(並走二重を排除)
       g.add(new THREE.Mesh(ribbonGeo(eRail,0.09,0.6),wallD2)); RAILPL.push(eRail);
       const nsI=Math.max(1,dpts.findIndex(p2=>p2[2]>z-53.2));
       const iRail=offPath(dpts,-2.15,0.55).slice(nsI);
@@ -853,6 +865,8 @@ const CLIMBERS=[];                                     // 上りランプを登�
         }
         const w4=wAt(z-53.0);
         goreIsland(eWn,eEn, (-84.5+w4[0])/2,(6.01+w4[1])/2+0.32,z-53.0);
+        const nc=[[-84.42,6.46,z-52.5],[-83.3,6.3,z-52.5],[-82.2,6.18,z-52.5]];   // ノーズ背後の横レール: 島の基部を閉じ、ゼブラ越しの転落を塞ぐ
+        g.add(new THREE.Mesh(ribbonGeo(nc,0.08,0.5),wallR)); RAILPL.push(nc);
         const sl=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.03,11.0),white);   // ゴア手前は破線→実線に(実物の文法)
         sl.position.set(-84.5,DH+0.02,z-68.3); g.add(sl);
       }
