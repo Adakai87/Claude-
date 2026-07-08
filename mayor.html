@@ -531,31 +531,31 @@ const CLIMBERS=[];                                     // 上りランプを登�
   TOD.windows.push(reflMat);                           // デリニエーター(視線誘導標)は夜に光る
   const W=11, Z0=-160, Z1=84, DH=6.0;
   const hwAng=z=>Math.atan2(HWX(z+4)-HWX(z-4),8);
-  // ---- 本線デッキ（緩カーブ: セグメント分割で曲げる。3枚ごとに橋桁の継ぎ目）----
-  for(let z=Z0;z<Z1;z+=8){
-    const zm=z+4, a=hwAng(zm), x=HWX(zm);
-    const deck=new THREE.Mesh(new THREE.BoxGeometry(W,0.55,8.9),asp);
-    deck.position.set(x,DH-0.28,zm); deck.rotation.y=a; deck.receiveShadow=true; g.add(deck);
-    const sk=new THREE.Mesh(new THREE.BoxGeometry(W,1.0,8.9),conc);
-    sk.position.set(x,DH-1.05,zm); sk.rotation.y=a; g.add(sk);
-    if(((z-Z0)/8)%3===0){
-      const jt=new THREE.Mesh(new THREE.BoxGeometry(W-0.7,0.03,0.34),joint);
-      jt.position.set(x,DH+0.005,zm-4); jt.rotation.y=a; g.add(jt);
-    }
-    const nx2=Math.cos(a), nz2=-Math.sin(a);
+  // ---- 本線デッキ（スプライン一体生成: 路面・箱桁・外側線・ワイヤーロープを中心線HWXの点列から連続で張る。板の列は使わない）----
+  const texRoadR=texRoad.clone(); texRoadR.wrapS=texRoadR.wrapT=THREE.RepeatWrapping;
+  texRoadR.repeat.set(1,28); texRoadR.needsUpdate=true;
+  const aspR=new THREE.MeshStandardMaterial({color:0x6e747e,roughness:0.9,map:texRoadR,side:THREE.DoubleSide});
+  const concR=new THREE.MeshStandardMaterial({color:0xc8c4ba,roughness:0.95,side:THREE.DoubleSide});
+  const whiteR=new THREE.MeshStandardMaterial({color:0xf2f0e8,roughness:0.8,side:THREE.DoubleSide});
+  const ropeR=new THREE.MeshStandardMaterial({color:0x9aa2ab,roughness:0.4,metalness:0.5,side:THREE.DoubleSide});
+  {
+    const cl=dy=>{ const p=[]; for(let z=Z0;z<=Z1;z+=2) p.push([HWX(z),DH+dy,z]); return p; };
+    const slab=new THREE.Mesh(ribbonGeo(cl(-0.005),W/2,0.55),aspR);
+    slab.receiveShadow=true; g.add(slab);
+    g.add(new THREE.Mesh(ribbonGeo(cl(-0.55),W/2-0.35,1.05),concR));   // 箱桁(わずかに内側へ絞る)
     for(const sd of [1,-1]){                           // 車道外側線(白実線・路肩との境界)
-      const el=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.03,8.9),white);
-      el.position.set(x+sd*(W/2-1.05)*nx2,DH+0.02,zm+sd*(W/2-1.05)*nz2);
-      el.rotation.y=a; g.add(el);
+      const p=[]; for(let z=Z0;z<=Z1;z+=2) p.push([HWX(z)+sd*(W/2-1.05),DH+0.022,z]);
+      g.add(new THREE.Mesh(ribbonGeo(p,0.08,0.03),whiteR));
     }
-    for(const ry of [0.42,0.68]){                      // 中央はワイヤーロープ式防護柵(暫定2車線の実物準拠)
-      const rope=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,8.95),ropeMat);
-      rope.position.set(x,DH+ry,zm); rope.rotation.y=a; g.add(rope);
-    }
-    for(let pz=-3;pz<=3;pz+=3){
-      const zz2=zm+pz;
+    for(const ry of [0.42,0.68])                       // 中央はワイヤーロープ式防護柵(暫定2車線の実物準拠)
+      g.add(new THREE.Mesh(ribbonGeo(cl(ry),0.028,0.05),ropeR));
+    for(let z=Z0+2;z<Z1;z+=3){
       const post=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.82,0.09),postMat);
-      post.position.set(HWX(zz2),DH+0.41,zz2); g.add(post);
+      post.position.set(HWX(z),DH+0.41,z); g.add(post);
+    }
+    for(let z=Z0;z<Z1;z+=24){                          // 橋桁の継ぎ目(連続スラブの上に刻む)
+      const jt=new THREE.Mesh(new THREE.BoxGeometry(W-0.7,0.03,0.34),joint);
+      jt.position.set(HWX(z),DH+0.008,z); jt.rotation.y=hwAng(z); g.add(jt);
     }
   }
   // ---- 橋脚（接続口の高架下通路は間引く）----
@@ -717,12 +717,18 @@ const CLIMBERS=[];                                     // 上りランプを登�
     for(const sd of (hasOn?[1,-1]:[1])){
       const lx=-90+sd*(W/2+1.6);
       const base= sd>0? (eastLoop? z-79 : z-65) : z-37;   // 東ループICは減速車線を14m北へ(浅い角度で剥がれる16mの分流を確保する助走)
-      const lane=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.55,18),asp);
-      lane.position.set(lx,DH-0.28,base); lane.receiveShadow=true; g.add(lane);
-      const lsk=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.0,18),conc);
-      lsk.position.set(lx,DH-1.05,base); g.add(lsk);
-      const taper=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.55,7.6),asp);
-      taper.rotation.y=sd*0.22; taper.position.set(lx-sd*0.85,DH-0.29,base-12.2); g.add(taper);
+      { // 車線+テーパー+取り付きは「本線の縁から膨らむ1枚のくさび」(箱2枚の板を並べない)
+        const dEdge=-90+sd*(W/2), lo=lx+sd*1.6;
+        const hasPad= sd>0;                             // 取り付き(パッド)は降り口側のみ
+        const padEnd= eastLoop? base+10.4 : base+10.8;   // 取り付き南縁(ゴア・壁と面一)
+        const zsL= [base-16.4, base-13, base-9.6, base-2, base+7.2].concat(hasPad? [base+8.6, base+9.6, padEnd] : [base+9]);
+        const oxL= [dEdge, lo-sd*1.6*0.5, lo, lo, lo].concat(hasPad? [lo, lo+sd*0.55, lo+sd*0.55] : [lo]);
+        const eIn=zsL.map(zz=>[dEdge,DH-0.008,zz]);
+        const eOut=zsL.map((zz,q)=>[oxL[q],DH-0.008,zz]);
+        const wj=new THREE.Mesh(wedgeGeo(eIn,eOut,0.55),aspR); wj.receiveShadow=true; g.add(wj);
+        g.add(new THREE.Mesh(wedgeGeo(eIn.map(p2=>[p2[0],DH-0.56,p2[2]]),
+                                      eOut.map(p2=>[p2[0],DH-0.56,p2[2]]),1.0),concR));
+      }
       { // 車線外側レール: 壁の線から剥がれて車線縁を沿う「1本の連続リボン」(直方体2枚の板を並べない)
         const rpts=[[HWX(base-16.4)+sd*(W/2-0.3),DH+0.95,base-16.4],
                     [lx+sd*1.72,DH+0.95,base-8.2],
@@ -740,9 +746,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
       p.position.set(bx,(DH+4.4)/2,bz2); g.add(p);
       addBoard(makeBoard(['\u2198 \u51fa\u53e3 '+(idx+1),'\u30de\u30a4\u30b7\u30c6\u30a3IC'],'#1e7d46',40),4.6,1.9,bx,DH+3.4,bz2);
     }
-    // 降り口の取り付き
-    const top=new THREE.Mesh(new THREE.BoxGeometry(5.8,0.55,4.8),asp);
-    top.position.set(-90+W/2+0.9,DH-0.28, eastLoop? z-71 : z-56.6); g.add(top);
+    // 降り口の取り付きは車線のくさびに統合済み
     if(!eastLoop){ // 南ICのみ: 取り付き東縁の短レール(北ICは接近路リボンに統合)
       const er=new THREE.Mesh(new THREE.BoxGeometry(0.25,1.0,4.5),wall);
       er.position.set(-90+W/2+3.7,DH+0.45,z-56.75); g.add(er);
@@ -754,18 +758,19 @@ const CLIMBERS=[];                                     // 上りランプを登�
     const cxr = eastLoop? -82.0 : xr;                  // タイルへの最終カーブの基準線(東ループは側帯道路x=-82から)
     let loopPts=null;                                  // 東ループの点列(見た目と走行経路で同じものを使い、ズレを構造的に防ぐ)
     if(!eastLoop){                                      // ---- 直線坂(南IC) ----
-    const z0=z-55, z1=z-2.8, nSeg=20;
+    const z0=z-55, z1=z-2.8, nSeg=40;
     const hAt=u=>DH-drop*(u*u*(3-2*u));
-    let pv=[z0,hAt(0)];
-    for(let s2=1;s2<=nSeg;s2++){
-      const u=s2/nSeg, zz=z0+(z1-z0)*u, hh2=hAt(u);
-      const len=Math.hypot(zz-pv[0],hh2-pv[1]);
-      const seg=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.45,len+0.55),
-        segMat(Math.max(0,(u-0.55)/0.45)*0.5));
-      seg.position.set(xr,(hh2+pv[1])/2-0.24,(zz+pv[0])/2);
-      seg.rotation.x=Math.atan2(pv[1]-hh2,zz-pv[0]);
-      seg.receiveShadow=true; g.add(seg);
-      pv=[zz,hh2];
+    { // 坂の路面も点列から1本のリボンで(板の列だと勾配の折れ目がカクつく)
+      const rp3=[]; for(let s2=0;s2<=nSeg;s2++){ const u=s2/nSeg; rp3.push([xr,hAt(u),z0+(z1-z0)*u]); }
+      const rm3=new THREE.Mesh(ribbonGeo(rp3,2.2,0.5),
+        new THREE.MeshStandardMaterial({color:0x79808a,roughness:0.88,map:texRoad,side:THREE.DoubleSide}));
+      rm3.receiveShadow=true; rm3.castShadow=true; g.add(rm3);
+      for(let s2=4;s2<nSeg-2;s2+=7){ const p2=rp3[s2];   // 高い区間には橋脚(浮いた板の解消)
+        if(p2[1]>2.2){
+          const pc=new THREE.Mesh(new THREE.BoxGeometry(1.1,p2[1]-0.35,1.1),conc);
+          pc.position.set(p2[0],(p2[1]-0.35)/2,p2[2]); g.add(pc);
+        }
+      }
     }
     for(const sx of [-2.15,2.15]){                      // 坂の縁レールも点列から1本のリボンで(板の列だと勾配の折れ目がカクつく)
       const cp=[];
@@ -856,22 +861,17 @@ const CLIMBERS=[];                                     // 上りランプを登�
         new THREE.MeshBasicMaterial({map:spdTex,side:THREE.DoubleSide,transparent:true}));
       m.position.set(eastLoop?-60.2:xr-2.9,3.35,eastLoop?z-62:z-28); g.add(m);
     }
-    // クォーターカーブ（タイル西端で終了・幅4.4→3.4に先細り）
-    const R=2.8, C=[cxr+R, z-R], aSeg=6;
-    for(let s2=0;s2<aSeg;s2++){
-      const tm=Math.PI-(Math.PI/2)*((s2+0.5)/aSeg);
-      const mx=C[0]+R*Math.cos(tm), mz=C[1]+R*Math.sin(tm);
-      const len=R*(Math.PI/2)/aSeg;
-      const w2= eastLoop? 3.4 : 4.4-1.0*((s2+1)/aSeg);
-      const seg=new THREE.Mesh(new THREE.BoxGeometry(w2,0.45,len+0.7),
-        segMat(0.5+0.5*((s2+1)/aSeg)));
-      seg.position.set(mx,0.345,mz);
-      seg.rotation.y=Math.atan2(Math.sin(tm),-Math.cos(tm));
-      seg.receiveShadow=true; g.add(seg);
-      if(s2<1 && !eastLoop){   // 東ループ側は高架下道路との交差点なので外周レール無し
-        const rl=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,len+0.7),wall);
-        rl.rotation.y=seg.rotation.y;
-        rl.position.set(C[0]+(R+1.9)*Math.cos(tm),0.62,C[1]+(R+1.9)*Math.sin(tm)); g.add(rl);
+    // クォーターカーブ（タイル西端で終了）— 円弧の点列から1本のリボンで
+    { const R=2.8, C=[cxr+R, z-R], ap=[];
+      for(let s2=0;s2<=12;s2++){ const tm=Math.PI-(Math.PI/2)*(s2/12);
+        ap.push([C[0]+R*Math.cos(tm),0.57,C[1]+R*Math.sin(tm)]); }
+      const cm=new THREE.Mesh(ribbonGeo(ap,eastLoop?1.7:1.9,0.5),
+        new THREE.MeshStandardMaterial({color:0x8a9098,roughness:0.85,map:texRoad,side:THREE.DoubleSide}));
+      cm.receiveShadow=true; g.add(cm);
+      if(!eastLoop){ const op=[];                       // 外周レール(短い円弧)もリボンで
+        for(let s2=0;s2<=6;s2++){ const tm=Math.PI-(Math.PI/4)*(s2/6);
+          op.push([C[0]+(R+1.9)*Math.cos(tm),0.75,C[1]+(R+1.9)*Math.sin(tm)]); }
+        g.add(new THREE.Mesh(ribbonGeo(op,0.08,0.55),wallR)); RAILPL.push(op);
       }
     }
     if(hasOn){ // ===== 上り入口一式（北ICのみ）=====
@@ -913,13 +913,12 @@ const CLIMBERS=[];                                     // 上りランプを登�
         }
       }
     }
-    // ループ出口→加速車線への側道橋（高架下通路の上を立体交差）
-    for(let bz=z+11;bz>z-26;bz-=7){
-      const bm=Math.max(bz-7,z-26), mid=(bz+bm)/2, ln=bz-bm;
-      const bd2=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.55,ln+0.6),asp);
-      bd2.position.set(-98.6,DH-0.28,mid); bd2.receiveShadow=true; g.add(bd2);
-      const sk2=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.9,ln+0.6),conc);
-      sk2.position.set(-98.6,DH-1.0,mid); g.add(sk2);
+    // ループ出口→加速車線への側道橋+渡り線（1本のリボン: スパン板の継ぎ目と斜め箱の食い違いを根絶）
+    { const bp=[[-98.6,DH-0.002,z+11],[-98.6,DH-0.002,z-24],[-98.35,DH-0.002,z-27],
+                [-97.5,DH-0.002,z-32],[-97.15,DH-0.002,z-34.5]];
+      const bm2=new THREE.Mesh(ribbonGeo(bp,2.2,0.55),aspR);
+      bm2.receiveShadow=true; bm2.castShadow=true; g.add(bm2);
+      g.add(new THREE.Mesh(ribbonGeo(bp.map(p2=>[p2[0],DH-0.56,p2[2]]),1.95,0.9),concR));
     }
     { // 側道橋〜渡り線のレール: スパンごとの板をやめ、橋の始端から渡り線の合流端まで1本のリボンで通す
       const wch=[[-100.75,DH+0.58,z+11],[-100.78,DH+0.58,z-26],[-99.1,DH+0.58,z-34.2]];
@@ -932,11 +931,7 @@ const CLIMBERS=[];                                     // 上りランプを登�
       const pc=new THREE.Mesh(new THREE.BoxGeometry(1.3,DH-1.45,1.3),conc);
       pc.position.set(-98.6,(DH-1.45)/2,pz2); g.add(pc);
     }
-    { // 渡り線: 側道橋→加速車線へ斜めに合流
-      const tr=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.55,8.6),asp);
-      tr.rotation.y=-0.21; tr.position.set(-97.85,DH-0.28,z-29.8); tr.receiveShadow=true; g.add(tr);
-      const tsk=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.9,8.6),conc);
-      tsk.rotation.y=-0.21; tsk.position.set(-97.85,DH-1.0,z-29.8); g.add(tsk);
+    { // 渡り線: 路面は側道橋リボンに統合済み。レールと導流帯のみ
       { // 導流帯の島(西・合流): 本線西縁(x-95.5)と渡り線東縁の間の隙間を島で埋める。下流(北)へ細り、ノーズは上流端
         const bxW=zz=>{ const t3=((zz-z)+25.1)/(-8.45); return -96.6+1.8*t3; };   // 渡り線の東縁x(z線形: 南端-96.6→北端-94.8)
         const eWw=[], eEw=[];
