@@ -1,0 +1,15 @@
+{
+  "name": "推しリマインダー — Screen Time Reminder",
+  "short_name": "推しリマインダー",
+  "description": "見すぎたら推しが画面に登場して大事なことに気づかせてくれるアプリ。",
+  "lang": "ja",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f14",
+  "theme_color": "#dd2476",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

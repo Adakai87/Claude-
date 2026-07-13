@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>推しリマインダー — 設定</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>⚙ 推しリマインダー 設定</h1>
+
+    <section class="card">
+      <h2>キャラクターを選ぶ</h2>
+      <div id="char-grid" class="char-grid"></div>
+    </section>
+
+    <section class="card" id="custom-card" hidden>
+      <h2>自分の推しを設定（customキャラ）</h2>
+      <label>画像URL（顔写真など。正方形がおすすめ）</label>
+      <input type="url" id="custom-img" placeholder="https://example.com/oshi.png" />
+      <p class="hint">※ 自分で用意した画像URLを使ってください（他人の写真の無断利用は避けて）。</p>
+      <label>自作の名言（1行に1つ）</label>
+      <textarea id="custom-quotes" rows="4" placeholder="顔を上げよう！&#10;今日もよく頑張ってる！"></textarea>
+    </section>
+
+    <section class="card">
+      <h2>監視するサイトと上限（分）</h2>
+      <p class="hint">ドメインの一部でOK（例: youtube.com）。今日の合計がこの分数を超えると推しが登場します。</p>
+      <div id="watched-list" class="watched-list"></div>
+      <div class="add-row">
+        <input type="text" id="new-host" placeholder="例: reddit.com" />
+        <input type="number" id="new-limit" placeholder="分" min="1" value="20" />
+        <button id="add-btn" class="btn small">＋ 追加</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>再表示の間隔</h2>
+      <label>「あと5分だけ」を押した後、何分で再登場するか</label>
+      <input type="number" id="resnooze" min="1" max="60" value="5" />
+    </section>
+
+    <div class="save-row">
+      <span id="saved-msg" class="saved-msg"></span>
+      <button id="save-btn" class="btn primary">保存する</button>
+    </div>
+  </div>
+
+  <script src="characters.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

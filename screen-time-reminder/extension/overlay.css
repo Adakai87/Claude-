@@ -1,0 +1,104 @@
+/* overlay.css — 全画面リマインダーの見た目（共通） */
+.str-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647; /* 最前面 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+    "Yu Gothic", "Meiryo", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  animation: str-fade-in 0.35s ease;
+  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+@keyframes str-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.str-card {
+  width: min(90vw, 460px);
+  padding: 36px 28px 28px;
+  border-radius: 28px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  animation: str-pop 0.45s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+@keyframes str-pop {
+  0% { transform: scale(0.6) translateY(40px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.str-char {
+  font-size: 96px;
+  line-height: 1;
+  margin-bottom: 12px;
+  animation: str-bounce 1.2s ease-in-out infinite;
+}
+
+.str-char img {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.8);
+}
+
+@keyframes str-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.str-name {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.85;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.str-quote {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.str-meta {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-bottom: 22px;
+}
+
+.str-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.str-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.str-btn:active { transform: scale(0.96); }
+
+.str-btn-primary {
+  background: #fff;
+  color: #222;
+}
+.str-btn-ghost {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+}

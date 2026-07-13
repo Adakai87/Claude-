@@ -1,0 +1,63 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --pink: #dd2476; --orange: #ff512f; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+  background: #0f0f14;
+  color: #fff;
+  min-height: 100vh;
+}
+.app { max-width: 480px; margin: 0 auto; padding: 24px 18px 60px; }
+
+.app-hd { text-align: center; margin-bottom: 24px; }
+.app-emoji { font-size: 56px; display: block; }
+.app-hd h1 { font-size: 24px; margin-top: 6px; }
+.app-tag { font-size: 13px; color: #9a9aa8; margin-top: 4px; }
+
+.panel {
+  background: #1b1b24;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.panel.center { text-align: center; }
+.panel h2 { font-size: 16px; margin-bottom: 6px; }
+.desc { font-size: 12px; color: #9a9aa8; margin-bottom: 14px; }
+
+.minute-chips { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.chip {
+  flex: 1; min-width: 64px; border: 1.5px solid #34343f; background: #23232e; color: #ccc;
+  border-radius: 12px; padding: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.chip.sel { border-color: var(--pink); background: rgba(221,36,118,.18); color: #fff; }
+
+.timer-display {
+  font-size: 52px; font-weight: 800; text-align: center; letter-spacing: 2px;
+  font-variant-numeric: tabular-nums; margin: 8px 0 16px;
+}
+.timer-actions { display: flex; gap: 10px; }
+
+.big-btn {
+  flex: 1; border: none; border-radius: 14px; padding: 16px; font-size: 16px;
+  font-weight: 800; cursor: pointer;
+}
+.big-btn.primary { background: linear-gradient(135deg, var(--orange), var(--pink)); color: #fff; }
+.big-btn.ghost { background: #2a2a36; color: #fff; }
+.status { text-align: center; font-size: 13px; color: #ffd479; margin-top: 12px; min-height: 18px; }
+
+.char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px,1fr)); gap: 10px; margin-bottom: 12px; }
+.char-opt {
+  border: 2px solid #34343f; border-radius: 14px; padding: 12px 6px; text-align: center;
+  cursor: pointer; background: #23232e;
+}
+.char-opt.sel { border-color: var(--pink); background: rgba(221,36,118,.18); }
+.char-opt .em { font-size: 32px; }
+.char-opt .nm { font-size: 11px; font-weight: 700; margin-top: 4px; }
+
+label { display: block; font-size: 12px; font-weight: 600; margin: 10px 0 6px; color: #bbb; }
+input, textarea {
+  width: 100%; border: 1.5px solid #34343f; background: #23232e; color: #fff;
+  border-radius: 10px; padding: 10px; font-size: 14px; font-family: inherit;
+}
+
+.link-btn { background: none; border: none; color: #7eb6ff; font-size: 13px; cursor: pointer; margin-top: 12px; text-decoration: underline; }
+.app-ft { text-align: center; font-size: 12px; color: #6a6a78; margin-top: 8px; }
