@@ -13,6 +13,18 @@
 
 → `.claude/team.md` 参照
 
+## AIエージェントチーム（KOE）
+
+→ `.claude/agents/` 参照
+
+| エージェント | ファイル | 起動ワード |
+|---|---|---|
+| PM | `agents/pm.md` | 「PMとして」「進捗確認」「ヒアリングして」 |
+| エンジニア | `agents/engineer.md` | 「実装して」「コード直して」「デプロイして」 |
+| デザイナー | `agents/designer.md` | 「UIを見て」「UX改善して」「デザインレビュー」 |
+| リサーチャー | `agents/researcher.md` | 「競合調査」「市場調査」「分析して」 |
+| PR戦略 | `agents/pr.md` | 「PR戦略」「発信計画」「コンテンツ作って」 |
+
 ## スタイルガイド
 
 → `.claude/style-guide/` 参照

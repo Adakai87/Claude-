@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>KOE</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{height:100%;font-family:-apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif;background:#F8F7FF;overflow:hidden;display:flex;justify-content:center}
+button{cursor:pointer;border:none;background:none;color:inherit;font:inherit}
+input,textarea,select{font:inherit;color:inherit}
+
+/* ===== APP ===== */
+#app{width:100%;max-width:430px;height:100%;background:#fff;display:flex;flex-direction:column;position:relative;overflow:hidden}
+
+/* ===== CSS VARS ===== */
+:root{
+  --bg:#fff;--bg2:#F8F7FF;--bd:#EEE9F8;--tx:#1A1A2E;--mu:#9CA3AF;
+  --ac:#764BA2;--acl:rgba(118,75,162,.09);
+}
+.dark{
+  --bg:#0D1117;--bg2:#161B22;--bd:#2D3748;--tx:#E2D9F3;--mu:#6B7280;
+  --ac:#9B7FD0;--acl:rgba(155,127,208,.12);
+}
+#app{background:var(--bg);color:var(--tx)}
+
+/* ===== SCREENS ===== */
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden}
+.screen.active{display:flex}
+
+/* ===== TOPBAR ===== */
+.topbar{
+  height:54px;display:flex;align-items:center;padding:0 12px;gap:8px;
+  background:var(--bg);border-bottom:1px solid var(--bd);
+  position:sticky;top:0;z-index:20;flex-shrink:0;
+}
+.tb-logo{font-size:22px;font-weight:900;letter-spacing:.1em;flex:1;text-align:center;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.tb-title{font-size:16px;font-weight:700;flex:1;text-align:center}
+.ib{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ib:active{background:var(--acl)}
+
+/* ===== BOTTOM NAV ===== */
+#bnav{
+  height:58px;display:flex;background:var(--bg);border-top:1px solid var(--bd);
+  flex-shrink:0;padding-bottom:env(safe-area-inset-bottom);
+}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--mu);position:relative}
+.ni.on{color:var(--ac);font-weight:700}
+.ni-ico{font-size:22px;line-height:1}
+.nbadge{position:absolute;top:6px;right:calc(50% - 16px);background:#EF4444;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px}
+
+/* ===== FAB ===== */
+#fab{
+  position:absolute;right:16px;bottom:70px;z-index:30;
+  width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);
+  color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(102,126,234,.5);
+}
+#fab:active{transform:scale(.93)}
+
+/* ===== SCROLL ===== */
+.sa{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sa::-webkit-scrollbar{display:none}
+
+/* ===== SIDEBAR ===== */
+#sbo{position:absolute;inset:0;background:transparent;z-index:100;pointer-events:none;transition:background .25s}
+#sbo.open{background:rgba(0,0,0,.45);pointer-events:all}
+#sb{
+  position:absolute;left:0;top:0;bottom:0;width:280px;background:var(--bg);
+  transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;overflow-y:auto;z-index:101;
+  box-shadow:4px 0 30px rgba(0,0,0,.12);
+}
+#sb.open{transform:translateX(0)}
+.sb-head{padding:24px 18px 16px;border-bottom:1px solid var(--bd)}
+.sb-av{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700;margin-bottom:12px}
+.sb-name{font-size:15px;font-weight:700}
+.sb-sub{font-size:12px;color:var(--mu);margin-top:3px}
+.sb-stats{display:flex;gap:16px;margin-top:10px;font-size:13px}
+.sb-stats strong{color:var(--tx)}
+.sb-stats span{color:var(--mu)}
+.sb-list{padding:6px 0}
+.si{display:flex;align-items:center;gap:14px;padding:13px 18px;font-size:15px;font-weight:500;width:100%;text-align:left}
+.si:active{background:var(--acl)}
+.si .ico{font-size:20px;width:26px;text-align:center}
+.si.red{color:#EF4444}
+.sdiv{height:1px;background:var(--bd);margin:6px 18px}
+
+/* ===== TAB BAR ===== */
+.tabbar{display:flex;background:var(--bg);border-bottom:1px solid var(--bd);flex-shrink:0}
+.tb{flex:1;padding:13px 0 10px;font-size:13px;font-weight:600;color:var(--mu);text-align:center;border-bottom:3px solid transparent;transition:all .15s;position:relative}
+.tb.on{color:var(--ac);border-bottom-color:transparent}
+.tb.on::after{content:'';position:absolute;bottom:0;left:15%;right:15%;height:3px;border-radius:2px;background:linear-gradient(90deg,#667EEA,#F093FB)}
+
+/* ===== POST CARD ===== */
+.pc{
+  background:#fff;border-radius:16px;margin:8px 12px;padding:14px 16px 10px;
+  box-shadow:0 2px 8px rgba(102,126,234,.08);border:1px solid rgba(232,228,240,.6);
+  display:flex;gap:10px;position:relative;cursor:pointer;transition:transform .15s;
+}
+.pc:active{transform:scale(.98);background:#fff}
+.dark .pc{background:#1A1F2E;border-color:rgba(102,126,234,.12);box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.pc-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:700}
+.pc-body{flex:1;min-width:0}
+.pc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+.pc-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.gbadge{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}
+.pc-info{font-size:11px;color:var(--mu);margin-top:1px}
+.pc-text{font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;margin:6px 0}
+.pc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.ptag{font-size:11px;color:var(--ac);font-weight:600}
+.pc-acts{display:flex;gap:4px;margin-top:6px}
+.pa{display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:16px;font-size:12px;color:var(--mu);min-width:48px}
+.pa:active,.pa:hover{background:var(--acl);color:var(--ac)}
+.pa.liked{color:#EF4444}
+.pa.saved{color:var(--ac)}
+.pa .pi{font-size:15px}
+
+/* ===== SPECIAL BANNERS ===== */
+.cbanner,.lbanner{border-radius:8px;padding:7px 10px;font-size:11px;display:flex;align-items:center;gap:6px;margin-bottom:8px;font-weight:600}
+.cbanner{background:#FEF3C7;color:#92400E}
+.dark .cbanner{background:rgba(245,158,11,.1);color:#FDE68A}
+.lbanner{background:#EDE9FE;color:#5B21B6}
+.dark .lbanner{background:rgba(167,139,250,.1);color:#C4B5FD}
+
+/* ===== SECTION HEADER ===== */
+.sh{padding:10px 14px;font-size:12px;font-weight:700;color:var(--mu);background:var(--bg2);border-bottom:1px solid var(--bd);text-transform:uppercase;letter-spacing:.4px}
+
+/* ===== CHIP SCROLL ===== */
+.chips{display:flex;gap:8px;padding:10px 14px;overflow-x:auto;border-bottom:1px solid var(--bd);flex-shrink:0;background:var(--bg)}
+.chips::-webkit-scrollbar{display:none}
+.chip{padding:6px 14px;border-radius:14px;font-size:13px;font-weight:600;border:1.5px solid var(--bd);color:var(--mu);white-space:nowrap;flex-shrink:0}
+.chip.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+
+/* ===== GEN SECTION (compare) ===== */
+.gs{border-bottom:1.5px solid var(--bd)}
+.gs-head{padding:13px 14px;display:flex;align-items:center;gap:10px;background:var(--bg);cursor:pointer}
+.gs-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.gs-title{font-size:14px;font-weight:700;flex:1}
+.gs-cnt{font-size:11px;color:var(--mu)}
+.gs-mine{font-size:10px;padding:2px 7px;border-radius:8px;color:#fff;font-weight:700}
+.gs-body{padding:0}
+.gv{padding:12px 14px;border-bottom:1px solid var(--bd);display:flex;gap:9px}
+.gv:last-child{border-bottom:none}
+.gv-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
+.gv-b{flex:1}
+.gv-who{font-size:11px;font-weight:700;margin-bottom:3px}
+.gv-text{font-size:13px;line-height:1.55;color:var(--tx)}
+
+/* ===== SEARCH ===== */
+.si-wrap{padding:10px 14px;border-bottom:1px solid var(--bd);background:var(--bg)}
+.si-inp{width:100%;padding:9px 14px;border-radius:22px;background:var(--bg2);border:1.5px solid var(--bd);font-size:14px;color:var(--tx)}
+.si-inp::placeholder{color:var(--mu)}
+.si-inp:focus{outline:none;border-color:var(--ac)}
+.trend-item{padding:12px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:12px;cursor:pointer}
+.trend-item:active{background:var(--acl)}
+.tr-rank{font-size:11px;font-weight:700;color:var(--mu);width:18px}
+.tr-info{flex:1}
+.tr-tag{font-size:14px;font-weight:700}
+.tr-cnt{font-size:11px;color:var(--mu);margin-top:2px}
+.tr-hot{font-size:11px;color:#EF4444;font-weight:700}
+
+/* ===== NOTIF ===== */
+.nitem{padding:13px 14px;border-bottom:1px solid var(--bd);display:flex;gap:10px;cursor:pointer}
+.nitem:active{background:var(--acl)}
+.nitem.unr{background:var(--acl)}
+.n-ico{flex-shrink:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--ac)}
+.n-text{font-size:13px;line-height:1.5;flex:1}
+.n-time{font-size:11px;color:var(--mu);margin-top:3px}
+
+/* ===== BOOKMARKS ===== */
+.empty{padding:60px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.empty-ico{font-size:44px}
+.empty-t{font-size:17px;font-weight:700}
+.empty-d{font-size:13px;color:var(--mu);line-height:1.65}
+
+/* ===== PROFILE ===== */
+.p-cover{height:110px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);flex-shrink:0}
+.p-av-wrap{position:relative;margin-top:-36px;margin-left:14px;display:inline-block}
+.p-av{width:72px;height:72px;border-radius:50%;border:3px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700}
+.p-head{padding:10px 14px 14px;border-bottom:1px solid var(--bd)}
+.p-namerow{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
+.p-name{font-size:19px;font-weight:800}
+.p-sub{font-size:12px;color:var(--ac);font-weight:600;margin-bottom:6px}
+.p-bio{font-size:13px;color:var(--mu);line-height:1.6;margin-bottom:12px}
+.p-stats{display:flex;gap:20px;font-size:13px}
+.p-stats strong{font-weight:700;font-size:15px}
+.p-stats span{color:var(--mu)}
+.edit-btn{padding:7px 16px;border-radius:18px;border:1.5px solid var(--bd);font-size:13px;font-weight:600;color:var(--tx)}
+
+/* ===== SETTINGS ===== */
+.set-sec-t{padding:14px 14px 7px;font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+.set-row{display:flex;align-items:center;padding:13px 14px;border-bottom:1px solid var(--bd);gap:13px}
+.set-row .ico{font-size:19px;width:26px}
+.set-lbl{flex:1;font-size:14px}
+.set-val{font-size:13px;color:var(--mu)}
+.tgl{width:44px;height:25px;border-radius:13px;background:var(--bd);position:relative;transition:background .2s;cursor:pointer;flex-shrink:0}
+.tgl.on{background:var(--ac)}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.tgl.on::after{transform:translateX(19px)}
+
+/* ===== DETAIL ===== */
+.d-body{padding:14px;border-bottom:1px solid var(--bd)}
+.d-userrow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.d-av{width:46px;height:46px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;font-weight:700}
+.d-name{font-size:15px;font-weight:700}
+.d-sub{font-size:12px;color:var(--mu);margin-top:2px}
+.d-text{font-size:17px;line-height:1.75;white-space:pre-wrap;word-break:break-word;margin-bottom:12px}
+.d-stats{display:flex;gap:18px;padding:11px 0;border-bottom:1px solid var(--bd);border-top:1px solid var(--bd);font-size:13px;color:var(--mu)}
+.d-stats strong{color:var(--tx);font-weight:700;font-size:15px}
+.d-acts{display:flex;justify-content:space-around;padding:8px 0;border-bottom:1px solid var(--bd)}
+.da{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--mu);padding:7px 10px;border-radius:16px}
+.da:active{background:var(--acl);color:var(--ac)}
+.da .pi{font-size:17px}
+.cmt-item{padding:12px 14px;border-bottom:1px solid var(--bd);display:flex;gap:9px}
+.cm-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
+.cm-body{flex:1}
+.cm-name{font-size:12px;font-weight:700}
+.cm-text{font-size:13px;line-height:1.5;margin-top:3px}
+.cm-time{font-size:10px;color:var(--mu);margin-top:3px}
+.reply-bar{padding:10px 12px;border-top:1px solid var(--bd);display:flex;gap:9px;align-items:flex-end;background:var(--bg);flex-shrink:0}
+.rp-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
+.rp-inp{flex:1;padding:9px 13px;border-radius:18px;background:var(--bg2);border:1.5px solid var(--bd);font-size:13px;color:var(--tx);resize:none;max-height:80px}
+.rp-inp:focus{outline:none;border-color:var(--ac)}
+.rp-inp::placeholder{color:var(--mu)}
+.rp-send{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#667EEA,#764BA2);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ===== COMPOSER ===== */
+#comp{
+  position:absolute;inset:0;background:var(--bg);z-index:200;
+  display:none;flex-direction:column;
+}
+#comp.open{display:flex}
+.comp-top{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.comp-body{flex:1;overflow-y:auto;padding:14px;display:flex;gap:12px}
+.comp-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:700}
+.comp-r{flex:1;display:flex;flex-direction:column;gap:10px}
+.comp-who{font-size:12px;color:var(--mu);font-weight:600}
+#ctxt{width:100%;font-size:15px;line-height:1.65;resize:none;min-height:110px;background:transparent;border:none;outline:none;color:var(--tx)}
+#ctxt::placeholder{color:var(--mu)}
+.comp-tags{display:flex;flex-wrap:wrap;gap:6px}
+.ctag{font-size:11px;padding:4px 9px;border-radius:10px;background:var(--acl);color:var(--ac);font-weight:600;cursor:pointer}
+.comp-bot{padding:10px 14px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.cchar{font-size:12px;color:var(--mu);flex:1;text-align:right}
+.post-btn{padding:8px 20px;border-radius:20px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:14px;font-weight:700;box-shadow:0 2px 10px rgba(102,126,234,.35)}
+.post-btn:disabled{opacity:.4}
+.comp-extra{padding:0 14px 10px}
+.cbox{background:var(--bg2);border-radius:12px;padding:14px;border:1.5px solid var(--bd)}
+.cbox h3{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--ac)}
+.cbox p{font-size:11px;color:var(--mu);margin-bottom:10px;line-height:1.55}
+.cbox select{width:100%;padding:8px 10px;border-radius:9px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-size:13px}
+.cbox select:focus{outline:none;border-color:var(--ac)}
+.dprev{margin-top:10px;padding:9px 12px;background:var(--acl);border-radius:8px;font-size:12px;color:var(--ac);line-height:1.65}
+.lbox{border-color:#A78BFA}
+.lbox h3{color:#5B21B6}
+.dark .lbox h3{color:#C4B5FD}
+.lbox .dprev{background:rgba(167,139,250,.1);color:#5B21B6}
+.dark .lbox .dprev{color:#C4B5FD}
+
+/* ===== LOGIN ===== */
+#login{
+  position:absolute;inset:0;background:var(--bg);z-index:300;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:36px 28px;overflow-y:auto;
+}
+.l-logo{font-size:52px;font-weight:900;letter-spacing:-1px;margin-bottom:8px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.l-tag{font-size:14px;color:var(--mu);text-align:center;line-height:1.65;margin-bottom:44px}
+.l-form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:18px}
+.lbl{font-size:12px;font-weight:700;color:var(--mu);margin-bottom:5px;display:block}
+.linp{width:100%;padding:13px 15px;border-radius:12px;background:var(--bg2);border:1.5px solid var(--bd);font-size:15px;color:var(--tx)}
+.linp:focus{outline:none;border-color:var(--ac)}
+.lsel{width:100%;padding:13px 15px;border-radius:12px;background:var(--bg2);border:1.5px solid var(--bd);font-size:15px;color:var(--tx);cursor:pointer}
+.lsel:focus{outline:none;border-color:var(--ac)}
+.l-info{background:var(--acl);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--ac);line-height:1.65}
+.l-btn{width:100%;padding:15px;border-radius:26px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:16px;font-weight:700;margin-top:6px;box-shadow:0 4px 16px rgba(102,126,234,.4)}
+.l-btn:disabled{opacity:.35}
+.l-note{font-size:11px;color:var(--mu);text-align:center;line-height:1.65}
+
+/* ===== CAPSULE / LETTER SCREENS ===== */
+#caps-screen,#lett-screen{
+  position:absolute;inset:0;background:var(--bg);z-index:150;
+  display:none;flex-direction:column;
+}
+#caps-screen.open,#lett-screen.open{display:flex}
+.cs-banner{margin:14px;border-radius:14px;padding:18px;border:1.5px solid #F59E0B;background:#FFFBEB}
+.dark .cs-banner{background:rgba(245,158,11,.07);border-color:#92400E}
+.cs-banner h2{font-size:16px;font-weight:800;color:#92400E;margin-bottom:8px}
+.dark .cs-banner h2{color:#FDE68A}
+.cs-banner p{font-size:12px;color:#78350F;line-height:1.65}
+.dark .cs-banner p{color:#FCD34D}
+.ls-banner{margin:14px;border-radius:14px;padding:18px;border:1.5px solid #A78BFA;background:#F5F3FF}
+.dark .ls-banner{background:rgba(167,139,250,.07);border-color:#5B21B6}
+.ls-banner h2{font-size:16px;font-weight:800;color:#5B21B6;margin-bottom:8px}
+.dark .ls-banner h2{color:#C4B5FD}
+.ls-banner p{font-size:12px;color:#4C1D95;line-height:1.65}
+.dark .ls-banner p{color:#A78BFA}
+.cs-btn{margin:0 14px 14px;display:block;width:calc(100% - 28px);padding:13px;border-radius:12px;background:linear-gradient(135deg,#667EEA,#764BA2,#F093FB);color:#fff;font-size:14px;font-weight:700;text-align:center;box-shadow:0 4px 14px rgba(102,126,234,.35)}
+
+/* ===== BOTTOM SHEET ===== */
+.bso{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:250;display:flex;align-items:flex-end}
+.bsh{width:100%;background:var(--bg);border-radius:18px 18px 0 0;padding:14px 0 28px;animation:su .22s ease}
+@keyframes su{from{transform:translateY(100%)}to{transform:none}}
+.bsh-hdl{width:38px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px}
+.bsh-t{font-size:12px;font-weight:700;color:var(--mu);padding:0 18px 10px;border-bottom:1px solid var(--bd);margin-bottom:6px}
+.bsh-row{display:flex;align-items:center;gap:13px;padding:13px 18px;font-size:14px;font-weight:500;width:100%;text-align:left}
+.bsh-row:active{background:var(--acl)}
+.bsh-row .ico{font-size:19px}
+.bsh-row.red{color:#EF4444}
+
+/* ===== EDIT PROFILE MODAL ===== */
+.ep-modal{position:absolute;inset:0;background:var(--bg);z-index:250;display:flex;flex-direction:column}
+.ep-form{padding:18px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.fg{display:flex;flex-direction:column;gap:6px}
+.fg label{font-size:12px;font-weight:700;color:var(--mu)}
+.fg input,.fg textarea{padding:11px 13px;border-radius:10px;border:1.5px solid var(--bd);background:var(--bg2);font-size:14px;color:var(--tx);width:100%}
+.fg input:focus,.fg textarea:focus{outline:none;border-color:var(--ac)}
+.fg .hint{font-size:11px;color:var(--mu)}
+.flw-btn{padding:6px 15px;border-radius:15px;font-size:12px;font-weight:700;border:1.5px solid var(--ac);color:var(--ac);flex-shrink:0}
+.flw-btn.on{background:var(--ac);color:#fff}
+
+/* ===== TOAST ===== */
+#toast{
+  position:absolute;bottom:70px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:#1A1A2E;color:#fff;padding:10px 20px;border-radius:22px;font-size:13px;font-weight:600;
+  white-space:nowrap;z-index:400;opacity:0;pointer-events:none;transition:all .2s;
+  max-width:calc(100% - 40px);
+}
+.dark #toast{background:#E2D9F3;color:#1A1A2E}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== TODAY BANNER ===== */
+.today-banner{
+  margin:10px 12px 4px;
+  background:linear-gradient(135deg,#1A1A2E,#16213E,#0F3460,#533483);
+  border-radius:18px;padding:22px 20px;position:relative;overflow:hidden;cursor:pointer;
+}
+.today-banner:active{opacity:.9}
+.today-star{position:absolute;color:rgba(255,255,255,.5);line-height:1;pointer-events:none}
+.today-from-tag{display:inline-block;padding:4px 12px;background:rgba(255,255,255,.12);border-radius:20px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,.85);font-weight:500}
+.today-text{font-size:22px;font-weight:700;color:#fff;line-height:1.6;white-space:pre-line;margin-bottom:16px}
+.today-hint{font-size:13px;color:rgba(255,255,255,.55);font-style:italic}
+.today-actions{display:none;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+.today-act-btn{padding:9px 18px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer}
+.today-act-like{background:rgba(240,147,251,.25);color:#fff;border:none}
+.today-act-share{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3)}
+
+/* ===== AGE FILTER CHIPS ===== */
+.age-filter-bar{
+  display:flex;gap:8px;padding:8px 12px;overflow-x:auto;background:var(--bg);
+  border-bottom:1px solid var(--bd);flex-shrink:0;align-items:center;
+}
+.age-filter-bar::-webkit-scrollbar{display:none}
+.age-filter-label{font-size:11px;color:var(--mu);font-weight:600;white-space:nowrap;flex-shrink:0}
+.afc{padding:5px 13px;border-radius:14px;font-size:12px;font-weight:600;border:1.5px solid var(--bd);color:var(--mu);white-space:nowrap;flex-shrink:0;transition:all .15s}
+.afc.on{background:linear-gradient(135deg,#667EEA,#764BA2);color:#fff;border-color:transparent}
+
+/* ===== SECTION HEADER (special) ===== */
+.sh-special{
+  padding:8px 14px;font-size:11px;font-weight:700;color:rgba(255,255,255,.8);
+  background:linear-gradient(90deg,#533483,#764BA2);
+  letter-spacing:.4px;
+}
+
+/* ===== ANIM ===== */
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.fu{animation:fu .22s ease both}
+
+/* ===== FULL-SCREEN MODAL (detail) ===== */
+.fsm{position:absolute;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;animation:si .2s ease}
+@keyframes si{from{transform:translateX(100%)}to{transform:none}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ========== LOGIN ========== -->
+<div id="login">
+  <div class="l-logo">KOE</div>
+  <div class="l-tag">年齢が、あなたの声になる。<br>世代を超えて、声を届けよう。</div>
+  <div class="l-form">
+    <div>
+      <label class="lbl">表示名</label>
+      <input class="linp" id="l-name" type="text" placeholder="ニックネームを入力" maxlength="20" oninput="loginCheck()">
+    </div>
+    <div>
+      <label class="lbl">生まれ年（KOEでのアイデンティティ）</label>
+      <select class="lsel" id="l-year" onchange="loginYearChange()"></select>
+      <div class="l-info" id="l-info" style="display:none;margin-top:8px">生まれ年を選択しました</div>
+    </div>
+    <div>
+      <label class="lbl">自己紹介（任意）</label>
+      <input class="linp" id="l-bio" type="text" placeholder="一言自己紹介" maxlength="60">
+    </div>
+    <button class="l-btn" id="l-btn" disabled onclick="doLogin()">KOEをはじめる →</button>
+    <div class="l-note">生まれ年は変更できません。KOEでは年齢があなたのアイデンティティです。</div>
+  </div>
+</div>
+
+<!-- ========== SIDEBAR ========== -->
+<div id="sbo" onclick="sbClose()">
+  <div id="sb" onclick="event.stopPropagation()">
+    <div class="sb-head">
+      <div class="sb-av" id="sb-av"></div>
+      <div class="sb-name" id="sb-name">-</div>
+      <div class="sb-sub" id="sb-sub">-</div>
+      <div class="sb-stats">
+        <div><strong id="sb-fw">24</strong> <span>フォロー</span></div>
+        <div><strong id="sb-fr">128</strong> <span>フォロワー</span></div>
+      </div>
+    </div>
+    <div class="sb-list">
+      <button class="si" onclick="nav('home');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>ホーム</button>
+      <button class="si" onclick="nav('search');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>検索</button>
+      <button class="si" onclick="nav('notif');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>通知</button>
+      <button class="si" onclick="nav('bm');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>ブックマーク</button>
+      <button class="si" onclick="nav('profile');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>プロフィール</button>
+      <div class="sdiv"></div>
+      <button class="si" onclick="openCapsScreen();sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>タイムカプセル</button>
+      <button class="si" onclick="openLettScreen();sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>過去への手紙</button>
+      <div class="sdiv"></div>
+      <button class="si" onclick="nav('settings');sbClose()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg></span>設定</button>
+      <button class="si red" onclick="doLogout()"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>ログアウト</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HOME ========== -->
+<div class="screen active" id="screen-home">
+  <div class="topbar">
+    <button class="ib" onclick="sbOpen()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="tb-logo">KOE</div>
+    <button class="ib" onclick="showToast('更新しました')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+  <div class="tabbar">
+    <button class="tb on" id="ht-home" onclick="switchHTab('home',this)">ホーム</button>
+    <button class="tb" id="ht-same" onclick="switchHTab('same',this)">同世代</button>
+    <button class="tb" id="ht-cmp" onclick="switchHTab('cmp',this)">世代比較</button>
+  </div>
+  <div class="sa" id="home-sa"><div id="home-content"></div></div>
+</div>
+
+<!-- ========== SEARCH ========== -->
+<div class="screen" id="screen-search">
+  <div class="topbar"><div class="tb-title">検索</div></div>
+  <div class="sa">
+    <div class="si-wrap">
+      <input class="si-inp" id="search-q" placeholder="キーワード・ハッシュタグを検索" oninput="doSearch(this.value)">
+    </div>
+    <div id="search-body"></div>
+  </div>
+</div>
+
+<!-- ========== NOTIFICATIONS ========== -->
+<div class="screen" id="screen-notif">
+  <div class="topbar">
+    <div class="tb-title">通知</div>
+    <button class="ib" onclick="markAllRead()" style="font-size:14px;color:var(--ac)">全既読</button>
+  </div>
+  <div class="sa" id="notif-body"></div>
+</div>
+
+<!-- ========== BOOKMARKS ========== -->
+<div class="screen" id="screen-bm">
+  <div class="topbar"><div class="tb-title">ブックマーク</div></div>
+  <div class="sa" id="bm-body"></div>
+</div>
+
+<!-- ========== PROFILE ========== -->
+<div class="screen" id="screen-profile">
+  <div class="topbar">
+    <button class="ib" onclick="nav('home')">←</button>
+    <div class="tb-title">プロフィール</div>
+    <button class="ib" onclick="openEditProfile()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+  <div class="sa" id="profile-body"></div>
+</div>
+
+<!-- ========== SETTINGS ========== -->
+<div class="screen" id="screen-settings">
+  <div class="topbar">
+    <button class="ib" onclick="nav('home')">←</button>
+    <div class="tb-title">設定</div>
+  </div>
+  <div class="sa">
+    <div class="set-sec-t">表示</div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="set-lbl">ダークモード</span><div class="tgl" id="dark-tgl" onclick="toggleDark()"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">同世代タイムラインの範囲</span>
+      <select id="age-range-sel" onchange="setAgeRange(parseInt(this.value))" style="padding:5px 8px;border-radius:8px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-size:12px;font-weight:600">
+        <option value="3">±3歳</option>
+        <option value="5" selected>±5歳</option>
+        <option value="10">±10歳</option>
+        <option value="999">全世代</option>
+      </select>
+    </div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><polyline points="4 7 4 4 20 4 20 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="20" x2="15" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">文字サイズ</span><span class="set-val">標準</span></div>
+    <div class="set-sec-t">通知</div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="set-lbl">返信・コメント</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">タイムカプセル到着</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">過去への手紙</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="set-lbl">フォロー通知</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-sec-t">プライバシー</div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">非公開アカウント</span><div class="tgl" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-row"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="set-lbl">センシティブコンテンツ非表示</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="set-sec-t">アカウント</div>
+    <div class="set-row" onclick="openEditProfile()"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="set-lbl">プロフィール編集</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg></span><span class="set-lbl">連携アプリ</span><span class="set-val">›</span></div>
+    <div class="set-sec-t">サポート</div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg></span><span class="set-lbl">ヘルプ</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('準備中です')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="set-lbl">利用規約・プライバシー</span><span class="set-val">›</span></div>
+    <div class="set-row" onclick="showToast('KOE v3.0.0')"><span class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></span><span class="set-lbl">バージョン情報</span><span class="set-val">3.0.0</span></div>
+  </div>
+</div>
+
+<!-- ========== BOTTOM NAV ========== -->
+<div id="bnav" style="display:none">
+  <button class="ni on" data-n="home" onclick="nav('home')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div>ホーム</div>
+  </button>
+  <button class="ni" data-n="search" onclick="nav('search')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>検索</div>
+  </button>
+  <button class="ni" data-n="notif" onclick="nav('notif')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>通知</div>
+    <div class="nbadge" id="nbadge">3</div>
+  </button>
+  <button class="ni" data-n="bm" onclick="nav('bm')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <div>保存</div>
+  </button>
+  <button class="ni" data-n="profile" onclick="nav('profile')">
+    <div class="ni-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+    <div>自分</div>
+  </button>
+</div>
+
+<!-- ========== FAB ========== -->
+<button id="fab" style="display:none" onclick="openComp()">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="white" stroke-width="2.2" stroke-linecap="round"/></svg>
+</button>
+
+<!-- ========== COMPOSER ========== -->
+<div id="comp">
+  <div class="comp-top">
+    <button onclick="closeComp()" style="font-size:18px;color:var(--mu);font-weight:700">✕</button>
+    <div style="font-size:15px;font-weight:700" id="comp-title">新しい投稿</div>
+    <button class="post-btn" id="post-btn" disabled onclick="submitPost()">投稿</button>
+  </div>
+  <div class="comp-body">
+    <div class="comp-av" id="comp-av"></div>
+    <div class="comp-r">
+      <div class="comp-who" id="comp-who"></div>
+      <textarea id="ctxt" placeholder="いまどんなこと思ってる？" oninput="compInput()" rows="5"></textarea>
+      <div class="comp-tags" id="comp-tags"></div>
+    </div>
+  </div>
+  <div class="comp-extra" id="comp-extra"></div>
+  <div class="comp-bot">
+    <button onclick="addTag()" style="color:var(--ac)" title="タグ追加"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg></button>
+    <button onclick="setCapsMode()" style="color:#F59E0B" title="タイムカプセル"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button onclick="setLettMode()" style="color:#A78BFA" title="過去への手紙"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="cchar" id="cchar">140</div>
+  </div>
+</div>
+
+<!-- ========== CAPSULE SCREEN ========== -->
+<div id="caps-screen">
+  <div class="topbar">
+    <button class="ib" onclick="closeCapsScreen()">←</button>
+    <div class="tb-title">タイムカプセル</div>
+  </div>
+  <div class="sa">
+    <div class="cs-banner">
+      <h2>タイムカプセルとは？</h2>
+      <p>未来の日付に届くメッセージ。届いた時、<strong>2か所</strong>に表示されます：<br><br>
+      ① 未来の自分のタイムライン<br>
+      ② 設定した年に、<strong>あなたと同じ年齢の人たちのタイムライン</strong><br><br>
+      例：今28歳のあなたが2046年届けに設定すると、2046年に28歳の人たちにも届きます。</p>
+    </div>
+    <div class="sh">自分のタイムカプセル</div>
+    <div id="caps-list"></div>
+    <button class="cs-btn" onclick="closeCapsScreen();openComp();setCapsMode()">＋ タイムカプセルを作る</button>
+  </div>
+</div>
+
+<!-- ========== LETTER SCREEN ========== -->
+<div id="lett-screen">
+  <div class="topbar">
+    <button class="ib" onclick="closeLettScreen()">←</button>
+    <div class="tb-title">過去への手紙</div>
+  </div>
+  <div class="sa">
+    <div class="ls-banner">
+      <h2>過去への手紙とは？</h2>
+      <p>若いころ知りたかったこと、経験から学んだことを届けよう。<br><br>
+      手紙は<strong>指定した年齢の人たちのタイムライン</strong>に表示されます。<br><br>
+      例：「20歳の頃の自分へ」と書けば、今20歳の人たちに届きます。</p>
+    </div>
+    <div class="sh">届いた手紙</div>
+    <div id="lett-list"></div>
+    <button class="cs-btn" style="background:#764BA2" onclick="closeLettScreen();openComp();setLettMode()">手紙を書く</button>
+  </div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div id="toast"></div>
+
+<script>
+// =====================================================
+// DATA
+// =====================================================
+const YR = 2026;
+let ME = null;
+
+const POSTS = [
+  {id:'p1',name:'みお',un:'mio_98',by:1998,
+   text:'ふと思ったこと。\n将来のことを考えると不安になるけど、\nそれ以上にワクワクしてる自分もいる。',
+   ptype:'post',tags:['#将来のこと','#モヤモヤ'],res:128,cmt:23,rp:12,ts:'22分前'},
+  {id:'p2',name:'そら',un:'sora_01',by:2001,
+   text:'今日バイトで初めてリーダー任された。\nめっちゃ緊張したけど、なんとかなった！\n小さな自信ゲット🎉',
+   ptype:'post',tags:['#バイト','#成長'],res:89,cmt:14,rp:7,ts:'1時間前'},
+  {id:'p3',name:'たかし',un:'takashi_73',by:1973,
+   text:'50代になって気づいたこと。\n人生、急がなくていい。\n回り道が、一番いい道だったりする。',
+   ptype:'post',tags:['#人生','#50代の気づき'],res:341,cmt:56,rp:89,ts:'3時間前'},
+  {id:'p4',name:'はな',un:'hana_85',by:1985,
+   text:'未来の自分へ。今28歳。\n毎日不安だけど、ちゃんと前に進んでるはず。\n数年後の私、どうなってるかな。',
+   ptype:'capsule',writtenYr:2013,deliverYr:2026,tags:['#タイムカプセル'],res:512,cmt:41,rp:127,ts:'届きました'},
+  {id:'p5',name:'けんじ',un:'kenji_80',by:1980,
+   text:'未来の自分へ。今27歳。\n仕事も恋愛もなにもうまくいかない。\nでも、先の自分を信じたい。ちゃんとなれてるかな。',
+   ptype:'capsule',writtenYr:2007,deliverYr:2026,tags:['#タイムカプセル'],res:298,cmt:33,rp:76,ts:'届きました'},
+  {id:'p6',name:'あかり',un:'akari_82',by:1982,
+   text:'20歳の君へ。\n恋愛に悩みすぎないで。\n人は出会いと別れを繰り返しながら、\n自分の芯をつくっていくから。',
+   ptype:'letter',targetAge:20,tags:['#過去への手紙'],res:445,cmt:62,rp:98,ts:'2時間前'},
+  {id:'p7',name:'まさき',un:'masaki_90',by:1990,
+   text:'SNSやりすぎると疲れる。\n10代の頃はそんなこと気にしなかったな。\nバランスって大事だと今更気づく。',
+   ptype:'post',tags:['#SNS疲れ','#気づき'],res:167,cmt:28,rp:19,ts:'4時間前'},
+  {id:'p8',name:'ゆい',un:'yui_05',by:2005,
+   text:'大学どこ行くか全然決まらん。\n親は地元の大学って言うけど、\nやっぱり東京行きたい気持ちもある。',
+   ptype:'post',tags:['#受験','#進路'],res:203,cmt:47,rp:12,ts:'5時間前'},
+  {id:'p9',name:'ひろ',un:'hiro_65',by:1965,
+   text:'60代からの挑戦。\nスマホでSNSはじめてみた。\n孫と同じことやってると思うと面白い。',
+   ptype:'post',tags:['#シニアSNS','#挑戦'],res:723,cmt:98,rp:211,ts:'6時間前'},
+  {id:'p10',name:'なな',un:'nana_95',by:1995,
+   text:'転職3回目。\nでも毎回成長できてる気がする。\n今の会社、すごくいい。やっと出会えた。',
+   ptype:'post',tags:['#転職','#キャリア'],res:234,cmt:31,rp:44,ts:'8時間前'},
+];
+
+const COMPARE_DATA = {
+  '#将来のこと':[
+    {gen:'60代',col:'#F59E0B',cnt:'6,234',posts:[
+      {name:'たかし',by:1963,text:'なるようになる。今の積み重ねが全部になる。'},
+      {name:'はなこ',by:1960,text:'心配するな。なんとかなるよ。若いころの不安は贈り物だ。'},
+    ]},
+    {gen:'50代',col:'#EF4444',cnt:'9,871',posts:[
+      {name:'けんじ',by:1973,text:'40代で転職してよかった。やりたいことに遅すぎはない。'},
+      {name:'みちこ',by:1975,text:'将来への不安が行動力になった。悩んだ時間は無駄じゃなかった。'},
+    ]},
+    {gen:'40代',col:'#10B981',cnt:'12,543',posts:[
+      {name:'あきら',by:1983,text:'30代で決めた選択が今の自分。迷っても動けば何かが変わる。'},
+      {name:'さちこ',by:1985,text:'将来より今日の積み重ね。気づいたら10年経ってた。'},
+    ]},
+    {gen:'30代',col:'#3B82F6',cnt:'8,765',posts:[
+      {name:'まさと',by:1993,text:'将来を考えると焦る。でも今できることをやるしかない。'},
+      {name:'あいこ',by:1991,text:'30代になって少し落ち着いてきた。20代の自分に言いたい「大丈夫」。'},
+    ]},
+    {gen:'20代',col:'#764BA2',cnt:'15,432',mine:true,posts:[
+      {name:'みお',by:1998,text:'不安とワクワクが共存してる。これが今の正直な気持ち。'},
+      {name:'ゆうき',by:2000,text:'将来が不安すぎて逆に笑える。でも諦めたくない。'},
+    ]},
+    {gen:'10代',col:'#EC4899',cnt:'4,321',posts:[
+      {name:'はる',by:2008,text:'将来が全然見えない。でも見えないからこそ面白いかも。'},
+      {name:'こはる',by:2010,text:'夢がたくさんあって選べない。全部やってみたい。'},
+    ]},
+  ],
+  '#恋愛':[
+    {gen:'60代',col:'#F59E0B',cnt:'3,102',posts:[
+      {name:'ふみ',by:1962,text:'何十年も一緒にいる人がいる。それだけで十分幸せだと気づいた。'},
+    ]},
+    {gen:'50代',col:'#EF4444',cnt:'5,678',posts:[
+      {name:'みか',by:1974,text:'50代の恋愛は落ち着いてていい。相手の全部を受け入れられる。'},
+    ]},
+    {gen:'40代',col:'#10B981',cnt:'7,890',posts:[
+      {name:'なつき',by:1984,text:'仕事と恋愛の両立、やっと上手くなってきた。'},
+    ]},
+    {gen:'30代',col:'#3B82F6',cnt:'9,234',posts:[
+      {name:'あや',by:1992,text:'30代の婚活は本気度が違う。でも焦りたくない。'},
+    ]},
+    {gen:'20代',col:'#764BA2',cnt:'18,567',mine:true,posts:[
+      {name:'さくら',by:1999,text:'片思い中。告白すべきか迷ってる。どうしよう。'},
+      {name:'こうた',by:2001,text:'失恋した。泣きすぎて笑えてきた。また好きになれるかな。'},
+    ]},
+    {gen:'10代',col:'#EC4899',cnt:'6,789',posts:[
+      {name:'ひまり',by:2009,text:'初めて好きな人ができた。どうしたらいいかわからん。'},
+    ]},
+  ],
+  '#仕事':[
+    {gen:'60代',col:'#F59E0B',cnt:'8,901',posts:[
+      {name:'のぼる',by:1963,text:'40年働いてわかったこと。信頼関係が全て。'},
+    ]},
+    {gen:'50代',col:'#EF4444',cnt:'11,234',posts:[
+      {name:'まこと',by:1971,text:'管理職になって10年。自分の仕事より部下の成長が嬉しくなってきた。'},
+    ]},
+    {gen:'40代',col:'#10B981',cnt:'14,567',posts:[
+      {name:'とも',by:1986,text:'副業はじめた。本業もある中で新しいことへの挑戦はしんどいけど楽しい。'},
+    ]},
+    {gen:'30代',col:'#3B82F6',cnt:'12,345',posts:[
+      {name:'じゅん',by:1993,text:'スタートアップ転職した。給料下がったけど毎日充実してる。'},
+    ]},
+    {gen:'20代',col:'#764BA2',cnt:'16,789',mine:true,posts:[
+      {name:'たく',by:1999,text:'就活終わった。第一志望受かった。信じて良かった。'},
+      {name:'えり',by:2001,text:'入社して半年。毎日が学びの連続。しんどいけど楽しい。'},
+    ]},
+    {gen:'10代',col:'#EC4899',cnt:'2,134',posts:[
+      {name:'りく',by:2009,text:'将来なりたいものまだ決まってない。みんなはどうやって決めたの？'},
+    ]},
+  ],
+};
+
+const TRENDS = [
+  {tag:'#将来のこと',cnt:'24,891件',hot:true},
+  {tag:'#転職',cnt:'18,234件',hot:true},
+  {tag:'#恋愛',cnt:'15,678件'},
+  {tag:'#仕事',cnt:'12,345件'},
+  {tag:'#SNS疲れ',cnt:'9,876件'},
+  {tag:'#受験',cnt:'8,234件'},
+  {tag:'#50代の気づき',cnt:'7,123件'},
+  {tag:'#バイト',cnt:'6,012件'},
+  {tag:'#キャリア',cnt:'5,890件'},
+  {tag:'#タイムカプセル',cnt:'4,567件'},
+];
+
+const GEN_TRENDS = [
+  {gen:'20代',col:'#764BA2',tags:['#就活','#恋愛','#一人暮らし']},
+  {gen:'30代',col:'#3B82F6',tags:['#転職','#育児','#結婚']},
+  {gen:'40代',col:'#10B981',tags:['#副業','#健康','#住宅ローン']},
+  {gen:'50代',col:'#EF4444',tags:['#定年','#子育て卒業','#再挑戦']},
+  {gen:'60代',col:'#F59E0B',tags:['#シニアライフ','#孫','#健康']},
+];
+
+const N_ICO = {
+  chat:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  rp:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  caps:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  heart:'<svg width="20" height="20" viewBox="0 0 24 24" fill="#EF4444"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="#EF4444" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  user:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>',
+  mail:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M22 6l-10 7L2 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  bell:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+};
+const NOTIFS = [
+  {id:'n1',ico:N_ICO.chat,msg:'<strong>みお</strong>さんがあなたの投稿に返信しました',time:'5分前',unr:true},
+  {id:'n2',ico:N_ICO.rp,msg:'<strong>そら</strong>さんがあなたの投稿をリポストしました',time:'20分前',unr:true},
+  {id:'n3',ico:N_ICO.caps,msg:'タイムカプセルが届きました！<strong>2013年</strong>のあなたからのメッセージです',time:'1時間前',unr:true},
+  {id:'n4',ico:N_ICO.heart,msg:'<strong>たかし</strong>さんがあなたの投稿をいいねしました',time:'2時間前',unr:false},
+  {id:'n5',ico:N_ICO.user,msg:'<strong>なな</strong>さんがあなたをフォローしました',time:'3時間前',unr:false},
+  {id:'n6',ico:N_ICO.mail,msg:'<strong>50代からの手紙</strong>があなたのタイムラインに届きました',time:'5時間前',unr:false},
+  {id:'n7',ico:N_ICO.bell,msg:'同世代の<strong>#転職</strong>が今週トレンド入りしています',time:'8時間前',unr:false},
+];
+
+const CMTS = {
+  p1:[
+    {name:'そら',by:2001,text:'わかる！将来が見えないのに、ワクワクしてる自分もいる。',time:'15分前'},
+    {name:'たかし',by:1973,text:'30年後から言わせてもらうと、不安だった時間は全部意味があったよ。',time:'10分前'},
+  ],
+  p4:[
+    {name:'みお',by:1998,text:'泣きそう。届いてよかった。',time:'30分前'},
+  ],
+};
+
+let BM = new Set();
+let LIKES = new Set();
+let FOLLOWS = new Set(['takashi_73','hiro_65','nana_95']);
+let hTab = 'home';
+let cmpTopic = '#将来のこと';
+let cMode = 'post';
+let cTags = [];
+let cYear = YR + 10;
+let cAge = 20;
+let darkOn = false;
+let todayRevealed = false;
+
+// 年齢フィルター設定
+const AGE_FILTER = { range: 5, tempRange: null };
+function getAgeRange(){ return AGE_FILTER.tempRange !== null ? AGE_FILTER.tempRange : AGE_FILTER.range; }
+function setAgeRange(v){
+  AGE_FILTER.range = v;
+  AGE_FILTER.tempRange = null;
+  const sel = document.getElementById('age-range-sel');
+  if(sel) sel.value = v;
+  if(hTab === 'same') renderHome();
+  showToast(`同世代の範囲を${v === 999 ? '全世代' : '±'+v+'歳'}に設定しました`);
+}
+function setTempAgeRange(v){
+  AGE_FILTER.tempRange = (AGE_FILTER.tempRange === v) ? null : v;
+  renderHome();
+}
+
+// =====================================================
+// UTILS
+// =====================================================
+function gCol(by){
+  const d = Math.floor(by/10)*10;
+  return ({1950:'#6B7280',1960:'#F59E0B',1970:'#EF4444',1980:'#10B981',1990:'#3B82F6',2000:'#764BA2',2010:'#EC4899'})[d]||'#9CA3AF';
+}
+function gLabel(by){
+  const a = YR - by;
+  if(a<20)return '10代'; if(a<30)return '20代'; if(a<40)return '30代';
+  if(a<50)return '40代'; if(a<60)return '50代'; return '60代';
+}
+function ini(n){return n?n[0]:'?'}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+// =====================================================
+// LOGIN
+// =====================================================
+(function(){
+  const sel=document.getElementById('l-year');
+  const o0=document.createElement('option');
+  o0.value=''; o0.textContent='生まれ年を選択してください';
+  sel.appendChild(o0);
+  for(let y=YR-10;y>=1950;y--){
+    const o=document.createElement('option');
+    o.value=y; o.textContent=`${y}年生まれ（${YR-y}歳）`;
+    sel.appendChild(o);
+  }
+})();
+
+function loginYearChange(){
+  const y=document.getElementById('l-year').value;
+  const info=document.getElementById('l-info');
+  if(y){
+    const age=YR-parseInt(y);
+    info.style.display='block';
+    info.innerHTML=`${y}年生まれ・${age}歳（${gLabel(parseInt(y))}）<br>同世代タイムラインに${gLabel(parseInt(y))}の声が届きます`;
+  } else { info.style.display='none'; }
+  loginCheck();
+}
+function loginCheck(){
+  const n=document.getElementById('l-name').value.trim();
+  const y=document.getElementById('l-year').value;
+  document.getElementById('l-btn').disabled=!n||!y;
+}
+function doLogin(){
+  const n=document.getElementById('l-name').value.trim();
+  const y=parseInt(document.getElementById('l-year').value);
+  const bio=document.getElementById('l-bio').value.trim();
+  if(!n||!y)return;
+  ME={name:n,by:y,un:n.toLowerCase()+'_'+y,bio:bio||'声を届けよう。',age:YR-y,col:gCol(y),following:24,followers:128};
+  document.getElementById('login').style.display='none';
+  document.getElementById('bnav').style.display='flex';
+  document.getElementById('fab').style.display='flex';
+  updateSB();
+  renderHome();
+  renderSearch();
+  renderNotifs();
+}
+function doLogout(){
+  if(!confirm('ログアウトしますか？'))return;
+  ME=null;
+  document.getElementById('login').style.display='flex';
+  document.getElementById('bnav').style.display='none';
+  document.getElementById('fab').style.display='none';
+  closeComp();
+  closeCapsScreen(); closeLettScreen();
+}
+
+// =====================================================
+// SIDEBAR
+// =====================================================
+function updateSB(){
+  if(!ME)return;
+  document.getElementById('sb-av').textContent=ini(ME.name);
+  document.getElementById('sb-av').style.background=ME.col;
+  document.getElementById('sb-name').textContent=ME.name;
+  document.getElementById('sb-sub').textContent=`${ME.by}年生まれ・${ME.age}歳・${gLabel(ME.by)}`;
+  document.getElementById('sb-fw').textContent=ME.following;
+  document.getElementById('sb-fr').textContent=ME.followers;
+}
+function sbOpen(){document.getElementById('sbo').classList.add('open');document.getElementById('sb').classList.add('open');}
+function sbClose(){document.getElementById('sbo').classList.remove('open');document.getElementById('sb').classList.remove('open');}
+
+// =====================================================
+// NAVIGATION
+// =====================================================
+function nav(key){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('screen-'+key);
+  if(el)el.classList.add('active');
+  document.querySelectorAll('.ni').forEach(b=>b.classList.toggle('on',b.dataset.n===key));
+  if(key==='bm')renderBM();
+  if(key==='profile')renderProfile();
+  if(key==='notif')renderNotifs();
+}
+
+// =====================================================
+// HOME
+// =====================================================
+function switchHTab(t, el){
+  hTab=t;
+  document.querySelectorAll('.tabbar .tb').forEach(b=>b.classList.remove('on'));
+  if(el)el.classList.add('on');
+  renderHome();
+}
+
+function renderHome(){
+  if(hTab==='home')renderMainTL();
+  else if(hTab==='same')renderSameTL();
+  else renderCompare(cmpTopic);
+}
+
+function todayBannerHTML(){
+  const revealed = todayRevealed;
+  return `<div class="today-banner" onclick="revealToday(this)">
+    <div class="today-star" style="top:14%;right:10%;font-size:18px">✦</div>
+    <div class="today-star" style="bottom:22%;left:7%;font-size:11px;opacity:.5">✦</div>
+    <div class="today-star" style="top:55%;right:5%;font-size:9px;opacity:.4">✦</div>
+    <div class="today-from-tag">1970年代生まれ・50代より</div>
+    <div class="today-text">「大丈夫。\nなんとかなるよ、\nきっと。」</div>
+    ${revealed
+      ? `<div class="today-actions">
+          <button class="today-act-btn today-act-like" onclick="event.stopPropagation();showToast('共鳴しました')">共鳴する</button>
+          <button class="today-act-btn today-act-share" onclick="event.stopPropagation();showToast('シェアしました')">シェア</button>
+        </div>`
+      : `<div class="today-hint" id="today-hint">タップして開く</div>`
+    }
+  </div>`;
+}
+
+function revealToday(el){
+  todayRevealed = true;
+  renderHome();
+}
+
+function renderMainTL(){
+  if(!ME){document.getElementById('home-content').innerHTML='';return;}
+  const range = AGE_FILTER.range;
+  const myAge = ME.age;
+  // 同世代フィルター（メインTLはrangeベース）
+  const same = POSTS.filter(p => p.ptype==='post' && (range===999 ? true : Math.abs((YR-p.by)-myAge)<=range));
+  const special = POSTS.filter(p=>p.ptype==='capsule'||p.ptype==='letter');
+  const other = POSTS.filter(p=>p.ptype==='post' && !(range===999 ? false : Math.abs((YR-p.by)-myAge)<=range));
+  let h = todayBannerHTML();
+  same.forEach(p=>{h+=pCard(p);});
+  if(special.length){h+=`<div class="sh-special">タイムラインに届いた声</div>`;special.forEach(p=>{h+=pCard(p);});}
+  if(other.length){h+=`<div class="sh">他の世代から</div>`;other.forEach(p=>{h+=pCard(p);});}
+  document.getElementById('home-content').innerHTML=h;
+}
+
+function renderSameTL(){
+  if(!ME){document.getElementById('home-content').innerHTML='';return;}
+  const range = getAgeRange();
+  const myAge = ME.age;
+  const rangeLabel = range === 999 ? '全世代' : `±${range}歳`;
+  const tempRange = AGE_FILTER.tempRange;
+
+  // フィルターチップ
+  const filterChips = [3, 5, 10, 999].map(v => {
+    const label = v === 999 ? '全世代' : `±${v}歳`;
+    const isOn = tempRange !== null ? tempRange === v : (tempRange === null && AGE_FILTER.range === v);
+    return `<button class="afc${isOn?' on':''}" onclick="setTempAgeRange(${v})">${label}</button>`;
+  }).join('');
+
+  const posts = POSTS.filter(p => {
+    if(range === 999) return true;
+    return Math.abs((YR - p.by) - myAge) <= range;
+  });
+
+  const myAgeStr = `${myAge}歳前後（${rangeLabel}）`;
+  let h = `<div class="age-filter-bar"><span class="age-filter-label">表示範囲：</span>${filterChips}</div>`;
+  h += `<div class="sh">${myAgeStr}の声</div>`;
+  h += posts.length ? posts.map(pCard).join('') : emptyState('','投稿がありません',`${rangeLabel}の投稿がまだありません`);
+  document.getElementById('home-content').innerHTML=h;
+}
+
+function renderCompare(topic){
+  cmpTopic=topic;
+  const chips=Object.keys(COMPARE_DATA).map(k=>
+    `<button class="chip${k===topic?' on':''}" onclick="renderCompare('${k}')">${k}</button>`
+  ).join('');
+  const secs=COMPARE_DATA[topic]||[];
+  const myGen=ME?gLabel(ME.by):'20代';
+  const secsH=secs.map(s=>{
+    const isMe=s.mine||(s.gen===myGen);
+    const voices=s.posts.map(v=>`
+      <div class="gv">
+        <div class="gv-av" style="background:${s.col}">${ini(v.name)}</div>
+        <div class="gv-b">
+          <div class="gv-who" style="color:${s.col}">${v.name}・${v.by}年生まれ</div>
+          <div class="gv-text">${v.text.replace(/\n/g,'<br>')}</div>
+        </div>
+      </div>`).join('');
+    return `<div class="gs">
+      <div class="gs-head" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+        <div class="gs-dot" style="background:${s.col}"></div>
+        <div class="gs-title" style="color:${s.col}">${s.gen}</div>
+        ${isMe?`<div class="gs-mine" style="background:${s.col}">自分の世代</div>`:''}
+        <div class="gs-cnt">${s.cnt}件</div>
+        <div style="color:var(--mu);font-size:12px">▾</div>
+      </div>
+      <div class="gs-body">${voices}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('home-content').innerHTML=`
+    <div class="chips">${chips}</div>
+    ${secsH}
+  `;
+}
+
+// =====================================================
+// POST CARD
+// =====================================================
+function pCard(p){
+  const col=gCol(p.by);
+  const gen=gLabel(p.by);
+  const liked=LIKES.has(p.id);
+  const bked=BM.has(p.id);
+  let banner='';
+  let extra='';
+  if(p.ptype==='capsule'){
+    const ageAtWrite = p.writtenYr && p.by ? p.writtenYr-p.by : null;
+    banner=`<div class="cbanner">${ageAtWrite?ageAtWrite+'歳のときに書かれたカプセル':'タイムカプセル'}</div>`;
+  } else if(p.ptype==='letter'){
+    banner=`<div class="lbanner">過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
+  }
+  const tags=(p.tags||[]).map(t=>`<span class="ptag">${t}</span>`).join('');
+  return `<div class="pc fu" onclick="openDetail('${p.id}')">
+    <div class="pc-av" style="background:${col}">${ini(p.name)}</div>
+    <div class="pc-body">
+      ${banner}
+      <div class="pc-top">
+        <div class="pc-name">
+          ${p.name}
+          <span class="gbadge" style="background:${col}22;color:${col}">${p.by}年生まれ</span>
+          ${FOLLOWS.has(p.un)?'<span style="font-size:10px;color:var(--mu)">フォロー中</span>':''}
+        </div>
+        <button class="ib" style="width:30px;height:30px;font-size:14px" onclick="event.stopPropagation();openOpts('${p.id}')">•••</button>
+      </div>
+      <div class="pc-info">@${p.un}・${p.ts}</div>
+      <div class="pc-text">${p.text.replace(/\n/g,'<br>')}</div>
+      ${tags?`<div class="pc-tags">${tags}</div>`:''}
+      <div class="pc-acts">
+        <button class="pa" onclick="event.stopPropagation();openDetail('${p.id}')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>${p.cmt}</button>
+        <button class="pa" onclick="event.stopPropagation();openRP('${p.id}')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${p.rp}</button>
+        <button class="pa${liked?' liked':''}" onclick="event.stopPropagation();toggleLike('${p.id}',this)"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="${liked?'#EF4444':'none'}"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="${liked?'#EF4444':'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg></span>${p.res}</button>
+        <button class="pa${bked?' saved':''}" onclick="event.stopPropagation();toggleBM('${p.id}',this)"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="${bked?'currentColor':'none'}"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span></button>
+        <button class="pa" onclick="event.stopPropagation();showToast('シェアしました')"><span class="pi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function emptyState(ico,t,d){
+  return `<div class="empty"><div class="empty-ico">${ico}</div><div class="empty-t">${t}</div><div class="empty-d">${d}</div></div>`;
+}
+
+// =====================================================
+// POST ACTIONS
+// =====================================================
+function toggleLike(id,btn){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  if(LIKES.has(id)){LIKES.delete(id);p.res--;}else{LIKES.add(id);p.res++;}
+  renderHome();
+}
+function toggleBM(id){
+  if(BM.has(id)){BM.delete(id);showToast('ブックマークを外しました');}
+  else{BM.add(id);showToast('ブックマークしました');}
+  renderHome();
+}
+
+function openRP(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  showSheet('リポスト',[
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',lbl:'リポスト',fn:()=>{p.rp++;showToast('リポストしました');renderHome();}},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',lbl:'引用リポスト',fn:()=>{openComp();document.getElementById('ctxt').placeholder=`「${p.text.slice(0,20)}...」への引用コメント`;}},
+  ]);
+}
+
+function openOpts(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  const fw=FOLLOWS.has(p.un);
+  showSheet(`${p.name}の投稿`,[
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',lbl:'ブックマーク',fn:()=>{BM.add(id);showToast('ブックマークしました');renderHome();}},
+    {ico:fw?'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>':'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',lbl:fw?'フォロー解除':'フォローする',fn:()=>{
+      if(fw){FOLLOWS.delete(p.un);showToast('フォロー解除しました');}
+      else{FOLLOWS.add(p.un);showToast(`${p.name}さんをフォローしました`);}
+      renderHome();
+    }},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',lbl:'リンクをコピー',fn:()=>showToast('リンクをコピーしました')},
+    {ico:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>',lbl:'報告する',red:true,fn:()=>showToast('報告しました。ありがとうございます。')},
+  ]);
+}
+
+function showSheet(title,items){
+  const ov=document.createElement('div');
+  ov.className='bso';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const sh=document.createElement('div');
+  sh.className='bsh';
+  sh.innerHTML=`<div class="bsh-hdl"></div><div class="bsh-t">${title}</div>`;
+  items.forEach(item=>{
+    const b=document.createElement('button');
+    b.className='bsh-row'+(item.red?' red':'');
+    b.innerHTML=`<span class="ico">${item.ico}</span>${item.lbl}`;
+    b.onclick=()=>{ov.remove();if(item.fn)item.fn();};
+    sh.appendChild(b);
+  });
+  ov.appendChild(sh);
+  document.getElementById('app').appendChild(ov);
+}
+
+// =====================================================
+// DETAIL
+// =====================================================
+function openDetail(id){
+  const p=POSTS.find(x=>x.id===id);if(!p)return;
+  const col=gCol(p.by);const gen=gLabel(p.by);
+  const liked=LIKES.has(id);const bked=BM.has(id);
+  const cmts=(CMTS[id]||[]);
+  let banner='';
+  if(p.ptype==='capsule'){
+    const ageAtWrite = p.writtenYr && p.by ? p.writtenYr-p.by : null;
+    banner=`<div class="cbanner" style="margin-bottom:12px">${ageAtWrite?ageAtWrite+'歳のときに書かれたカプセル':'タイムカプセル'}</div>`;
+  } else if(p.ptype==='letter'){
+    banner=`<div class="lbanner" style="margin-bottom:12px">過去への手紙・${p.targetAge||20}歳へ向けて</div>`;
+  }
+  const tags=(p.tags||[]).map(t=>`<span class="ptag" style="font-size:12px">${t}</span>`).join('');
+  const fw=FOLLOWS.has(p.un);
+  const cmtH=cmts.map(c=>`
+    <div class="cmt-item">
+      <div class="cm-av" style="background:${gCol(c.by)}">${ini(c.name)}</div>
+      <div class="cm-body">
+        <div class="cm-name" style="color:${gCol(c.by)}">${c.name}</div>
+        <div class="cm-text">${c.text}</div>
+        <div class="cm-time">${c.time}</div>
+      </div>
+    </div>`).join('');
+  const m=document.createElement('div');
+  m.className='fsm';
+  m.innerHTML=`
+    <div class="topbar">
+      <button class="ib" onclick="this.closest('.fsm').remove()">←</button>
+      <div class="tb-title">投稿</div>
+    </div>
+    <div class="sa">
+      <div class="d-body">
+        ${banner}
+        <div class="d-userrow">
+          <div class="d-av" style="background:${col}">${ini(p.name)}</div>
+          <div style="flex:1">
+            <div class="d-name">${p.name} <span class="gbadge" style="background:${col}22;color:${col}">${gen}</span></div>
+            <div class="d-sub">@${p.un}・${p.by}年生まれ</div>
+          </div>
+          <button class="flw-btn${fw?' on':''}" onclick="toggleFlw('${p.un}','${p.name}',this)">${fw?'フォロー中':'フォロー'}</button>
+        </div>
+        <div class="d-text">${p.text.replace(/\n/g,'<br>')}</div>
+        ${tags?`<div class="pc-tags" style="margin-bottom:12px">${tags}</div>`:''}
+        <div class="d-stats">
+          <span><strong>${p.rp}</strong> リポスト</span>
+          <span><strong>${p.res}</strong> いいね</span>
+          <span><strong>${p.cmt}</strong> 返信</span>
+        </div>
+        <div class="d-acts">
+          <button class="da" onclick="openRP('${p.id}')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>リポスト</button>
+          <button class="da${liked?' liked':''}" onclick="toggleLike('${p.id}',this)"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="${liked?'#EF4444':'none'}"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="${liked?'#EF4444':'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg></span>いいね</button>
+          <button class="da${bked?' saved':''}" onclick="toggleBM('${p.id}')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="${bked?'currentColor':'none'}"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>保存</button>
+          <button class="da" onclick="showToast('シェアしました')"><span class="pi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>シェア</button>
+        </div>
+      </div>
+      <div id="d-cmts-${id}">${cmtH||emptyState('','まだ返信なし','最初に返信しよう')}</div>
+    </div>
+    <div class="reply-bar">
+      <div class="rp-av" style="background:${ME?ME.col:'#764BA2'}">${ME?ini(ME.name):'?'}</div>
+      <textarea class="rp-inp" placeholder="返信を書く..." rows="1" id="ri-${id}"></textarea>
+      <button class="rp-send" onclick="sendReply('${id}')">➤</button>
+    </div>
+  `;
+  document.getElementById('app').appendChild(m);
+}
+
+function toggleFlw(un,name,btn){
+  if(FOLLOWS.has(un)){FOLLOWS.delete(un);btn.textContent='フォロー';btn.classList.remove('on');showToast('フォロー解除しました');}
+  else{FOLLOWS.add(un);btn.textContent='フォロー中';btn.classList.add('on');showToast(`${name}さんをフォローしました`);}
+}
+
+function sendReply(id){
+  const inp=document.getElementById('ri-'+id);
+  const txt=inp?.value.trim();if(!txt)return;
+  const p=POSTS.find(x=>x.id===id);if(p)p.cmt++;
+  if(!CMTS[id])CMTS[id]=[];
+  CMTS[id].unshift({name:ME.name,by:ME.by,text:txt,time:'今'});
+  const con=document.getElementById('d-cmts-'+id);
+  if(con){
+    con.innerHTML=`<div class="cmt-item">
+      <div class="cm-av" style="background:${ME.col}">${ini(ME.name)}</div>
+      <div class="cm-body">
+        <div class="cm-name" style="color:${ME.col}">${ME.name}</div>
+        <div class="cm-text">${txt}</div>
+        <div class="cm-time">今</div>
+      </div>
+    </div>`+con.innerHTML;
+  }
+  inp.value='';
+  showToast('返信しました');
+}
+
+// =====================================================
+// COMPOSER
+// =====================================================
+function openComp(){
+  cMode='post'; cTags=[];
+  document.getElementById('ctxt').value='';
+  document.getElementById('comp-tags').innerHTML='';
+  document.getElementById('cchar').textContent='140';
+  document.getElementById('post-btn').disabled=true;
+  document.getElementById('comp-title').textContent='新しい投稿';
+  document.getElementById('comp-extra').innerHTML='';
+  if(ME){
+    document.getElementById('comp-av').textContent=ini(ME.name);
+    document.getElementById('comp-av').style.background=ME.col;
+    document.getElementById('comp-who').textContent=`${ME.name}・${ME.by}年生まれ・${gLabel(ME.by)}`;
+  }
+  document.getElementById('comp').classList.add('open');
+}
+function closeComp(){document.getElementById('comp').classList.remove('open');}
+
+function compInput(){
+  const v=document.getElementById('ctxt').value;
+  document.getElementById('cchar').textContent=140-v.length;
+  document.getElementById('post-btn').disabled=v.trim().length===0;
+}
+
+function addTag(){
+  const t=prompt('ハッシュタグを入力（#なしでもOK）:');
+  if(!t)return;
+  const n=t.startsWith('#')?t:'#'+t;
+  if(!cTags.includes(n))cTags.push(n);
+  document.getElementById('comp-tags').innerHTML=cTags.map(t=>
+    `<span class="ctag" onclick="rmTag('${t}')">${t} ✕</span>`
+  ).join('');
+}
+function rmTag(t){cTags=cTags.filter(x=>x!==t);document.getElementById('comp-tags').innerHTML=cTags.map(t=>`<span class="ctag" onclick="rmTag('${t}')">${t} ✕</span>`).join('');}
+
+function setCapsMode(){
+  cMode='capsule';
+  document.getElementById('comp-title').textContent='タイムカプセル';
+  const myAge=ME?ME.age:28;
+  const opts=Array.from({length:30},(_,i)=>YR+1+i).map(y=>
+    `<option value="${y}"${y===cYear?' selected':''}>${y}年（${ME?y-ME.by:y-YR}歳のとき）</option>`
+  ).join('');
+  document.getElementById('comp-extra').innerHTML=`
+    <div class="cbox">
+      <h3>届ける年を設定</h3>
+      <p>今書いたメッセージが、未来のあなたへ届きます。②その年に今のあなたと同じ年齢の人たちにも届きます。</p>
+      <select onchange="cYear=parseInt(this.value);updCapsPrev()">${opts}</select>
+      <div class="dprev" id="cprev">${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${myAge}歳の人たちのタイムライン</div>
+    </div>`;
+}
+
+function updCapsPrev(){
+  const el=document.getElementById('cprev');
+  if(el){const a=ME?ME.age:28;el.innerHTML=`${cYear}年に届きます<br>① 未来の自分のタイムライン<br>② ${cYear}年に${a}歳の人たちのタイムライン`;}
+}
+
+function setLettMode(){
+  cMode='letter';
+  document.getElementById('comp-title').textContent='過去への手紙';
+  const opts=Array.from({length:25},(_,i)=>i+10).map(a=>
+    `<option value="${a}"${a===cAge?' selected':''}>${a}歳の人へ</option>`
+  ).join('');
+  document.getElementById('comp-extra').innerHTML=`
+    <div class="cbox lbox">
+      <h3>届ける年齢を設定</h3>
+      <p>今その年齢を生きている人たちのタイムラインに届きます</p>
+      <select onchange="cAge=parseInt(this.value);updLettPrev()">${opts}</select>
+      <div class="dprev" id="lprev">今${cAge}歳の人たちのタイムラインに届きます</div>
+    </div>`;
+}
+function updLettPrev(){
+  const el=document.getElementById('lprev');
+  if(el)el.innerHTML=`今${cAge}歳の人たちのタイムラインに届きます`;
+}
+
+function submitPost(){
+  const txt=document.getElementById('ctxt').value.trim();
+  if(!txt)return;
+  const p={id:'u'+Date.now(),name:ME.name,un:ME.un,by:ME.by,text:txt,ptype:cMode,tags:[...cTags],res:0,cmt:0,rp:0,ts:'今'};
+  if(cMode==='capsule'){p.writtenYr=YR;p.deliverYr=cYear;showToast(`タイムカプセルを${cYear}年に設定しました`);}
+  else if(cMode==='letter'){p.targetAge=cAge;showToast(`${cAge}歳の人へ手紙を届けました`);}
+  else{showToast('投稿しました');}
+  POSTS.unshift(p);
+  closeComp();
+  renderHome();
+}
+
+// =====================================================
+// SEARCH
+// =====================================================
+function renderSearch(){
+  const tH=TRENDS.map((t,i)=>`
+    <div class="trend-item" onclick="searchBy('${t.tag}')">
+      <div class="tr-rank">${i+1}</div>
+      <div class="tr-info">
+        <div class="tr-tag">${t.tag} ${t.hot?'<span class="tr-hot">HOT</span>':''}</div>
+        <div class="tr-cnt">${t.cnt}の投稿</div>
+      </div>
+    </div>`).join('');
+  const gH=GEN_TRENDS.map(g=>`
+    <div style="padding:11px 14px;border-bottom:1px solid var(--bd)">
+      <div style="font-size:12px;font-weight:700;color:${g.col};margin-bottom:8px">● ${g.gen}</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">${g.tags.map(t=>`<button class="chip" onclick="searchBy('${t}')">${t}</button>`).join('')}</div>
+    </div>`).join('');
+  document.getElementById('search-body').innerHTML=`
+    <div class="sh">トレンド</div>${tH}
+    <div class="sh" style="margin-top:8px">世代別注目タグ</div>${gH}`;
+}
+
+function doSearch(q){
+  if(!q.trim()){renderSearch();return;}
+  const ql=q.toLowerCase();
+  const r=POSTS.filter(p=>p.text.toLowerCase().includes(ql)||(p.tags||[]).some(t=>t.toLowerCase().includes(ql))||p.name.toLowerCase().includes(ql));
+  document.getElementById('search-body').innerHTML=r.length?r.map(pCard).join(''):emptyState('','見つかりません',`「${q}」の検索結果がありません`);
+}
+
+function searchBy(tag){
+  nav('search');
+  document.getElementById('search-q').value=tag;
+  doSearch(tag);
+}
+
+// =====================================================
+// NOTIFICATIONS
+// =====================================================
+function renderNotifs(){
+  document.getElementById('notif-body').innerHTML=NOTIFS.map(n=>`
+    <div class="nitem${n.unr?' unr':''}" onclick="this.classList.remove('unr');n${n.id}read=true">
+      <div class="n-ico">${n.ico}</div>
+      <div style="flex:1">
+        <div class="n-text">${n.msg}</div>
+        <div class="n-time">${n.time}</div>
+      </div>
+    </div>`).join('');
+}
+function markAllRead(){
+  NOTIFS.forEach(n=>n.unr=false);
+  renderNotifs();
+  document.getElementById('nbadge').style.display='none';
+  showToast('すべて既読にしました');
+}
+
+// =====================================================
+// BOOKMARKS
+// =====================================================
+function renderBM(){
+  const con=document.getElementById('bm-body');
+  if(BM.size===0){con.innerHTML=emptyState('','ブックマークなし','気に入った投稿をブックマークすると、ここで確認できます');return;}
+  con.innerHTML=POSTS.filter(p=>BM.has(p.id)).map(pCard).join('');
+}
+
+// =====================================================
+// PROFILE
+// =====================================================
+function renderProfile(){
+  if(!ME)return;
+  const myPosts=POSTS.filter(p=>p.un===ME.un);
+  document.getElementById('profile-body').innerHTML=`
+    <div class="p-cover"></div>
+    <div class="p-av-wrap"><div class="p-av" style="background:${ME.col}">${ini(ME.name)}</div></div>
+    <div class="p-head">
+      <div class="p-namerow">
+        <div>
+          <div class="p-name">${ME.name}</div>
+          <div class="p-sub" style="color:${ME.col}">${ME.by}年生まれ・${ME.age}歳・${gLabel(ME.by)}</div>
+        </div>
+        <button class="edit-btn" onclick="openEditProfile()">編集</button>
+      </div>
+      <div class="p-bio">${ME.bio}</div>
+      <div class="p-stats">
+        <div><strong>${ME.following}</strong> <span>フォロー</span></div>
+        <div style="margin-left:16px"><strong>${ME.followers}</strong> <span>フォロワー</span></div>
+        <div style="margin-left:16px"><strong>${myPosts.length}</strong> <span>投稿</span></div>
+      </div>
+    </div>
+    <div class="tabbar" style="position:sticky;top:54px;z-index:10">
+      <button class="tb on" onclick="showProfileTab(this,'posts')">投稿</button>
+      <button class="tb" onclick="showProfileTab(this,'caps')">カプセル</button>
+      <button class="tb" onclick="showProfileTab(this,'letter')">手紙</button>
+      <button class="tb" onclick="showProfileTab(this,'likes')">いいね</button>
+    </div>
+    <div id="profile-posts">${myPosts.length?myPosts.map(pCard).join(''):emptyState('','まだ投稿なし','声を届けよう')}</div>
+  `;
+}
+
+function showProfileTab(el,type){
+  document.querySelectorAll('#screen-profile .tabbar .tb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  const con=document.getElementById('profile-posts');
+  if(type==='posts'){const p=POSTS.filter(x=>x.un===ME.un);con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','まだ投稿なし','声を届けよう');}
+  else if(type==='caps'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='capsule');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','タイムカプセルなし','未来の自分へメッセージを書こう');}
+  else if(type==='letter'){const p=POSTS.filter(x=>x.un===ME.un&&x.ptype==='letter');con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','手紙なし','過去への手紙を書いてみよう');}
+  else{const p=POSTS.filter(x=>LIKES.has(x.id));con.innerHTML=p.length?p.map(pCard).join(''):emptyState('','いいねなし','気に入った投稿をいいねしよう');}
+}
+
+// =====================================================
+// EDIT PROFILE
+// =====================================================
+function openEditProfile(){
+  const m=document.createElement('div');
+  m.className='ep-modal';
+  m.innerHTML=`
+    <div class="topbar">
+      <button class="ib" onclick="this.closest('.ep-modal').remove()">✕</button>
+      <div class="tb-title">プロフィール編集</div>
+      <button class="post-btn" onclick="saveProfile(this)">保存</button>
+    </div>
+    <div class="ep-form">
+      <div class="fg"><label>表示名</label><input id="ep-name" value="${ME.name}" maxlength="20"></div>
+      <div class="fg"><label>自己紹介</label><input id="ep-bio" value="${ME.bio}" maxlength="60"></div>
+      <div class="fg">
+        <label>生まれ年</label>
+        <div style="padding:11px 13px;border-radius:10px;border:1.5px solid var(--bd);background:var(--bg2);font-size:14px;color:var(--mu)">${ME.by}年（変更不可）</div>
+        <div class="hint">KOEでは生まれ年はアイデンティティのため変更できません</div>
+      </div>
+    </div>`;
+  document.getElementById('app').appendChild(m);
+}
+
+function saveProfile(btn){
+  const n=document.getElementById('ep-name').value.trim();
+  const b=document.getElementById('ep-bio').value.trim();
+  if(!n)return;
+  ME.name=n; ME.bio=b||ME.bio;
+  btn.closest('.ep-modal').remove();
+  updateSB(); renderProfile();
+  showToast('プロフィールを更新しました ✓');
+}
+
+// =====================================================
+// CAPSULE / LETTER SCREENS
+// =====================================================
+function openCapsScreen(){
+  document.getElementById('caps-screen').classList.add('open');
+  const caps=POSTS.filter(p=>p.ptype==='capsule');
+  document.getElementById('caps-list').innerHTML=caps.length?caps.map(pCard).join(''):emptyState('','タイムカプセルなし','未来の自分へメッセージを書こう');
+}
+function closeCapsScreen(){document.getElementById('caps-screen').classList.remove('open');}
+
+function openLettScreen(){
+  document.getElementById('lett-screen').classList.add('open');
+  const lett=POSTS.filter(p=>p.ptype==='letter');
+  document.getElementById('lett-list').innerHTML=lett.length?lett.map(pCard).join(''):emptyState('','手紙なし','若い世代への手紙を書いてみよう');
+}
+function closeLettScreen(){document.getElementById('lett-screen').classList.remove('open');}
+
+// =====================================================
+// DARK MODE
+// =====================================================
+function toggleDark(){
+  darkOn=!darkOn;
+  document.getElementById('app').classList.toggle('dark',darkOn);
+  document.getElementById('dark-tgl').classList.toggle('on',darkOn);
+  showToast(darkOn?'ダークモード ON':'ライトモード ON');
+}
+
+// =====================================================
+// INIT
+// =====================================================
+renderSearch();
+</script>
+</body>
+</html>
